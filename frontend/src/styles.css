@@ -24,13 +24,23 @@ body {
     radial-gradient(circle at 90% 0%, rgba(255, 79, 216, 0.14), transparent 35%),
     linear-gradient(135deg, var(--bg-1), var(--bg-2));
   color: var(--fg-1);
-  min-height: 100vh;
+  height: 100vh;
+  overflow: hidden;
 }
 
 .app-shell {
-  max-width: 1360px;
-  margin: 0 auto;
-  padding: 1rem;
+  width: 100%;
+  height: 100vh;
+  padding: 0.75rem;
+  display: grid;
+  grid-template-rows: auto 1fr;
+  gap: 0.7rem;
+}
+
+.app-shell.graph-only-mode {
+  padding: 0;
+  gap: 0;
+  grid-template-rows: 1fr;
 }
 
 .topbar {
@@ -38,7 +48,26 @@ body {
   justify-content: space-between;
   align-items: flex-end;
   gap: 1rem;
-  margin-bottom: 1rem;
+  min-height: 58px;
+}
+
+.topbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+}
+
+.graph-only-mode .topbar {
+  display: none;
+}
+
+.graph-only-overlay-controls {
+  position: fixed;
+  left: 10px;
+  top: 10px;
+  z-index: 20;
+  display: flex;
+  gap: 0.4rem;
 }
 
 .topbar h1 {
@@ -79,23 +108,48 @@ body {
   padding: 0.65rem 0.8rem;
 }
 
+.graph-only-mode .error-banner {
+  display: none;
+}
+
 .dashboard-grid {
   display: grid;
-  grid-template-columns: 340px 1fr;
-  grid-template-rows: auto auto;
-  gap: 1rem;
+  grid-template-columns: 300px 1fr;
+  grid-template-rows: 1fr;
+  gap: 0.7rem;
+  min-height: 0;
+  height: 100%;
+}
+
+.graph-only-mode .dashboard-grid {
+  grid-template-columns: 1fr;
+  gap: 0;
 }
 
 .import-panel {
-  grid-row: 1 / span 2;
+  min-height: 0;
+  overflow: auto;
+}
+
+.graph-only-mode .import-panel {
+  display: none;
 }
 
 .signal-workspace {
-  min-height: 420px;
+  min-height: 0;
+  height: 100%;
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+  overflow: hidden;
 }
 
-.track-map-panel {
-  min-height: 260px;
+.signal-workspace-max {
+  border-radius: 0;
+  border: 0;
+  box-shadow: none;
+  padding: 0;
+  background: transparent;
+  grid-template-rows: 1fr;
 }
 
 .panel {
@@ -103,7 +157,11 @@ body {
   border-radius: 1rem;
   background: linear-gradient(160deg, rgba(12, 17, 27, 0.95), rgba(18, 26, 40, 0.8));
   box-shadow: 0 20px 50px rgba(0, 0, 0, 0.35);
-  padding: 0.9rem;
+  padding: 0.75rem;
+}
+
+.graph-only-mode .panel {
+  padding: 0;
 }
 
 .panel-header {
@@ -111,6 +169,14 @@ body {
   justify-content: space-between;
   align-items: center;
   margin-bottom: 0.7rem;
+}
+
+.panel-header-tight {
+  margin-bottom: 0.5rem;
+}
+
+.panel-header-hidden {
+  display: none;
 }
 
 .panel-header h2 {
@@ -132,6 +198,17 @@ body {
   line-height: 1.4;
 }
 
+.file-picked {
+  color: #c2e6ff;
+  margin-top: 0.65rem;
+  margin-bottom: 0.35rem;
+}
+
+.import-message {
+  color: #9ce4a9;
+  margin-top: 0.25rem;
+}
+
 .field-label {
   display: block;
   margin-bottom: 0.35rem;
@@ -143,6 +220,28 @@ body {
   width: 100%;
   margin-bottom: 0.9rem;
   color: var(--fg-1);
+}
+
+.import-button {
+  width: 100%;
+  border: 1px solid rgba(0, 212, 255, 0.42);
+  background: linear-gradient(180deg, rgba(0, 212, 255, 0.2), rgba(0, 132, 181, 0.2));
+  color: var(--fg-1);
+  border-radius: 0.55rem;
+  padding: 0.55rem 0.75rem;
+  cursor: pointer;
+  transition: transform 0.12s ease, box-shadow 0.12s ease;
+  margin-bottom: 0.6rem;
+}
+
+.import-button:hover:enabled {
+  transform: translateY(-1px);
+  box-shadow: 0 10px 20px rgba(0, 212, 255, 0.22);
+}
+
+.import-button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
 }
 
 .meta-grid {
@@ -163,10 +262,165 @@ body {
   margin-bottom: 0.2rem;
 }
 
+.dashboard-tools {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.75rem;
+  color: var(--fg-2);
+}
+
+.dashboard-tools label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.mini-select {
+  border: 1px solid rgba(0, 212, 255, 0.28);
+  background: rgba(11, 17, 27, 0.9);
+  color: var(--fg-1);
+  border-radius: 0.4rem;
+  padding: 0.2rem 0.3rem;
+  min-width: 48px;
+}
+
+.small-button {
+  border: 1px solid rgba(0, 212, 255, 0.38);
+  background: rgba(0, 212, 255, 0.13);
+  color: var(--fg-1);
+  border-radius: 0.45rem;
+  padding: 0.3rem 0.55rem;
+  cursor: pointer;
+}
+
 .workspace-placeholder {
+  min-height: 0;
+}
+
+.signal-config-grid {
   display: grid;
-  gap: 0.7rem;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.65rem;
+  margin-bottom: 0.8rem;
+}
+
+.graph-grid {
+  display: grid;
+  gap: 0.55rem;
+  min-height: 0;
   height: 100%;
+}
+
+.graph-only-mode .graph-grid {
+  gap: 0;
+}
+
+.graph-tile {
+  position: relative;
+  border: 1px solid rgba(39, 52, 71, 0.9);
+  border-radius: 0.7rem;
+  background: linear-gradient(180deg, rgba(11, 17, 27, 0.82), rgba(14, 21, 33, 0.75));
+  overflow: hidden;
+  min-height: 0;
+}
+
+.graph-only-mode .graph-tile {
+  border-radius: 0;
+  border-left: 0;
+  border-right: 0;
+}
+
+.graph-tile-dragging {
+  opacity: 0.45;
+}
+
+.graph-tile .js-plotly-plot,
+.graph-tile .plot-container,
+.graph-tile .svg-container {
+  width: 100% !important;
+  height: 100% !important;
+}
+
+.graph-corner-actions {
+  position: absolute;
+  right: 0.4rem;
+  top: 0.35rem;
+  display: flex;
+  gap: 0.3rem;
+  z-index: 6;
+}
+
+.icon-button {
+  width: 26px;
+  height: 26px;
+  border: 1px solid rgba(0, 212, 255, 0.35);
+  background: rgba(12, 18, 28, 0.85);
+  color: #d7e7f6;
+  border-radius: 0.45rem;
+  cursor: pointer;
+}
+
+.icon-button-danger {
+  border-color: rgba(255, 107, 107, 0.45);
+  color: #ffabab;
+}
+
+.graph-menu {
+  position: absolute;
+  left: 0.35rem;
+  top: 0.35rem;
+  z-index: 7;
+  width: min(260px, calc(100% - 0.7rem));
+  border: 1px solid rgba(0, 212, 255, 0.32);
+  border-radius: 0.6rem;
+  background: rgba(8, 12, 19, 0.95);
+  backdrop-filter: blur(3px);
+  padding: 0.45rem;
+}
+
+.menu-help {
+  margin: 0.35rem 0 0;
+  font-size: 0.72rem;
+  color: #9bb0c8;
+}
+
+.placement-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.4rem;
+  margin-top: 0.45rem;
+}
+
+.signal-select {
+  min-height: 94px;
+  border: 1px solid rgba(0, 212, 255, 0.3);
+  background: rgba(11, 17, 27, 0.8);
+  color: var(--fg-1);
+  border-radius: 0.5rem;
+  padding: 0.25rem;
+}
+
+.plot-shell {
+  position: relative;
+  border: 1px solid rgba(39, 52, 71, 0.9);
+  border-radius: 0.7rem;
+  min-height: 220px;
+  background: linear-gradient(180deg, rgba(11, 17, 27, 0.82), rgba(14, 21, 33, 0.75));
+  overflow: hidden;
+}
+
+.loading-plot {
+  position: absolute;
+  right: 0.5rem;
+  top: 0.5rem;
+  z-index: 4;
+  background: rgba(11, 17, 27, 0.75);
+  border: 1px solid rgba(0, 212, 255, 0.3);
+  border-radius: 999px;
+  padding: 0.2rem 0.55rem;
+  font-size: 0.74rem;
+  color: #9edfff;
 }
 
 .placeholder-graph {
@@ -188,35 +442,42 @@ body {
 
 .track-placeholder {
   position: relative;
-  height: 190px;
+  height: 100%;
   border-radius: 0.7rem;
   border: 1px solid rgba(255, 212, 71, 0.35);
   background: linear-gradient(180deg, rgba(12, 18, 28, 0.82), rgba(17, 24, 36, 0.76));
   overflow: hidden;
 }
 
-.track-shape {
-  position: absolute;
-  inset: 20px;
-  border: 2px solid rgba(255, 212, 71, 0.7);
-  border-radius: 40% 60% 57% 43% / 52% 35% 65% 48%;
+.graph-tile-track {
+  border-color: rgba(255, 212, 71, 0.38);
 }
 
-.car-dot {
+.graph-track-head {
   position: absolute;
-  width: 12px;
-  height: 12px;
-  border-radius: 50%;
-  background: var(--magenta);
-  box-shadow: 0 0 0 4px rgba(255, 79, 216, 0.22);
-  left: 64%;
-  top: 58%;
+  top: 6px;
+  left: 8px;
+  z-index: 3;
+  font-size: 0.78rem;
+  color: #dce8f4;
+}
+
+.track-svg {
+  width: 100%;
+  height: 100%;
+}
+
+.track-empty {
+  height: 100%;
+  display: grid;
+  place-items: center;
+  color: #a6b4c8;
+  font-size: 0.92rem;
 }
 
 @media (max-width: 1000px) {
   .dashboard-grid {
     grid-template-columns: 1fr;
-    grid-template-rows: auto;
   }
 
   .import-panel {
@@ -226,5 +487,9 @@ body {
   .signal-workspace,
   .track-map-panel {
     min-height: unset;
+  }
+
+  .signal-config-grid {
+    grid-template-columns: 1fr;
   }
 }

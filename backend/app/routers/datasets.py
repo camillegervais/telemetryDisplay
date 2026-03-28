@@ -1,15 +1,12 @@
-"""
-Dataset import, query, and track map endpoints.
-"""
+"""Dataset import, query, and track map endpoints."""
 
-import io
 from pathlib import Path
 from tempfile import TemporaryDirectory
-from typing import Dict
+from typing import Dict, Optional
 
 import numpy as np
 import pandas as pd
-from fastapi import APIRouter, File, HTTPException, UploadFile
+from fastapi import APIRouter, HTTPException, UploadFile
 
 from app.config import config
 from app.schemas import (
@@ -28,6 +25,25 @@ mat_loader = MatLoader(reference_step_m=config.reference_distance_step_m)
 
 # Track maps cache (dataset_id -> dataframe)
 track_maps: Dict[str, pd.DataFrame] = {}
+
+
+def _track_csv_path_from_metadata(source_path: str) -> Path:
+    source_name = Path(source_path).stem
+    repo_root = Path(__file__).resolve().parents[3]
+    return repo_root / "data" / f"{source_name}_track.csv"
+
+
+def _load_trackmap_dataframe(source_path: str) -> Optional[pd.DataFrame]:
+    csv_path = _track_csv_path_from_metadata(source_path)
+    if not csv_path.exists():
+        return None
+
+    df = pd.read_csv(csv_path)
+    required = {"lap_distance", "x_position", "y_position"}
+    if not required.issubset(df.columns):
+        return None
+
+    return df[["lap_distance", "x_position", "y_position"]].dropna()
 
 
 @router.post("/import", response_model=DatasetImportResponse)
@@ -155,31 +171,36 @@ def query_dataset(dataset_id: str, request: DatasetQueryRequest) -> DatasetQuery
 
 @router.get("/{dataset_id}/trackmap", response_model=TrackMapResponse)
 def get_trackmap(dataset_id: str) -> TrackMapResponse:
-    """
-    Get track map coordinates (x, y) indexed by lap distance.
-
-    Note: This endpoint is a placeholder for Phase 2.
-    In a full implementation, track maps would be loaded from CSV or fetched from FastF1.
-
-    Args:
-        dataset_id: dataset identifier
-
-    Returns:
-        Track coordinates
-    """
+    """Get track map coordinates (x, y) indexed by lap distance."""
     dataset = mat_loader.get_dataset(dataset_id)
     if dataset is None:
         raise HTTPException(status_code=404, detail="Dataset not found")
 
     _, metadata = dataset
 
-    # For now, generate a synthetic track using dataset's distance range
+    if dataset_id in track_maps:
+        track_df = track_maps[dataset_id]
+        return TrackMapResponse(
+            lap_distance=track_df["lap_distance"].tolist(),
+            x_position=track_df["x_position"].tolist(),
+            y_position=track_df["y_position"].tolist(),
+        )
+
+    track_df = _load_trackmap_dataframe(metadata.source_path)
+    if track_df is not None and not track_df.empty:
+        track_maps[dataset_id] = track_df
+        return TrackMapResponse(
+            lap_distance=track_df["lap_distance"].tolist(),
+            x_position=track_df["x_position"].tolist(),
+            y_position=track_df["y_position"].tolist(),
+        )
+
+    # Fallback only if CSV is missing for this dataset.
     lap_min, lap_max = metadata.lap_distance_range
     lap_distance = np.linspace(lap_min, lap_max, metadata.num_samples)
-    angle = (lap_distance / lap_max) * 2 * np.pi
+    angle = (lap_distance / max(lap_max, 1.0)) * 2 * np.pi
     x = 500 * np.cos(angle)
     y = 300 * np.sin(angle)
-
     return TrackMapResponse(
         lap_distance=lap_distance.tolist(),
         x_position=x.tolist(),
