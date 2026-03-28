@@ -1,0 +1,230 @@
+:root {
+  color-scheme: dark;
+  --bg-1: #08090c;
+  --bg-2: #111827;
+  --bg-3: #161f2f;
+  --fg-1: #e5e7eb;
+  --fg-2: #9ca3af;
+  --line: #273447;
+  --cyan: #00d4ff;
+  --magenta: #ff4fd8;
+  --yellow: #ffd447;
+  --green: #34d399;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+  background:
+    radial-gradient(circle at 10% 10%, rgba(0, 212, 255, 0.14), transparent 32%),
+    radial-gradient(circle at 90% 0%, rgba(255, 79, 216, 0.14), transparent 35%),
+    linear-gradient(135deg, var(--bg-1), var(--bg-2));
+  color: var(--fg-1);
+  min-height: 100vh;
+}
+
+.app-shell {
+  max-width: 1360px;
+  margin: 0 auto;
+  padding: 1rem;
+}
+
+.topbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.topbar h1 {
+  margin: 0;
+  font-size: clamp(1.5rem, 2vw, 2.2rem);
+  letter-spacing: 0.03em;
+}
+
+.topbar p {
+  margin: 0.35rem 0 0;
+  color: var(--fg-2);
+}
+
+.status-box {
+  border: 1px solid var(--line);
+  background: linear-gradient(180deg, rgba(10, 15, 25, 0.9), rgba(16, 23, 38, 0.75));
+  border-radius: 0.7rem;
+  padding: 0.55rem 0.8rem;
+  min-width: 130px;
+  display: grid;
+  gap: 0.2rem;
+}
+
+.status-box span {
+  color: var(--fg-2);
+  font-size: 0.75rem;
+}
+
+.status-box strong {
+  color: var(--green);
+}
+
+.error-banner {
+  margin-bottom: 1rem;
+  background: rgba(255, 107, 107, 0.2);
+  border: 1px solid #ff6b6b;
+  border-radius: 0.6rem;
+  padding: 0.65rem 0.8rem;
+}
+
+.dashboard-grid {
+  display: grid;
+  grid-template-columns: 340px 1fr;
+  grid-template-rows: auto auto;
+  gap: 1rem;
+}
+
+.import-panel {
+  grid-row: 1 / span 2;
+}
+
+.signal-workspace {
+  min-height: 420px;
+}
+
+.track-map-panel {
+  min-height: 260px;
+}
+
+.panel {
+  border: 1px solid var(--line);
+  border-radius: 1rem;
+  background: linear-gradient(160deg, rgba(12, 17, 27, 0.95), rgba(18, 26, 40, 0.8));
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.35);
+  padding: 0.9rem;
+}
+
+.panel-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.7rem;
+}
+
+.panel-header h2 {
+  margin: 0;
+  font-size: 1.02rem;
+}
+
+.panel-badge {
+  border-radius: 999px;
+  border: 1px solid rgba(0, 212, 255, 0.3);
+  color: var(--cyan);
+  padding: 0.2rem 0.55rem;
+  font-size: 0.74rem;
+}
+
+.panel-text {
+  margin: 0 0 0.8rem;
+  color: var(--fg-2);
+  line-height: 1.4;
+}
+
+.field-label {
+  display: block;
+  margin-bottom: 0.35rem;
+  font-size: 0.84rem;
+  color: var(--fg-2);
+}
+
+.file-input {
+  width: 100%;
+  margin-bottom: 0.9rem;
+  color: var(--fg-1);
+}
+
+.meta-grid {
+  display: grid;
+  gap: 0.6rem;
+}
+
+.meta-item {
+  border: 1px solid rgba(39, 52, 71, 0.9);
+  border-radius: 0.6rem;
+  padding: 0.65rem;
+  background: rgba(13, 20, 31, 0.75);
+}
+
+.meta-item span {
+  display: block;
+  color: var(--fg-2);
+  margin-bottom: 0.2rem;
+}
+
+.workspace-placeholder {
+  display: grid;
+  gap: 0.7rem;
+  height: 100%;
+}
+
+.placeholder-graph {
+  height: 180px;
+  border: 1px dashed rgba(0, 212, 255, 0.35);
+  border-radius: 0.7rem;
+  background:
+    linear-gradient(transparent 23px, rgba(38, 52, 70, 0.45) 24px),
+    linear-gradient(90deg, transparent 31px, rgba(38, 52, 70, 0.33) 32px),
+    linear-gradient(180deg, rgba(11, 17, 27, 0.82), rgba(14, 21, 33, 0.75));
+  background-size: 100% 24px, 32px 100%, 100% 100%;
+  display: grid;
+  place-items: center;
+  color: #8ea0b6;
+  text-transform: uppercase;
+  font-size: 0.82rem;
+  letter-spacing: 0.03em;
+}
+
+.track-placeholder {
+  position: relative;
+  height: 190px;
+  border-radius: 0.7rem;
+  border: 1px solid rgba(255, 212, 71, 0.35);
+  background: linear-gradient(180deg, rgba(12, 18, 28, 0.82), rgba(17, 24, 36, 0.76));
+  overflow: hidden;
+}
+
+.track-shape {
+  position: absolute;
+  inset: 20px;
+  border: 2px solid rgba(255, 212, 71, 0.7);
+  border-radius: 40% 60% 57% 43% / 52% 35% 65% 48%;
+}
+
+.car-dot {
+  position: absolute;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--magenta);
+  box-shadow: 0 0 0 4px rgba(255, 79, 216, 0.22);
+  left: 64%;
+  top: 58%;
+}
+
+@media (max-width: 1000px) {
+  .dashboard-grid {
+    grid-template-columns: 1fr;
+    grid-template-rows: auto;
+  }
+
+  .import-panel {
+    grid-row: auto;
+  }
+
+  .signal-workspace,
+  .track-map-panel {
+    min-height: unset;
+  }
+}
