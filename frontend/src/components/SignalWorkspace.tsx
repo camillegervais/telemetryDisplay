@@ -443,10 +443,11 @@ export default function SignalWorkspace({
                 gridColumn: widget.col,
                 gridRow: widget.row,
               }}
-              draggable
-              onDragStart={() => setDragFromId(widget.id)}
-              onDragEnd={() => setDragFromId(null)}
-              onDragOver={(event) => event.preventDefault()}
+              onDragOver={(event) => {
+                if (dragFromId !== null) {
+                  event.preventDefault();
+                }
+              }}
               onDrop={(event) => {
                 event.preventDefault();
                 if (dragFromId !== null) {
@@ -456,6 +457,15 @@ export default function SignalWorkspace({
               }}
             >
               <div className="graph-corner-actions">
+                <button
+                  className="icon-button"
+                  draggable
+                  onDragStart={() => setDragFromId(widget.id)}
+                  onDragEnd={() => setDragFromId(null)}
+                  title="Déplacer"
+                >
+                  ↕
+                </button>
                 <button
                   className="icon-button"
                   onClick={() =>
@@ -510,29 +520,31 @@ export default function SignalWorkspace({
 
               {loadingById[widget.id] ? <div className="loading-plot">Chargement...</div> : null}
 
-              <Plot
-                data={chart.data}
-                layout={chart.layout}
-                useResizeHandler
-                config={{ displaylogo: false, responsive: true }}
-                style={{ width: "100%", height: "100%" }}
-                onHover={(evt: HoverEvent) => {
-                  const hoveredX = evt.points?.[0]?.x;
-                  if (typeof hoveredX === "number") {
-                    setCursorDistance(hoveredX);
-                  }
-                }}
-                onRelayout={(eventData) => {
-                  const min = eventData["xaxis.range[0]"];
-                  const max = eventData["xaxis.range[1]"];
-                  if (typeof min === "number" && typeof max === "number") {
-                    setXRange({ start: min, end: max });
-                  }
-                  if (eventData["xaxis.autorange"] === true) {
-                    setXRange(null);
-                  }
-                }}
-              />
+              <div className="plot-fill">
+                <Plot
+                  data={chart.data}
+                  layout={chart.layout}
+                  useResizeHandler
+                  config={{ displaylogo: false, responsive: true }}
+                  style={{ width: "100%", height: "100%" }}
+                  onHover={(evt: HoverEvent) => {
+                    const hoveredX = evt.points?.[0]?.x;
+                    if (typeof hoveredX === "number") {
+                      setCursorDistance(hoveredX);
+                    }
+                  }}
+                  onRelayout={(eventData) => {
+                    const min = eventData["xaxis.range[0]"];
+                    const max = eventData["xaxis.range[1]"];
+                    if (typeof min === "number" && typeof max === "number") {
+                      setXRange({ start: min, end: max });
+                    }
+                    if (eventData["xaxis.autorange"] === true) {
+                      setXRange(null);
+                    }
+                  }}
+                />
+              </div>
             </article>
           );
         })}

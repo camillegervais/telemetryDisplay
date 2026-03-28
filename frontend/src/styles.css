@@ -335,16 +335,16 @@ body {
   opacity: 0.45;
 }
 
-.graph-tile .js-plotly-plot,
-.graph-tile .plot-container,
-.graph-tile .svg-container {
-  width: 100% !important;
-  height: 100% !important;
-}
-
-.graph-tile > div {
+.plot-fill {
   width: 100%;
   height: 100%;
+}
+
+.plot-fill .js-plotly-plot,
+.plot-fill .plot-container,
+.plot-fill .svg-container {
+  width: 100% !important;
+  height: 100% !important;
 }
 
 .graph-corner-actions {
