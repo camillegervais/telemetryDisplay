@@ -1,4 +1,3 @@
-import type { ChangeEvent } from "react";
 import { useEffect, useMemo, useState } from "react";
 import Plot from "react-plotly.js";
 
@@ -20,6 +19,8 @@ type GraphWidget = {
   menuOpen: boolean;
   row: number;
   col: number;
+  widthSpan: number;
+  heightSpan: number;
 };
 
 type HoverEvent = {
@@ -36,11 +37,61 @@ function createWidget(id: number, title: string, row: number, col: number): Grap
     menuOpen: false,
     row,
     col,
+    widthSpan: 1,
+    heightSpan: 1,
   };
 }
 
 function isTrackCell(row: number, col: number, rows: number, cols: number): boolean {
   return row === rows && col === cols;
+}
+
+function getOccupiedCells(widgets: GraphWidget[]): Set<string> {
+  const occupied = new Set<string>();
+  widgets.forEach((widget) => {
+    for (let r = widget.row; r < widget.row + widget.heightSpan; r += 1) {
+      for (let c = widget.col; c < widget.col + widget.widthSpan; c += 1) {
+        occupied.add(`${r},${c}`);
+      }
+    }
+  });
+  return occupied;
+}
+
+function canPlaceWidget(
+  widget: GraphWidget,
+  targetRow: number,
+  targetCol: number,
+  rows: number,
+  cols: number,
+  otherWidgets: GraphWidget[]
+): boolean {
+  // Check bounds
+  if (
+    targetRow < 1 ||
+    targetCol < 1 ||
+    targetRow + widget.heightSpan - 1 > rows ||
+    targetCol + widget.widthSpan - 1 > cols
+  ) {
+    return false;
+  }
+
+  // Check track cell
+  if (isTrackCell(targetRow, targetCol, rows, cols)) {
+    return false;
+  }
+
+  // Check collisions with other widgets (excluding self)
+  const occupied = getOccupiedCells(otherWidgets.filter((w) => w.id !== widget.id));
+  for (let r = targetRow; r < targetRow + widget.heightSpan; r += 1) {
+    for (let c = targetCol; c < targetCol + widget.widthSpan; c += 1) {
+      if (occupied.has(`${r},${c}`)) {
+        return false;
+      }
+    }
+  }
+
+  return true;
 }
 
 function normalize(values: number[], min: number, max: number, outMin: number, outMax: number): number[] {
@@ -167,23 +218,17 @@ function buildChartConfig(
   return { data, layout };
 }
 
-function selectedValues(event: ChangeEvent<HTMLSelectElement>): string[] {
-  return Array.from(event.currentTarget.selectedOptions).map((option) => option.value);
-}
-
 function firstFreeCell(
   widgets: GraphWidget[],
   rows: number,
   cols: number,
-  avoidTrackCell: boolean
+  widthSpan: number = 1,
+  heightSpan: number = 1
 ): { row: number; col: number } {
   for (let row = 1; row <= rows; row += 1) {
     for (let col = 1; col <= cols; col += 1) {
-      if (avoidTrackCell && isTrackCell(row, col, rows, cols)) {
-        continue;
-      }
-      const occupied = widgets.some((widget) => widget.row === row && widget.col === col);
-      if (!occupied) {
+      const testWidget = { id: -1, title: "", signals: [], menuOpen: false, row, col, widthSpan, heightSpan };
+      if (canPlaceWidget(testWidget, row, col, rows, cols, widgets)) {
         return { row, col };
       }
     }
@@ -195,16 +240,12 @@ function fitWidgetsToGrid(widgets: GraphWidget[], rows: number, cols: number): G
   const fitted: GraphWidget[] = [];
 
   widgets.forEach((widget) => {
-    let nextRow = Math.min(Math.max(widget.row, 1), rows);
-    let nextCol = Math.min(Math.max(widget.col, 1), cols);
-
-    if (isTrackCell(nextRow, nextCol, rows, cols) || fitted.some((w) => w.row === nextRow && w.col === nextCol)) {
-      const free = firstFreeCell(fitted, rows, cols, true);
-      nextRow = free.row;
-      nextCol = free.col;
+    if (canPlaceWidget(widget, widget.row, widget.col, rows, cols, fitted)) {
+      fitted.push(widget);
+    } else {
+      const free = firstFreeCell(fitted, rows, cols, widget.widthSpan, widget.heightSpan);
+      fitted.push({ ...widget, row: free.row, col: free.col });
     }
-
-    fitted.push({ ...widget, row: nextRow, col: nextCol });
   });
 
   return fitted;
@@ -344,10 +385,44 @@ export default function SignalWorkspace({
     setNextId((prev) => prev + 1);
 
     setWidgets((prev) => {
-      const free = firstFreeCell(prev, gridRows, gridCols, true);
+      const free = firstFreeCell(prev, gridRows, gridCols);
       return [...prev, createWidget(id, `G${id}`, free.row, free.col)];
     });
   }
+
+  function handleDropOnEmptyCell(targetRow: number, targetCol: number) {
+    setWidgets((prev) => {
+      const source = prev.find((item) => item.id === dragFromId);
+      if (!source) {
+        return prev;
+      }
+
+      // Check if drop is valid at target position
+      const otherWidgets = prev.filter((w) => w.id !== dragFromId);
+      if (canPlaceWidget(source, targetRow, targetCol, gridRows, gridCols, otherWidgets)) {
+        return prev.map((item) => {
+          if (item.id === dragFromId) {
+            return { ...item, row: targetRow, col: targetCol };
+          }
+          return item;
+        });
+      }
+
+      return prev;
+    });
+  }
+
+  const occupiedCells = useMemo(() => {
+    const occupied = new Set<string>();
+    widgets.forEach((widget) => {
+      for (let r = widget.row; r < widget.row + widget.heightSpan; r += 1) {
+        for (let c = widget.col; c < widget.col + widget.widthSpan; c += 1) {
+          occupied.add(`${r},${c}`);
+        }
+      }
+    });
+    return occupied;
+  }, [widgets]);
 
   function removeWidget(id: number) {
     setWidgets((prev) => prev.filter((widget) => widget.id !== id));
@@ -375,6 +450,23 @@ export default function SignalWorkspace({
         return prev;
       }
 
+      // Check if swap is valid (no collisions)
+      const otherWidgets = prev.filter((w) => w.id !== sourceId && w.id !== targetId);
+      const sourceAtTarget = canPlaceWidget(source, target.row, target.col, gridRows, gridCols, otherWidgets);
+      const targetAtSource = canPlaceWidget(target, source.row, source.col, gridRows, gridCols, otherWidgets);
+
+      if (!sourceAtTarget || !targetAtSource) {
+        // If swap would create collision, place source at first free cell
+        const free = firstFreeCell(prev.filter((w) => w.id !== sourceId), gridRows, gridCols, source.widthSpan, source.heightSpan);
+        return prev.map((item) => {
+          if (item.id === sourceId) {
+            return { ...item, row: free.row, col: free.col };
+          }
+          return item;
+        });
+      }
+
+      // Swap is valid
       return prev.map((item) => {
         if (item.id === sourceId) {
           return { ...item, row: target.row, col: target.col };
@@ -384,6 +476,46 @@ export default function SignalWorkspace({
         }
         return item;
       });
+    });
+  }
+
+  function moveWidgetToPosition(sourceId: number, targetRow: number, targetCol: number) {
+    setWidgets((prev) => {
+      const source = prev.find((item) => item.id === sourceId);
+      if (!source) {
+        return prev;
+      }
+
+      if (canPlaceWidget(source, targetRow, targetCol, gridRows, gridCols, prev.filter((w) => w.id !== sourceId))) {
+        return prev.map((item) => {
+          if (item.id === sourceId) {
+            return { ...item, row: targetRow, col: targetCol };
+          }
+          return item;
+        });
+      }
+
+      return prev;
+    });
+  }
+
+  function changeWidgetSize(id: number, widthSpan: number, heightSpan: number) {
+    setWidgets((prev) => {
+      const widget = prev.find((item) => item.id === id);
+      if (!widget) {
+        return prev;
+      }
+
+      if (canPlaceWidget({ ...widget, widthSpan, heightSpan }, widget.row, widget.col, gridRows, gridCols, prev.filter((w) => w.id !== id))) {
+        return prev.map((item) => {
+          if (item.id === id) {
+            return { ...item, widthSpan, heightSpan };
+          }
+          return item;
+        });
+      }
+
+      return prev;
     });
   }
 
@@ -440,8 +572,8 @@ export default function SignalWorkspace({
               key={widget.id}
               className={`graph-tile ${dragFromId === widget.id ? "graph-tile-dragging" : ""}`}
               style={{
-                gridColumn: widget.col,
-                gridRow: widget.row,
+                gridColumn: `${widget.col} / span ${widget.widthSpan}`,
+                gridRow: `${widget.row} / span ${widget.heightSpan}`,
               }}
               onDragOver={(event) => {
                 if (dragFromId !== null) {
@@ -490,31 +622,97 @@ export default function SignalWorkspace({
 
               {widget.menuOpen ? (
                 <div className="graph-menu">
-                  <label className="field-label" htmlFor={`signals-${widget.id}`}>
-                    Signaux
-                  </label>
-                  <select
-                    id={`signals-${widget.id}`}
-                    className="signal-select"
-                    multiple
-                    value={widget.signals}
-                    onChange={(event) => {
-                      const values = selectedValues(event);
-                      setWidgets((prev) =>
-                        prev.map((item) =>
-                          item.id === widget.id ? { ...item, signals: values } : item
-                        )
-                      );
-                    }}
-                  >
-                    {availableSignals.map((signal) => (
-                      <option key={`${widget.id}-${signal}`} value={signal}>
-                        {signal}
-                      </option>
+                  <label className="field-label">Signaux</label>
+                  <div className="signal-grid">
+                    {availableSignals.map((signal, idx) => (
+                      <label key={`${widget.id}-${signal}`} className="signal-checkbox">
+                        <input
+                          type="checkbox"
+                          checked={widget.signals.includes(signal)}
+                          onChange={(event) => {
+                            const isChecked = event.target.checked;
+                            setWidgets((prev) =>
+                              prev.map((item) => {
+                                if (item.id === widget.id) {
+                                  if (isChecked) {
+                                    return { ...item, signals: [...item.signals, signal] };
+                                  } else {
+                                    return { ...item, signals: item.signals.filter((s) => s !== signal) };
+                                  }
+                                }
+                                return item;
+                              })
+                            );
+                          }}
+                        />
+                        <span className="signal-badge" style={{ borderColor: COLORS[idx % COLORS.length] }}>
+                          {signal}
+                        </span>
+                      </label>
                     ))}
-                  </select>
+                  </div>
 
-                  <p className="menu-help">Déplacez les graphes en glissant la tuile.</p>
+                  <p className="menu-help">Taille du graphe</p>
+                  <div className="size-selector">
+                    <label>Largeur</label>
+                    <select
+                      className="mini-select"
+                      value={widget.widthSpan}
+                      onChange={(event) => changeWidgetSize(widget.id, Number(event.target.value), widget.heightSpan)}
+                    >
+                      <option value={1}>1 col</option>
+                      <option value={2}>2 cols</option>
+                      <option value={3}>3 cols</option>
+                      <option value={4}>4 cols</option>
+                    </select>
+                  </div>
+
+                  <div className="size-selector">
+                    <label>Hauteur</label>
+                    <select
+                      className="mini-select"
+                      value={widget.heightSpan}
+                      onChange={(event) => changeWidgetSize(widget.id, widget.widthSpan, Number(event.target.value))}
+                    >
+                      <option value={1}>1 ligne</option>
+                      <option value={2}>2 lignes</option>
+                      <option value={3}>3 lignes</option>
+                      <option value={4}>4 lignes</option>
+                    </select>
+                  </div>
+
+                  <p className="menu-help">Position</p>
+                  <div className="position-selector">
+                    <label>Ligne</label>
+                    <select
+                      className="mini-select"
+                      value={widget.row}
+                      onChange={(event) => moveWidgetToPosition(widget.id, Number(event.target.value), widget.col)}
+                    >
+                      {Array.from({ length: gridRows }, (_, i) => i + 1).map((row) => (
+                        <option key={`row-${row}`} value={row}>
+                          {row}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div className="position-selector">
+                    <label>Colonne</label>
+                    <select
+                      className="mini-select"
+                      value={widget.col}
+                      onChange={(event) => moveWidgetToPosition(widget.id, widget.row, Number(event.target.value))}
+                    >
+                      {Array.from({ length: gridCols }, (_, i) => i + 1).map((col) => (
+                        <option key={`col-${col}`} value={col}>
+                          {col}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <p className="menu-help">Déplacez les graphes en glissant la tuile ou utilisez les contrôles ci-dessus.</p>
                 </div>
               ) : null}
 
@@ -549,7 +747,44 @@ export default function SignalWorkspace({
           );
         })}
 
-        <article className="graph-tile graph-tile-track" style={{ gridColumn: gridCols, gridRow: gridRows }}>
+        {Array.from({ length: gridRows }, (_, r) =>
+          Array.from({ length: gridCols }, (_, c) => {
+            const row = r + 1;
+            const col = c + 1;
+            const cellKey = `${row},${col}`;
+            const isOccupied = occupiedCells.has(cellKey);
+            const isTrack = row === gridRows && col === gridCols;
+
+            if (isOccupied || isTrack) {
+              return null;
+            }
+
+            return (
+              <div
+                key={`drop-${cellKey}`}
+                className="drop-zone"
+                style={{
+                  gridColumn: col,
+                  gridRow: row,
+                }}
+                onDragOver={(event) => {
+                  if (dragFromId !== null) {
+                    event.preventDefault();
+                  }
+                }}
+                onDrop={(event) => {
+                  event.preventDefault();
+                  if (dragFromId !== null) {
+                    handleDropOnEmptyCell(row, col);
+                  }
+                  setDragFromId(null);
+                }}
+              />
+            );
+          })
+        ).flat()}
+
+        <article className="graph-tile graph-tile-track" style={{ gridColumn: `${gridCols} / span 1`, gridRow: `${gridRows} / span 1` }}>
           <div className="graph-track-head">Track</div>
           {!trackMapped ? (
             <div className="track-empty">Aucune piste</div>

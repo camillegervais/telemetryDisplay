@@ -124,6 +124,8 @@ body {
 .graph-only-mode .dashboard-grid {
   grid-template-columns: 1fr;
   gap: 0;
+  margin-top: 3rem;
+  height: 94%;
 }
 
 .import-panel {
@@ -335,6 +337,12 @@ body {
   opacity: 0.45;
 }
 
+.drop-zone {
+  pointer-events: all;
+  min-height: 0;
+  overflow: hidden;
+}
+
 .plot-fill {
   width: 100%;
   height: 100%;
@@ -349,7 +357,7 @@ body {
 
 .graph-corner-actions {
   position: absolute;
-  right: -0.4rem;
+  right: 1.4rem;
   top: 0.35rem;
   display: flex;
   gap: 0.3rem;
@@ -377,6 +385,8 @@ body {
   top: 0.35rem;
   z-index: 7;
   width: min(260px, calc(100% - 0.7rem));
+  max-height: calc(100% - 0.7rem);
+  overflow-y: auto;
   border: 1px solid rgba(0, 212, 255, 0.32);
   border-radius: 0.6rem;
   background: rgba(8, 12, 19, 0.95);
@@ -390,6 +400,27 @@ body {
   color: #9bb0c8;
 }
 
+.size-selector,
+.position-selector {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  margin-top: 0.35rem;
+}
+
+.size-selector label,
+.position-selector label {
+  font-size: 0.72rem;
+  color: #9bb0c8;
+  min-width: 48px;
+}
+
+.size-selector .mini-select,
+.position-selector .mini-select {
+  flex: 1;
+  font-size: 0.72rem;
+}
+
 .placement-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -398,13 +429,56 @@ body {
 }
 
 .signal-select {
-  min-height: 94px;
-  border: 1px solid rgba(0, 212, 255, 0.3);
-  background: rgba(11, 17, 27, 0.8);
-  color: var(--fg-1);
-  border-radius: 0.5rem;
-  padding: 0.25rem;
+  display: none;
 }
+
+.signal-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 0.4rem;
+  margin-top: 0.3rem;
+  max-height: 200px;
+  overflow-y: auto;
+  padding-right: 0.2rem;
+}
+
+.signal-checkbox {
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+  user-select: none;
+}
+
+.signal-checkbox input {
+  display: none;
+}
+
+.signal-badge {
+  display: block;
+  padding: 0.35rem 0.6rem;
+  border: 2px solid;
+  border-radius: 0.35rem;
+  font-size: 0.74rem;
+  font-weight: 500;
+  color: var(--fg-1);
+  background: rgba(11, 17, 27, 0.6);
+  transition: all 0.2s ease;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  overflow: hidden;
+}
+
+.signal-checkbox input:checked + .signal-badge {
+  background: rgba(0, 212, 255, 0.15);
+  border-color: currentColor;
+  box-shadow: 0 0 8px rgba(0, 212, 255, 0.25);
+}
+
+.signal-checkbox:hover .signal-badge {
+  transform: translateX(2px);
+  border-color: currentColor;
+}
+
 
 .plot-shell {
   position: relative;
