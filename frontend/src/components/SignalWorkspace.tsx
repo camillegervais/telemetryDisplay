@@ -102,6 +102,7 @@ function buildChartConfig(
 
   const layout: Record<string, unknown> = {
     title: graphOnlyMode ? undefined : title,
+    autosize: true,
     paper_bgcolor: "#0b111b",
     plot_bgcolor: "#121a28",
     font: { color: "#e5e7eb" },
@@ -512,6 +513,7 @@ export default function SignalWorkspace({
               <Plot
                 data={chart.data}
                 layout={chart.layout}
+                useResizeHandler
                 config={{ displaylogo: false, responsive: true }}
                 style={{ width: "100%", height: "100%" }}
                 onHover={(evt: HoverEvent) => {
