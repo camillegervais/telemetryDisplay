@@ -9,17 +9,39 @@ Scalable baseline for a racing telemetry web application.
 - `data/`: input and demo data
 - `docs/`: format and conventions
 
-## Phase 1 status
+## Phase 1 & 2 status
 
+### Phase 1
 - Backend scaffold with:
-	- `GET /api/health`
-	- `GET /api/app-info`
-	- datasets placeholder router
+  - `GET /api/health`
+  - `GET /api/app-info` (includes reference spatial step)
 - Frontend telemetry-style dashboard scaffold:
-	- import panel
-	- signals workspace placeholders
-	- track map placeholder
+  - import panel with spatial step display
+  - signals workspace placeholders
+  - track map placeholder
 - Spatial sampling convention documented in `docs/MAT_FORMAT.md`
+
+### Phase 2 (implemented)
+- **MAT loader service** (`backend/app/services/mat_loader.py`) with:
+  - .mat file validation (mandatory `lap_distance`, signals, spatial step)
+  - Source spatial step detection (from `distance_step_m` or median delta)
+  - Full normalization to reference step via **linear interpolation** (numpy.interp)
+  - Metadata tracking (source step, normalized step, enrichment factor, signal names)
+
+- **Dataset API endpoints**:
+  - `POST /api/datasets/import` — upload .mat, get dataset_id
+  - `GET /api/datasets/{dataset_id}/metadata` — signal list, distance range, steps, interpolation method
+  - `POST /api/datasets/{dataset_id}/query` — fetch signals with distance range and max_points decimation
+  - `GET /api/datasets/{dataset_id}/trackmap` — track coordinates
+
+- **Data generation utilities**:
+  - `backend/scripts/generate_losail_data.py` — generate Losail telemetry dataset (uses real FastF1 circuit data)
+  - `backend/scripts/generate_demo_data.py` — generic synthetic demo data
+  - `backend/app/utils/circuit.py` — reusable circuit fetcher (FastF1 + synthetic fallback)
+
+- **Demo data available**:
+  - `data/losail.mat` — 2000 samples, Losail circuit, 5400m lap, 2.7m spatial step (fetched via FastF1)
+  - `data/losail_track.csv` — real Losail track coordinates from FastF1
 
 ## Run backend
 
@@ -27,8 +49,12 @@ Scalable baseline for a racing telemetry web application.
 2. `python -m venv .venv`
 3. Activate virtual environment
 4. `pip install -r requirements.txt`
-5. Optional: `python scripts/generate_demo_data.py`
+5. **Generate demo data** (choose one):
+   - Losail with real circuit coordinates (requires FastF1): `python scripts/generate_losail_data.py`
+   - Generic demo data: `python scripts/generate_demo_data.py`
 6. `uvicorn app.main:app --reload --port 8000`
+
+Data files are saved to `data/` directory.
 
 ## Run frontend
 
