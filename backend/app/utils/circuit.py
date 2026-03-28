@@ -32,24 +32,38 @@ def fetch_circuit_coordinates(circuit_name: str, year: int = 2024) -> Optional[n
         session = fastf1.get_session(year, circuit_name, "FP1")
         session.load()
 
-        # Extract first car's telemetry to get track coordinates
+        # Extract telemetry from a representative full lap.
+        # Using quick laps avoids out-laps/in-laps that often leave a large gap.
         driver = session.drivers[0]
-        laps = session.laps.pick_driver(driver)
+        laps = session.laps.pick_driver(driver).pick_quicklaps()
+
+        if len(laps) == 0:
+            # Fallback if quicklap filtering is too strict for the session.
+            laps = session.laps.pick_driver(driver)
 
         if len(laps) == 0:
             return None
 
-        # Get baseline lap with full telemetry
-        lap = laps.iloc[0]
-        telemetry = lap.get_telemetry()
+        # Prefer the shortest valid lap first.
+        lap_candidates = laps.sort_values(by="LapTime", na_position="last")
 
-        if telemetry.empty:
-            return None
+        for _, lap in lap_candidates.iterrows():
+            telemetry = lap.get_telemetry()
+            if telemetry.empty or "X" not in telemetry or "Y" not in telemetry:
+                continue
 
-        x = telemetry["X"].values
-        y = telemetry["Y"].values
+            x = telemetry["X"].to_numpy(dtype=float)
+            y = telemetry["Y"].to_numpy(dtype=float)
+            finite_mask = np.isfinite(x) & np.isfinite(y)
+            x = x[finite_mask]
+            y = y[finite_mask]
 
-        return np.column_stack((x, y))
+            if x.size < 10:
+                continue
+
+            return np.column_stack((x, y))
+
+        return None
     except Exception as e:
         print(f"FastF1 fetch failed for {circuit_name}: {e}")
         return None

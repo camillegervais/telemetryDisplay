@@ -23,11 +23,73 @@ type GraphWidget = {
   heightSpan: number;
 };
 
+type WorkspaceTab = {
+  id: string;
+  name: string;
+  gridCols: number;
+  gridRows: number;
+  nextId: number;
+  widgets: GraphWidget[];
+};
+
+type SavedWorkspaceConfig = {
+  id: string;
+  name: string;
+  tabs: WorkspaceTab[];
+  activeTabId: string;
+};
+
 type HoverEvent = {
   points?: Array<{ x?: unknown }>;
 };
 
 const COLORS = ["#00d4ff", "#ff4fd8", "#ffd447", "#34d399", "#ff7f50", "#8b5cf6"];
+const WORKSPACE_CONFIGS_KEY = "telemetry-display.workspace-configs.v1";
+
+function makeId(prefix: string): string {
+  return `${prefix}-${Date.now()}-${Math.random().toString(16).slice(2, 8)}`;
+}
+
+function createDefaultTab(name: string = "Onglet 1"): WorkspaceTab {
+  return {
+    id: makeId("tab"),
+    name,
+    gridCols: 2,
+    gridRows: 2,
+    nextId: 3,
+    widgets: [createWidget(1, "G1", 1, 1), createWidget(2, "G2", 1, 2)],
+  };
+}
+
+function sanitizeWidgetsForStorage(widgets: GraphWidget[]): GraphWidget[] {
+  return widgets.map((widget) => ({ ...widget, menuOpen: false }));
+}
+
+function loadSavedWorkspaceConfigs(): SavedWorkspaceConfig[] {
+  if (typeof window === "undefined") {
+    return [];
+  }
+  try {
+    const raw = window.localStorage.getItem(WORKSPACE_CONFIGS_KEY);
+    if (!raw) {
+      return [];
+    }
+    const parsed = JSON.parse(raw) as SavedWorkspaceConfig[];
+    if (!Array.isArray(parsed)) {
+      return [];
+    }
+    return parsed.filter((cfg) => Array.isArray(cfg.tabs) && cfg.tabs.length > 0);
+  } catch {
+    return [];
+  }
+}
+
+function storeWorkspaceConfigs(configs: SavedWorkspaceConfig[]): void {
+  if (typeof window === "undefined") {
+    return;
+  }
+  window.localStorage.setItem(WORKSPACE_CONFIGS_KEY, JSON.stringify(configs));
+}
 
 function createWidget(id: number, title: string, row: number, col: number): GraphWidget {
   return {
@@ -259,19 +321,38 @@ export default function SignalWorkspace({
 }: SignalWorkspaceProps) {
   const { cursorDistance, xRange, setCursorDistance, setXRange } = useTelemetryStore();
 
-  const [gridCols, setGridCols] = useState(2);
-  const [gridRows, setGridRows] = useState(2);
-  const [nextId, setNextId] = useState(3);
-  const [widgets, setWidgets] = useState<GraphWidget[]>([
-    createWidget(1, "G1", 1, 1),
-    createWidget(2, "G2", 1, 2),
-  ]);
+  const initialTab = useMemo(() => createDefaultTab(), []);
+  const [tabs, setTabs] = useState<WorkspaceTab[]>([initialTab]);
+  const [activeTabId, setActiveTabId] = useState<string>(initialTab.id);
+  const [gridCols, setGridCols] = useState(initialTab.gridCols);
+  const [gridRows, setGridRows] = useState(initialTab.gridRows);
+  const [nextId, setNextId] = useState(initialTab.nextId);
+  const [widgets, setWidgets] = useState<GraphWidget[]>(initialTab.widgets);
+  const [savedConfigs, setSavedConfigs] = useState<SavedWorkspaceConfig[]>(() => loadSavedWorkspaceConfigs());
+  const [selectedConfigId, setSelectedConfigId] = useState<string>("");
+  const [currentConfigId, setCurrentConfigId] = useState<string | null>(null);
   const [dragFromId, setDragFromId] = useState<number | null>(null);
   const [seriesById, setSeriesById] = useState<Record<number, SignalSeries | null>>({});
   const [loadingById, setLoadingById] = useState<Record<number, boolean>>({});
 
   const availableSignals = datasetMetadata?.signal_names ?? [];
   const canQuery = datasetId !== null && datasetMetadata !== null;
+
+  useEffect(() => {
+    setTabs((prev) =>
+      prev.map((tab) =>
+        tab.id === activeTabId
+          ? {
+              ...tab,
+              gridCols,
+              gridRows,
+              nextId,
+              widgets,
+            }
+          : tab
+      )
+    );
+  }, [activeTabId, gridCols, gridRows, nextId, widgets]);
 
   useEffect(() => {
     setWidgets((prev) => fitWidgetsToGrid(prev, gridRows, gridCols));
@@ -369,11 +450,21 @@ export default function SignalWorkspace({
     const xs = normalize(trackMap.x_position, minX, maxX, pad, width - pad);
     const ys = normalize(trackMap.y_position, minY, maxY, height - pad, pad);
 
+    const firstX = xs[0];
+    const firstY = ys[0];
+    const lastX = xs[xs.length - 1];
+    const lastY = ys[ys.length - 1];
+    const seamPx = Math.hypot(lastX - firstX, lastY - firstY);
+    const closeTrack = seamPx <= 18;
+    const points = closeTrack
+      ? [...xs.map((x, i) => `${x},${ys[i]}`), `${firstX},${firstY}`].join(" ")
+      : xs.map((x, i) => `${x},${ys[i]}`).join(" ");
+
     const idx = nearestIndex(trackMap.lap_distance, cursorDistance);
     return {
       width,
       height,
-      points: xs.map((x, i) => `${x},${ys[i]}`).join(" "),
+      points,
       markerX: xs[idx],
       markerY: ys[idx],
       markerDistance: trackMap.lap_distance[idx],
@@ -388,6 +479,151 @@ export default function SignalWorkspace({
       const free = firstFreeCell(prev, gridRows, gridCols);
       return [...prev, createWidget(id, `G${id}`, free.row, free.col)];
     });
+  }
+
+  function switchToTab(tabId: string) {
+    const targetTab = tabs.find((tab) => tab.id === tabId);
+    if (!targetTab) {
+      return;
+    }
+    setActiveTabId(tabId);
+    setGridCols(targetTab.gridCols);
+    setGridRows(targetTab.gridRows);
+    setNextId(targetTab.nextId);
+    setWidgets(targetTab.widgets);
+    setSeriesById({});
+    setLoadingById({});
+    setDragFromId(null);
+  }
+
+  function addTab() {
+    const newTab = createDefaultTab(`Onglet ${tabs.length + 1}`);
+    setTabs((prev) => [...prev, newTab]);
+    setActiveTabId(newTab.id);
+    setGridCols(newTab.gridCols);
+    setGridRows(newTab.gridRows);
+    setNextId(newTab.nextId);
+    setWidgets(newTab.widgets);
+    setSeriesById({});
+    setLoadingById({});
+    setDragFromId(null);
+  }
+
+  function removeTab(tabId: string) {
+    if (tabs.length <= 1) {
+      return;
+    }
+
+    const remaining = tabs.filter((tab) => tab.id !== tabId);
+    setTabs(remaining);
+    if (activeTabId === tabId) {
+      const nextActive = remaining[0];
+      setActiveTabId(nextActive.id);
+      setGridCols(nextActive.gridCols);
+      setGridRows(nextActive.gridRows);
+      setNextId(nextActive.nextId);
+      setWidgets(nextActive.widgets);
+    }
+  }
+
+  function renameTab(tabId: string) {
+    const tab = tabs.find((item) => item.id === tabId);
+    if (!tab) {
+      return;
+    }
+    const nextName = window.prompt("Nom de l'onglet", tab.name);
+    if (!nextName) {
+      return;
+    }
+    setTabs((prev) => prev.map((item) => (item.id === tabId ? { ...item, name: nextName.trim() || item.name } : item)));
+  }
+
+  function saveCurrentConfiguration() {
+    const defaultName = currentConfigId
+      ? savedConfigs.find((cfg) => cfg.id === currentConfigId)?.name ?? "Configuration"
+      : `Configuration ${savedConfigs.length + 1}`;
+    const nextName = window.prompt("Nom de la configuration", defaultName);
+    if (!nextName) {
+      return;
+    }
+
+    const normalizedTabs = tabs.map((tab) => ({
+      ...tab,
+      widgets: sanitizeWidgetsForStorage(tab.widgets),
+    }));
+
+    setSavedConfigs((prev) => {
+      let nextConfigs: SavedWorkspaceConfig[];
+      if (currentConfigId && prev.some((cfg) => cfg.id === currentConfigId)) {
+        nextConfigs = prev.map((cfg) =>
+          cfg.id === currentConfigId
+            ? {
+                ...cfg,
+                name: nextName.trim() || cfg.name,
+                tabs: normalizedTabs,
+                activeTabId,
+              }
+            : cfg
+        );
+      } else {
+        const newId = makeId("cfg");
+        setCurrentConfigId(newId);
+        setSelectedConfigId(newId);
+        nextConfigs = [
+          ...prev,
+          {
+            id: newId,
+            name: nextName.trim() || defaultName,
+            tabs: normalizedTabs,
+            activeTabId,
+          },
+        ];
+      }
+      storeWorkspaceConfigs(nextConfigs);
+      return nextConfigs;
+    });
+  }
+
+  function loadConfiguration(configId: string) {
+    const config = savedConfigs.find((cfg) => cfg.id === configId);
+    if (!config || config.tabs.length === 0) {
+      return;
+    }
+
+    const clonedTabs = config.tabs.map((tab) => ({
+      ...tab,
+      widgets: tab.widgets.map((widget) => ({ ...widget, menuOpen: false })),
+    }));
+    const nextActiveId = clonedTabs.some((tab) => tab.id === config.activeTabId)
+      ? config.activeTabId
+      : clonedTabs[0].id;
+    const activeTab = clonedTabs.find((tab) => tab.id === nextActiveId) ?? clonedTabs[0];
+
+    setTabs(clonedTabs);
+    setActiveTabId(activeTab.id);
+    setGridCols(activeTab.gridCols);
+    setGridRows(activeTab.gridRows);
+    setNextId(activeTab.nextId);
+    setWidgets(activeTab.widgets);
+    setCurrentConfigId(config.id);
+    setSelectedConfigId(config.id);
+    setSeriesById({});
+    setLoadingById({});
+    setDragFromId(null);
+  }
+
+  function deleteConfiguration(configId: string) {
+    setSavedConfigs((prev) => {
+      const nextConfigs = prev.filter((cfg) => cfg.id !== configId);
+      storeWorkspaceConfigs(nextConfigs);
+      return nextConfigs;
+    });
+    if (currentConfigId === configId) {
+      setCurrentConfigId(null);
+    }
+    if (selectedConfigId === configId) {
+      setSelectedConfigId("");
+    }
   }
 
   function handleDropOnEmptyCell(targetRow: number, targetCol: number) {
@@ -524,6 +760,35 @@ export default function SignalWorkspace({
       <div className={`panel-header panel-header-tight ${graphOnlyMode ? "panel-header-hidden" : ""}`}>
         <h2>Dashboard</h2>
         <div className="dashboard-tools">
+          <select
+            className="mini-select config-select"
+            value={selectedConfigId}
+            onChange={(event) => setSelectedConfigId(event.target.value)}
+          >
+            <option value="">Config locale...</option>
+            {savedConfigs.map((config) => (
+              <option key={config.id} value={config.id}>
+                {config.name}
+              </option>
+            ))}
+          </select>
+          <button
+            className="small-button"
+            disabled={!selectedConfigId}
+            onClick={() => loadConfiguration(selectedConfigId)}
+          >
+            Charger
+          </button>
+          <button className="small-button" onClick={saveCurrentConfiguration}>
+            Sauver
+          </button>
+          <button
+            className="small-button"
+            disabled={!selectedConfigId}
+            onClick={() => deleteConfiguration(selectedConfigId)}
+          >
+            Suppr
+          </button>
           <label>
             Colonnes
             <select
@@ -554,6 +819,33 @@ export default function SignalWorkspace({
             + Graphe
           </button>
         </div>
+      </div>
+
+      <div className={`workspace-tabs ${graphOnlyMode ? "workspace-tabs-hidden" : ""}`}>
+        {tabs.map((tab) => (
+          <div
+            key={tab.id}
+            className={`workspace-tab ${tab.id === activeTabId ? "workspace-tab-active" : ""}`}
+          >
+            <button className="workspace-tab-name" onClick={() => switchToTab(tab.id)} title={tab.name}>
+              {tab.name}
+            </button>
+            <button className="workspace-tab-action" onClick={() => renameTab(tab.id)} title="Renommer onglet">
+              ✎
+            </button>
+            <button
+              className="workspace-tab-action"
+              onClick={() => removeTab(tab.id)}
+              title="Fermer onglet"
+              disabled={tabs.length <= 1}
+            >
+              ×
+            </button>
+          </div>
+        ))}
+        <button className="workspace-tab-add" onClick={addTab} title="Nouvel onglet">
+          + Onglet
+        </button>
       </div>
 
       <div className="graph-grid" style={gridStyle}>
