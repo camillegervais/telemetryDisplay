@@ -43,7 +43,7 @@ type HoverEvent = {
   points?: Array<{ x?: unknown }>;
 };
 
-const COLORS = ["#00d4ff", "#ff4fd8", "#ffd447", "#34d399", "#ff7f50", "#8b5cf6"];
+const COLORS = ["#00a8ff", "#ff2d4f", "#ffd447", "#34d399", "#ff8a33", "#ff9aa8"];
 const WORKSPACE_CONFIGS_KEY = "telemetry-display.workspace-configs.v1";
 const SIGNAL_DRAG_MIME = "application/x-telemetry-signal";
 
@@ -193,8 +193,8 @@ function buildChartConfig(
       data: [],
       layout: {
         title,
-        paper_bgcolor: "#0b111b",
-        plot_bgcolor: "#121a28",
+        paper_bgcolor: "#14080b",
+        plot_bgcolor: "#1b0a0e",
         font: { color: "#e5e7eb" },
       },
     };
@@ -217,13 +217,13 @@ function buildChartConfig(
   const layout: Record<string, unknown> = {
     title: graphOnlyMode ? undefined : title,
     autosize: true,
-    paper_bgcolor: "#0b111b",
-    plot_bgcolor: "#121a28",
+    paper_bgcolor: "#14080b",
+    plot_bgcolor: "#1b0a0e",
     font: { color: "#e5e7eb" },
     margin: graphOnlyMode ? { l: 26, r: 26, t: 8, b: 22 } : { l: 36, r: 36, t: 30, b: 28 },
     xaxis: {
       title: graphOnlyMode ? undefined : "Distance (m)",
-      gridcolor: "rgba(70, 83, 104, 0.25)",
+      gridcolor: "rgba(255, 93, 120, 0.22)",
       zeroline: false,
       ...(xRange
         ? {
@@ -236,7 +236,7 @@ function buildChartConfig(
     },
     yaxis: {
       title: graphOnlyMode ? undefined : selectedSignals[0],
-      gridcolor: "rgba(70, 83, 104, 0.25)",
+      gridcolor: "rgba(255, 93, 120, 0.22)",
       zeroline: false,
     },
     hovermode: "x",

@@ -77,9 +77,15 @@ export default function App() {
   return (
     <div className={`app-shell ${graphOnlyMode ? "graph-only-mode" : ""}`}>
       <header className="topbar">
-        <div>
-          <h1>Telemetry Display</h1>
-          <p>Dashboard telemetry</p>
+        <div className="topbar-brand">
+          <div className="app-logo" aria-hidden="true">
+            <span className="app-logo-ring" />
+            <span className="app-logo-core">TD</span>
+          </div>
+          <div>
+            <h1>Telemetry Display</h1>
+            <p>Race Telemetry Console</p>
+          </div>
         </div>
         <div className="topbar-actions">
           <button className="small-button" onClick={resetAllGraphsToHome}>
