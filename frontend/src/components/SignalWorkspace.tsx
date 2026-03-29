@@ -1071,31 +1071,39 @@ export default function SignalWorkspace({
 
               {loadingById[widget.id] ? <div className="loading-plot">Chargement...</div> : null}
 
-              <div className="plot-fill">
-                <Plot
-                  data={chart.data}
-                  layout={chart.layout}
-                  useResizeHandler
-                  config={{ displaylogo: false, responsive: true }}
-                  style={{ width: "100%", height: "100%" }}
-                  onHover={(evt: HoverEvent) => {
-                    const hoveredX = evt.points?.[0]?.x;
-                    if (typeof hoveredX === "number") {
-                      setCursorDistance(hoveredX);
-                    }
-                  }}
-                  onRelayout={(eventData) => {
-                    const min = eventData["xaxis.range[0]"];
-                    const max = eventData["xaxis.range[1]"];
-                    if (typeof min === "number" && typeof max === "number") {
-                      setXRange({ start: min, end: max });
-                    }
-                    if (eventData["xaxis.autorange"] === true) {
-                      setXRange(null);
-                    }
-                  }}
-                />
-              </div>
+              {widget.signals.length === 0 ? (
+                <div className="placeholder-graph" aria-label="Aucun signal sélectionné">
+                  <div className="placeholder-graph-mark">+</div>
+                  <div className="placeholder-graph-text">Ajoutez un signal</div>
+                  <div className="placeholder-graph-help">Glissez un signal ici ou ouvrez les paramètres</div>
+                </div>
+              ) : (
+                <div className="plot-fill">
+                  <Plot
+                    data={chart.data}
+                    layout={chart.layout}
+                    useResizeHandler
+                    config={{ displaylogo: false, responsive: true }}
+                    style={{ width: "100%", height: "100%" }}
+                    onHover={(evt: HoverEvent) => {
+                      const hoveredX = evt.points?.[0]?.x;
+                      if (typeof hoveredX === "number") {
+                        setCursorDistance(hoveredX);
+                      }
+                    }}
+                    onRelayout={(eventData) => {
+                      const min = eventData["xaxis.range[0]"];
+                      const max = eventData["xaxis.range[1]"];
+                      if (typeof min === "number" && typeof max === "number") {
+                        setXRange({ start: min, end: max });
+                      }
+                      if (eventData["xaxis.autorange"] === true) {
+                        setXRange(null);
+                      }
+                    }}
+                  />
+                </div>
+              )}
             </article>
           );
         })}

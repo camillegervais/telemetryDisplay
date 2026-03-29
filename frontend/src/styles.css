@@ -824,20 +824,48 @@ body {
 }
 
 .placeholder-graph {
-  height: 180px;
-  border: 1px dashed rgba(0, 212, 255, 0.35);
-  border-radius: 0.7rem;
+  height: 100%;
+  min-height: 0;
+  border: 1px dashed rgba(255, 70, 93, 0.45);
   background:
-    linear-gradient(transparent 23px, rgba(38, 52, 70, 0.45) 24px),
-    linear-gradient(90deg, transparent 31px, rgba(38, 52, 70, 0.33) 32px),
-    linear-gradient(180deg, rgba(11, 17, 27, 0.82), rgba(14, 21, 33, 0.75));
+    linear-gradient(transparent 23px, rgba(72, 24, 33, 0.42) 24px),
+    linear-gradient(90deg, transparent 31px, rgba(72, 24, 33, 0.32) 32px),
+    linear-gradient(180deg, rgba(24, 9, 13, 0.86), rgba(16, 7, 10, 0.84));
   background-size: 100% 24px, 32px 100%, 100% 100%;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  gap: 0.35rem;
+  color: #d8bcc2;
+  text-align: center;
+  padding: 0.6rem;
+}
+
+.placeholder-graph-mark {
+  width: 36px;
+  height: 36px;
+  border: 1px solid rgba(255, 70, 93, 0.62);
   display: grid;
   place-items: center;
-  color: #8ea0b6;
+  font-family: "Rajdhani", sans-serif;
+  font-weight: 700;
+  font-size: 1.25rem;
+  color: #ffd4db;
+  box-shadow: 0 0 14px rgba(255, 70, 93, 0.22);
+}
+
+.placeholder-graph-text {
+  font-family: "Rajdhani", sans-serif;
+  font-size: 0.95rem;
+  letter-spacing: 0.07em;
   text-transform: uppercase;
-  font-size: 0.82rem;
-  letter-spacing: 0.03em;
+  color: #ffe6eb;
+}
+
+.placeholder-graph-help {
+  font-size: 0.72rem;
+  color: #b99aa1;
 }
 
 .track-placeholder {
