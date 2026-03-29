@@ -81,6 +81,35 @@ export default function ImportPanel({
           </strong>
         </div>
       </div>
+
+      <div className="sidebar-signals">
+        <div className="panel-header panel-header-tight sidebar-signals-head">
+          <h2>Signaux</h2>
+          <span className="panel-badge">{datasetMetadata?.signal_names.length ?? 0}</span>
+        </div>
+
+        {!datasetMetadata || datasetMetadata.signal_names.length === 0 ? (
+          <p className="panel-text">Importez un dataset pour afficher les signaux.</p>
+        ) : (
+          <div className="sidebar-signals-list">
+            {datasetMetadata.signal_names.map((signal) => (
+              <button
+                key={signal}
+                type="button"
+                className="sidebar-signal-chip"
+                draggable
+                onDragStart={(event) => {
+                  event.dataTransfer.setData("application/x-telemetry-signal", signal);
+                  event.dataTransfer.effectAllowed = "copy";
+                }}
+                title="Glisser vers un graphe pour ajouter"
+              >
+                {signal}
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
     </section>
   );
 }

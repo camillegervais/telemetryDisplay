@@ -45,6 +45,7 @@ type HoverEvent = {
 
 const COLORS = ["#00d4ff", "#ff4fd8", "#ffd447", "#34d399", "#ff7f50", "#8b5cf6"];
 const WORKSPACE_CONFIGS_KEY = "telemetry-display.workspace-configs.v1";
+const SIGNAL_DRAG_MIME = "application/x-telemetry-signal";
 
 function makeId(prefix: string): string {
   return `${prefix}-${Date.now()}-${Math.random().toString(16).slice(2, 8)}`;
@@ -332,6 +333,7 @@ export default function SignalWorkspace({
   const [selectedConfigId, setSelectedConfigId] = useState<string>("");
   const [currentConfigId, setCurrentConfigId] = useState<string | null>(null);
   const [dragFromId, setDragFromId] = useState<number | null>(null);
+  const [expandedWidgetId, setExpandedWidgetId] = useState<number | null>(null);
   const [seriesById, setSeriesById] = useState<Record<number, SignalSeries | null>>({});
   const [loadingById, setLoadingById] = useState<Record<number, boolean>>({});
 
@@ -755,6 +757,45 @@ export default function SignalWorkspace({
     });
   }
 
+  function addSignalToWidget(widgetId: number, signal: string) {
+    setWidgets((prev) =>
+      prev.map((item) => {
+        if (item.id !== widgetId) {
+          return item;
+        }
+        if (item.signals.includes(signal)) {
+          return item;
+        }
+        return { ...item, signals: [...item.signals, signal] };
+      })
+    );
+  }
+
+  function addWidgetWithSignalAtPosition(targetRow: number, targetCol: number, signal: string) {
+    setNextId((prevId) => {
+      const newId = prevId;
+      setWidgets((prev) => {
+        const candidate = {
+          id: newId,
+          title: `G${newId}`,
+          signals: [signal],
+          menuOpen: false,
+          row: targetRow,
+          col: targetCol,
+          widthSpan: 1,
+          heightSpan: 1,
+        };
+
+        if (!canPlaceWidget(candidate, targetRow, targetCol, gridRows, gridCols, prev)) {
+          return prev;
+        }
+
+        return [...prev, candidate];
+      });
+      return prevId + 1;
+    });
+  }
+
   return (
     <section className={`panel signal-workspace ${graphOnlyMode ? "signal-workspace-max" : ""}`}>
       <div className={`panel-header panel-header-tight ${graphOnlyMode ? "panel-header-hidden" : ""}`}>
@@ -848,7 +889,7 @@ export default function SignalWorkspace({
         </button>
       </div>
 
-      <div className="graph-grid" style={gridStyle}>
+      <div className={`graph-grid ${expandedWidgetId !== null ? "graph-grid-has-expanded" : ""}`} style={gridStyle}>
         {widgets.map((widget) => {
           const chart = buildChartConfig(
             widget.title,
@@ -862,13 +903,14 @@ export default function SignalWorkspace({
           return (
             <article
               key={widget.id}
-              className={`graph-tile ${dragFromId === widget.id ? "graph-tile-dragging" : ""}`}
+              className={`graph-tile ${dragFromId === widget.id ? "graph-tile-dragging" : ""} ${widget.menuOpen ? "has-open-menu" : ""} ${expandedWidgetId === widget.id ? "graph-tile-expanded" : ""}`}
               style={{
                 gridColumn: `${widget.col} / span ${widget.widthSpan}`,
                 gridRow: `${widget.row} / span ${widget.heightSpan}`,
               }}
               onDragOver={(event) => {
-                if (dragFromId !== null) {
+                const canDropSignal = event.dataTransfer.types.includes(SIGNAL_DRAG_MIME);
+                if (dragFromId !== null || canDropSignal) {
                   event.preventDefault();
                 }
               }}
@@ -876,6 +918,11 @@ export default function SignalWorkspace({
                 event.preventDefault();
                 if (dragFromId !== null) {
                   swapWidgetPositions(dragFromId, widget.id);
+                } else {
+                  const droppedSignal = event.dataTransfer.getData(SIGNAL_DRAG_MIME);
+                  if (droppedSignal) {
+                    addSignalToWidget(widget.id, droppedSignal);
+                  }
                 }
                 setDragFromId(null);
               }}
@@ -909,6 +956,15 @@ export default function SignalWorkspace({
                   title="Supprimer"
                 >
                   ×
+                </button>
+                <button
+                  className="icon-button"
+                  onClick={() =>
+                    setExpandedWidgetId((prev) => (prev === widget.id ? null : widget.id))
+                  }
+                  title={expandedWidgetId === widget.id ? "Réduire" : "Plein écran"}
+                >
+                  {expandedWidgetId === widget.id ? "⤡" : "⛶"}
                 </button>
               </div>
 
@@ -1060,7 +1116,8 @@ export default function SignalWorkspace({
                   gridRow: row,
                 }}
                 onDragOver={(event) => {
-                  if (dragFromId !== null) {
+                  const canDropSignal = event.dataTransfer.types.includes(SIGNAL_DRAG_MIME);
+                  if (dragFromId !== null || canDropSignal) {
                     event.preventDefault();
                   }
                 }}
@@ -1068,6 +1125,11 @@ export default function SignalWorkspace({
                   event.preventDefault();
                   if (dragFromId !== null) {
                     handleDropOnEmptyCell(row, col);
+                  } else {
+                    const droppedSignal = event.dataTransfer.getData(SIGNAL_DRAG_MIME);
+                    if (droppedSignal) {
+                      addWidgetWithSignalAtPosition(row, col, droppedSignal);
+                    }
                   }
                   setDragFromId(null);
                 }}

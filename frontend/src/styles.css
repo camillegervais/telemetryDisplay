@@ -133,6 +133,39 @@ body {
   overflow: auto;
 }
 
+.sidebar-signals {
+  margin-top: 0.9rem;
+  border-top: 1px solid rgba(39, 52, 71, 0.8);
+  padding-top: 0.7rem;
+}
+
+.sidebar-signals-head {
+  margin-bottom: 0.45rem;
+}
+
+.sidebar-signals-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  max-height: 220px;
+  overflow-y: auto;
+  padding-right: 0.2rem;
+}
+
+.sidebar-signal-chip {
+  border: 1px solid rgba(0, 212, 255, 0.34);
+  background: rgba(0, 212, 255, 0.11);
+  color: #d7f4ff;
+  border-radius: 999px;
+  padding: 0.28rem 0.56rem;
+  font-size: 0.72rem;
+  cursor: grab;
+}
+
+.sidebar-signal-chip:active {
+  cursor: grabbing;
+}
+
 .graph-only-mode .import-panel {
   display: none;
 }
@@ -439,6 +472,17 @@ body {
   display: flex;
   gap: 0.3rem;
   z-index: 6;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.18s ease;
+}
+
+.graph-tile:hover .graph-corner-actions,
+.graph-tile:focus-within .graph-corner-actions,
+.graph-tile.has-open-menu .graph-corner-actions,
+.graph-tile-expanded .graph-corner-actions {
+  opacity: 1;
+  pointer-events: auto;
 }
 
 .icon-button {
@@ -469,6 +513,26 @@ body {
   background: rgba(8, 12, 19, 0.95);
   backdrop-filter: blur(3px);
   padding: 0.45rem;
+}
+
+.graph-grid-has-expanded .graph-tile {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.graph-grid-has-expanded .graph-tile-expanded {
+  position: fixed;
+  inset: 12px;
+  z-index: 40;
+  border-radius: 0.8rem;
+  opacity: 1;
+  pointer-events: auto;
+  box-shadow: 0 25px 60px rgba(0, 0, 0, 0.5);
+}
+
+.graph-grid-has-expanded .drop-zone,
+.graph-grid-has-expanded .graph-tile-track {
+  display: none;
 }
 
 .menu-help {
