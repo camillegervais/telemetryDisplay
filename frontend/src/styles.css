@@ -354,6 +354,7 @@ body {
 
 .panel-text {
   margin: 0 0 0.8rem;
+  text-align: center;
   color: var(--fg-2);
   line-height: 1.4;
 }
@@ -569,6 +570,10 @@ body {
   gap: 0;
 }
 
+.graph-grid-resizing {
+  user-select: none;
+}
+
 .graph-tile {
   position: relative;
   border: 1px solid rgba(73, 23, 33, 0.9);
@@ -646,6 +651,76 @@ body {
 .graph-tile-expanded .graph-corner-actions {
   opacity: 1;
   pointer-events: auto;
+}
+
+.graph-resize-handle {
+  position: absolute;
+  width: 14px;
+  height: 14px;
+  border: 0;
+  background: transparent;
+  z-index: 6;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.18s ease;
+}
+
+.graph-resize-handle::before {
+  content: "";
+  position: absolute;
+  inset: 2px;
+  border-right: 2px solid rgba(255, 135, 149, 0.95);
+  border-bottom: 2px solid rgba(255, 135, 149, 0.95);
+  filter: drop-shadow(0 0 2px rgba(255, 70, 93, 0.5));
+}
+
+.graph-resize-handle:focus-visible {
+  outline: none;
+}
+
+.graph-tile:hover .graph-resize-handle,
+.graph-tile:focus-within .graph-resize-handle,
+.graph-tile.has-open-menu .graph-resize-handle,
+.graph-tile-expanded .graph-resize-handle,
+.graph-grid-resizing .graph-resize-handle {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.graph-resize-handle.handle-nw {
+  top: 2px;
+  left: 2px;
+  cursor: nwse-resize;
+}
+
+.graph-resize-handle.handle-nw::before {
+  transform: rotate(180deg);
+}
+
+.graph-resize-handle.handle-ne {
+  top: 2px;
+  right: 2px;
+  cursor: nesw-resize;
+}
+
+.graph-resize-handle.handle-ne::before {
+  transform: rotate(-90deg);
+}
+
+.graph-resize-handle.handle-sw {
+  bottom: 2px;
+  left: 2px;
+  cursor: nesw-resize;
+}
+
+.graph-resize-handle.handle-sw::before {
+  transform: rotate(90deg);
+}
+
+.graph-resize-handle.handle-se {
+  bottom: 2px;
+  right: 2px;
+  cursor: nwse-resize;
 }
 
 .icon-button {

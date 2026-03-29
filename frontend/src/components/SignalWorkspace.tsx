@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import type { MouseEvent as ReactMouseEvent } from "react";
 import Plot from "react-plotly.js";
 
 import { queryDataset } from "../api";
@@ -43,9 +44,26 @@ type HoverEvent = {
   points?: Array<{ x?: unknown }>;
 };
 
+type ResizeHandle = "nw" | "ne" | "sw" | "se";
+
+type ResizeState = {
+  widgetId: number;
+  handle: ResizeHandle;
+  startX: number;
+  startY: number;
+  startRow: number;
+  startCol: number;
+  startWidthSpan: number;
+  startHeightSpan: number;
+};
+
 const COLORS = ["#00a8ff", "#ff2d4f", "#ffd447", "#34d399", "#ff8a33", "#ff9aa8"];
 const WORKSPACE_CONFIGS_KEY = "telemetry-display.workspace-configs.v1";
 const SIGNAL_DRAG_MIME = "application/x-telemetry-signal";
+
+function clamp(value: number, min: number, max: number): number {
+  return Math.max(min, Math.min(max, value));
+}
 
 function makeId(prefix: string): string {
   return `${prefix}-${Date.now()}-${Math.random().toString(16).slice(2, 8)}`;
@@ -335,11 +353,111 @@ export default function SignalWorkspace({
   const [dragFromId, setDragFromId] = useState<number | null>(null);
   const [signalDropCell, setSignalDropCell] = useState<string | null>(null);
   const [expandedWidgetId, setExpandedWidgetId] = useState<number | null>(null);
+  const [resizeState, setResizeState] = useState<ResizeState | null>(null);
   const [seriesById, setSeriesById] = useState<Record<number, SignalSeries | null>>({});
   const [loadingById, setLoadingById] = useState<Record<number, boolean>>({});
+  const gridRef = useRef<HTMLDivElement | null>(null);
 
   const availableSignals = datasetMetadata?.signal_names ?? [];
   const canQuery = datasetId !== null && datasetMetadata !== null;
+
+  useEffect(() => {
+    if (!resizeState) {
+      return;
+    }
+
+    const activeResize = resizeState;
+
+    function onMouseMove(event: MouseEvent) {
+      const gridElement = gridRef.current;
+      if (!gridElement) {
+        return;
+      }
+
+      const rect = gridElement.getBoundingClientRect();
+      const cellWidth = rect.width / Math.max(gridCols, 1);
+      const cellHeight = rect.height / Math.max(gridRows, 1);
+
+      if (cellWidth <= 0 || cellHeight <= 0) {
+        return;
+      }
+
+      const deltaCols = Math.round((event.clientX - activeResize.startX) / cellWidth);
+      const deltaRows = Math.round((event.clientY - activeResize.startY) / cellHeight);
+
+      setWidgets((prev) => {
+        const widget = prev.find((item) => item.id === activeResize.widgetId);
+        if (!widget) {
+          return prev;
+        }
+
+        let nextCol = activeResize.startCol;
+        let nextRow = activeResize.startRow;
+        let nextWidthSpan = activeResize.startWidthSpan;
+        let nextHeightSpan = activeResize.startHeightSpan;
+
+        if (activeResize.handle.includes("e")) {
+          nextWidthSpan = clamp(
+            activeResize.startWidthSpan + deltaCols,
+            1,
+            gridCols - activeResize.startCol + 1
+          );
+        }
+        if (activeResize.handle.includes("s")) {
+          nextHeightSpan = clamp(
+            activeResize.startHeightSpan + deltaRows,
+            1,
+            gridRows - activeResize.startRow + 1
+          );
+        }
+        if (activeResize.handle.includes("w")) {
+          const rightEdge = activeResize.startCol + activeResize.startWidthSpan - 1;
+          nextCol = clamp(activeResize.startCol + deltaCols, 1, rightEdge);
+          nextWidthSpan = rightEdge - nextCol + 1;
+        }
+        if (activeResize.handle.includes("n")) {
+          const bottomEdge = activeResize.startRow + activeResize.startHeightSpan - 1;
+          nextRow = clamp(activeResize.startRow + deltaRows, 1, bottomEdge);
+          nextHeightSpan = bottomEdge - nextRow + 1;
+        }
+
+        const candidate = {
+          ...widget,
+          row: nextRow,
+          col: nextCol,
+          widthSpan: nextWidthSpan,
+          heightSpan: nextHeightSpan,
+        };
+        const otherWidgets = prev.filter((item) => item.id !== widget.id);
+        const canPlace = canPlaceWidget(
+          candidate,
+          nextRow,
+          nextCol,
+          gridRows,
+          gridCols,
+          otherWidgets
+        );
+
+        if (!canPlace) {
+          return prev;
+        }
+
+        return prev.map((item) => (item.id === widget.id ? candidate : item));
+      });
+    }
+
+    function onMouseUp() {
+      setResizeState(null);
+    }
+
+    window.addEventListener("mousemove", onMouseMove);
+    window.addEventListener("mouseup", onMouseUp);
+
+    return () => {
+      window.removeEventListener("mousemove", onMouseMove);
+      window.removeEventListener("mouseup", onMouseUp);
+    };
+  }, [gridCols, gridRows, resizeState]);
 
   useEffect(() => {
     setTabs((prev) =>
@@ -797,6 +915,25 @@ export default function SignalWorkspace({
     });
   }
 
+  function startResize(
+    event: ReactMouseEvent<HTMLButtonElement>,
+    widget: GraphWidget,
+    handle: ResizeHandle
+  ) {
+    event.preventDefault();
+    event.stopPropagation();
+    setResizeState({
+      widgetId: widget.id,
+      handle,
+      startX: event.clientX,
+      startY: event.clientY,
+      startRow: widget.row,
+      startCol: widget.col,
+      startWidthSpan: widget.widthSpan,
+      startHeightSpan: widget.heightSpan,
+    });
+  }
+
   return (
     <section className={`panel signal-workspace ${graphOnlyMode ? "signal-workspace-max" : ""}`}>
       <div className={`panel-header panel-header-tight ${graphOnlyMode ? "panel-header-hidden" : ""}`}>
@@ -890,7 +1027,11 @@ export default function SignalWorkspace({
         </button>
       </div>
 
-      <div className={`graph-grid ${expandedWidgetId !== null ? "graph-grid-has-expanded" : ""}`} style={gridStyle}>
+      <div
+        ref={gridRef}
+        className={`graph-grid ${expandedWidgetId !== null ? "graph-grid-has-expanded" : ""} ${resizeState ? "graph-grid-resizing" : ""}`}
+        style={gridStyle}
+      >
         {widgets.map((widget) => {
           const chart = buildChartConfig(
             widget.title,
@@ -972,6 +1113,31 @@ export default function SignalWorkspace({
                   {expandedWidgetId === widget.id ? "⤡" : "⛶"}
                 </button>
               </div>
+
+              <button
+                type="button"
+                className="graph-resize-handle handle-nw"
+                onMouseDown={(event) => startResize(event, widget, "nw")}
+                title="Redimensionner"
+              />
+              <button
+                type="button"
+                className="graph-resize-handle handle-ne"
+                onMouseDown={(event) => startResize(event, widget, "ne")}
+                title="Redimensionner"
+              />
+              <button
+                type="button"
+                className="graph-resize-handle handle-sw"
+                onMouseDown={(event) => startResize(event, widget, "sw")}
+                title="Redimensionner"
+              />
+              <button
+                type="button"
+                className="graph-resize-handle handle-se"
+                onMouseDown={(event) => startResize(event, widget, "se")}
+                title="Redimensionner"
+              />
 
               {widget.menuOpen ? (
                 <div className="graph-menu">
