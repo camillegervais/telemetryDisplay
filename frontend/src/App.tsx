@@ -104,6 +104,7 @@ export default function App() {
             loadingAppInfo={loadingAppInfo}
             importing={importing}
             importMessage={importMessage}
+            datasetId={datasetId}
             datasetMetadata={datasetMetadata}
             onImport={handleImport}
           />
