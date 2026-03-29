@@ -211,7 +211,7 @@ function buildChartConfig(
       width: 2,
     },
     yaxis: index === 0 ? "y" : `y${index + 1}`,
-    hovertemplate: `${signal}<br>%{x:.1f} m<br>%{y:.3f}<extra></extra>`,
+    hovertemplate: `%{y:.3f}<extra></extra>`,
   }));
 
   const layout: Record<string, unknown> = {
@@ -333,6 +333,7 @@ export default function SignalWorkspace({
   const [selectedConfigId, setSelectedConfigId] = useState<string>("");
   const [currentConfigId, setCurrentConfigId] = useState<string | null>(null);
   const [dragFromId, setDragFromId] = useState<number | null>(null);
+  const [signalDropCell, setSignalDropCell] = useState<string | null>(null);
   const [expandedWidgetId, setExpandedWidgetId] = useState<number | null>(null);
   const [seriesById, setSeriesById] = useState<Record<number, SignalSeries | null>>({});
   const [loadingById, setLoadingById] = useState<Record<number, boolean>>({});
@@ -913,6 +914,9 @@ export default function SignalWorkspace({
                 if (dragFromId !== null || canDropSignal) {
                   event.preventDefault();
                 }
+                if (canDropSignal && signalDropCell !== null) {
+                  setSignalDropCell(null);
+                }
               }}
               onDrop={(event) => {
                 event.preventDefault();
@@ -925,6 +929,7 @@ export default function SignalWorkspace({
                   }
                 }
                 setDragFromId(null);
+                setSignalDropCell(null);
               }}
             >
               <div className="graph-corner-actions">
@@ -1110,7 +1115,7 @@ export default function SignalWorkspace({
             return (
               <div
                 key={`drop-${cellKey}`}
-                className="drop-zone"
+                className={`drop-zone ${signalDropCell === cellKey ? "drop-zone-signal-hover" : ""}`}
                 style={{
                   gridColumn: col,
                   gridRow: row,
@@ -1119,6 +1124,14 @@ export default function SignalWorkspace({
                   const canDropSignal = event.dataTransfer.types.includes(SIGNAL_DRAG_MIME);
                   if (dragFromId !== null || canDropSignal) {
                     event.preventDefault();
+                  }
+                  if (canDropSignal && signalDropCell !== cellKey) {
+                    setSignalDropCell(cellKey);
+                  }
+                }}
+                onDragLeave={() => {
+                  if (signalDropCell === cellKey) {
+                    setSignalDropCell(null);
                   }
                 }}
                 onDrop={(event) => {
@@ -1132,6 +1145,7 @@ export default function SignalWorkspace({
                     }
                   }
                   setDragFromId(null);
+                  setSignalDropCell(null);
                 }}
               />
             );

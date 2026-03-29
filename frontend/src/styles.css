@@ -448,9 +448,31 @@ body {
 }
 
 .drop-zone {
+  position: relative;
   pointer-events: all;
   min-height: 0;
   overflow: hidden;
+  border: 1px dashed transparent;
+  border-radius: 0.65rem;
+  transition: border-color 0.15s ease, background-color 0.15s ease;
+}
+
+.drop-zone-signal-hover {
+  border-color: rgba(0, 212, 255, 0.65);
+  background: rgba(0, 212, 255, 0.12);
+}
+
+.drop-zone-signal-hover::before {
+  content: "+";
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  color: #c9f3ff;
+  font-size: 1.45rem;
+  font-weight: 700;
+  line-height: 1;
+  text-shadow: 0 0 10px rgba(0, 212, 255, 0.5);
 }
 
 .plot-fill {
