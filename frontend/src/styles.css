@@ -151,6 +151,29 @@ body {
   display: none;
 }
 
+.global-loading-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: grid;
+  place-items: center;
+  background: rgba(8, 3, 5, 0.46);
+  backdrop-filter: blur(2px);
+}
+
+.global-loading-card {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.55rem;
+  border: 1px solid rgba(255, 70, 93, 0.6);
+  background: rgba(20, 7, 10, 0.94);
+  color: #ffd9df;
+  padding: 0.55rem 0.8rem;
+  font-family: "Rajdhani", sans-serif;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
 .dashboard-grid {
   display: grid;
   grid-template-columns: 300px 1fr;
@@ -902,12 +925,39 @@ body {
   right: 0.5rem;
   top: 0.5rem;
   z-index: 4;
-  background: rgba(11, 17, 27, 0.75);
-  border: 1px solid rgba(0, 212, 255, 0.3);
+  background: rgba(20, 8, 12, 0.82);
+  border: 1px solid rgba(255, 70, 93, 0.45);
   border-radius: 999px;
-  padding: 0.2rem 0.55rem;
+  padding: 0.2rem 0.5rem;
   font-size: 0.74rem;
-  color: #9edfff;
+  color: #ffd9df;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.38rem;
+}
+
+.loading-inline {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.38rem;
+}
+
+.loading-spinner {
+  width: 0.82rem;
+  height: 0.82rem;
+  border-radius: 999px;
+  border: 2px solid rgba(255, 160, 175, 0.3);
+  border-top-color: #ff8ea0;
+  animation: spin-telemetry 0.8s linear infinite;
+}
+
+@keyframes spin-telemetry {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 .placeholder-graph {

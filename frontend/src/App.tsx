@@ -123,6 +123,15 @@ export default function App() {
 
       {error ? <div className="error-banner">API error: {error}</div> : null}
 
+      {importing ? (
+        <div className="global-loading-overlay" role="status" aria-live="polite">
+          <div className="global-loading-card">
+            <span className="loading-spinner" aria-hidden="true" />
+            <span>Import en cours</span>
+          </div>
+        </div>
+      ) : null}
+
       <main className="dashboard-grid">
         {!graphOnlyMode ? (
           <ImportPanel

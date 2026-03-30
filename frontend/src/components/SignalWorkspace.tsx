@@ -1470,7 +1470,12 @@ export default function SignalWorkspace({
       {isTrajectoryActive ? (
         <div className="graph-grid" style={{ gridTemplateColumns: "1fr", gridTemplateRows: "1fr" }}>
           <article className="graph-tile" style={{ gridColumn: "1 / span 1", gridRow: "1 / span 1" }}>
-            {trajectoryLoading ? <div className="loading-plot">Chargement...</div> : null}
+            {trajectoryLoading ? (
+              <div className="loading-plot">
+                <span className="loading-spinner" aria-hidden="true" />
+                Chargement...
+              </div>
+            ) : null}
             {trajectoryError ? <p className="panel-text">{trajectoryError}</p> : null}
             {!trajectoryError && !trajectoryChart.hasCar ? (
               <div className="placeholder-graph" aria-label="Trajectoire indisponible">
@@ -1758,7 +1763,12 @@ export default function SignalWorkspace({
                 </div>
               ) : null}
 
-              {loadingById[widget.id] ? <div className="loading-plot">Chargement...</div> : null}
+              {loadingById[widget.id] ? (
+                <div className="loading-plot">
+                  <span className="loading-spinner" aria-hidden="true" />
+                  Chargement...
+                </div>
+              ) : null}
 
               {(widgetKind === "xy" && (!widget.xSignal || widget.signals.length === 0)) ||
               (widgetKind === "timeseries" && widget.signals.length === 0) ? (

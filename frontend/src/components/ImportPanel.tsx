@@ -235,7 +235,14 @@ export default function ImportPanel({
             />
 
             <button className="import-button" disabled={!canImport} onClick={handleImportClick}>
-              {importing ? "Import en cours..." : "Importer le dataset"}
+              {importing ? (
+                <span className="loading-inline">
+                  <span className="loading-spinner" aria-hidden="true" />
+                  Import en cours...
+                </span>
+              ) : (
+                "Importer le dataset"
+              )}
             </button>
 
             <button
@@ -243,7 +250,14 @@ export default function ImportPanel({
               disabled={!canRefreshFromLastSelection}
               onClick={handleRefreshFromLastSelectionClick}
             >
-              {importing ? "Import en cours..." : "Refresh depuis derniere selection"}
+              {importing ? (
+                <span className="loading-inline">
+                  <span className="loading-spinner" aria-hidden="true" />
+                  Import en cours...
+                </span>
+              ) : (
+                "Refresh depuis derniere selection"
+              )}
             </button>
 
             <label className="field-label" htmlFor="mat-path-input">
@@ -262,7 +276,14 @@ export default function ImportPanel({
               disabled={!canImportFromPath}
               onClick={handleImportFromPathClick}
             >
-              {importing ? "Import en cours..." : "Importer depuis chemin"}
+              {importing ? (
+                <span className="loading-inline">
+                  <span className="loading-spinner" aria-hidden="true" />
+                  Import en cours...
+                </span>
+              ) : (
+                "Importer depuis chemin"
+              )}
             </button>
 
             {selectedFile ? <p className="panel-text file-picked">{selectedFile.name}</p> : null}
@@ -340,7 +361,12 @@ export default function ImportPanel({
                 <h2>Stats signaux</h2>
               </div>
 
-              {loadingStats ? <p className="panel-text">Calcul des statistiques...</p> : null}
+              {loadingStats ? (
+                <p className="panel-text loading-inline">
+                  <span className="loading-spinner" aria-hidden="true" />
+                  Calcul des statistiques...
+                </p>
+              ) : null}
               {statsError ? <p className="panel-text">{statsError}</p> : null}
 
               {!loadingStats && !statsError ? (
