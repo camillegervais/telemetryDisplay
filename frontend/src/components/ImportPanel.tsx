@@ -3,7 +3,7 @@ import { useEffect, useMemo, useState } from "react";
 import { queryDataset } from "../api";
 import { useTelemetryStore } from "../store/telemetryStore";
 
-import type { AppInfo, DatasetMetadata } from "../types";
+import type { AppInfo, DatasetMetadata, MathChannel } from "../types";
 
 type ImportPanelProps = {
   appInfo: AppInfo | null;
@@ -12,8 +12,11 @@ type ImportPanelProps = {
   importMessage: string | null;
   datasetId: string | null;
   datasetMetadata: DatasetMetadata | null;
+  mathChannels: MathChannel[];
   onImport: (file: File) => Promise<void>;
   onImportFromPath: (matPath: string) => Promise<void>;
+  onAddMathChannel: (name: string, expression: string) => string | null;
+  onRemoveMathChannel: (name: string) => void;
 };
 
 type SignalStats = {
@@ -37,8 +40,11 @@ export default function ImportPanel({
   importMessage,
   datasetId,
   datasetMetadata,
+  mathChannels,
   onImport,
   onImportFromPath,
+  onAddMathChannel,
+  onRemoveMathChannel,
 }: ImportPanelProps) {
   const { xAxisMode, sampleRateHz, setXAxisMode, setSampleRateHz } = useTelemetryStore();
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
@@ -49,6 +55,9 @@ export default function ImportPanel({
   const [signalStats, setSignalStats] = useState<Record<string, SignalStats>>({});
   const [loadingStats, setLoadingStats] = useState(false);
   const [statsError, setStatsError] = useState<string | null>(null);
+  const [mathName, setMathName] = useState("");
+  const [mathExpression, setMathExpression] = useState("");
+  const [mathError, setMathError] = useState<string | null>(null);
 
   const canImport = useMemo(() => selectedFile !== null && !importing, [importing, selectedFile]);
   const canImportFromPath = useMemo(() => matPath.trim().length > 0 && !importing, [importing, matPath]);
@@ -57,13 +66,13 @@ export default function ImportPanel({
     [importing, matPath, selectedFile]
   );
   const filteredSignals = useMemo(() => {
-    const allSignals = datasetMetadata?.signal_names ?? [];
+    const allSignals = [...(datasetMetadata?.signal_names ?? []), ...mathChannels.map((channel) => channel.name)];
     const filter = signalFilter.trim().toLowerCase();
     if (!filter) {
       return allSignals;
     }
     return allSignals.filter((signal) => signal.toLowerCase().includes(filter));
-  }, [datasetMetadata, signalFilter]);
+  }, [datasetMetadata, mathChannels, signalFilter]);
 
   useEffect(() => {
     const savedPath = window.localStorage.getItem(LAST_MAT_PATH_KEY);
@@ -185,6 +194,18 @@ export default function ImportPanel({
     }
     window.localStorage.setItem(LAST_MAT_PATH_KEY, path);
     await onImportFromPath(path);
+  }
+
+  function handleAddMathChannelClick() {
+    const error = onAddMathChannel(mathName, mathExpression);
+    if (error) {
+      setMathError(error);
+      return;
+    }
+
+    setMathName("");
+    setMathExpression("");
+    setMathError(null);
   }
 
   return (
@@ -361,6 +382,49 @@ export default function ImportPanel({
               placeholder="Ex: 100"
             />
           </div>
+        </div>
+
+        <div className="signals-stats" style={{ marginTop: "0.4rem", flex: "0 0 auto" }}>
+          <div className="panel-header panel-header-tight signals-stats-head">
+            <h2>Math channel</h2>
+          </div>
+          <input
+            type="text"
+            className="signals-filter-input"
+            value={mathName}
+            onChange={(event) => setMathName(event.target.value)}
+            placeholder="Nom du canal (ex: speed_gain)"
+          />
+          <input
+            type="text"
+            className="signals-filter-input"
+            value={mathExpression}
+            onChange={(event) => setMathExpression(event.target.value)}
+            placeholder="Expression (ex: gain(speed_kmh, 1.05) - 3)"
+          />
+          <button className="small-button" onClick={handleAddMathChannelClick}>
+            Ajouter math
+          </button>
+          {mathError ? <p className="panel-text">{mathError}</p> : null}
+          {mathChannels.length > 0 ? (
+            <div className="signals-stats-list" style={{ maxHeight: "120px", flex: "0 0 auto" }}>
+              {mathChannels.map((channel) => (
+                <div key={channel.name} className="signals-stats-item">
+                  <div className="signals-stats-title">{channel.name}</div>
+                  <div className="signals-stats-values" style={{ gridTemplateColumns: "1fr" }}>
+                    <span>{channel.expression}</span>
+                  </div>
+                  <button
+                    type="button"
+                    className="small-button"
+                    onClick={() => onRemoveMathChannel(channel.name)}
+                  >
+                    Supprimer
+                  </button>
+                </div>
+              ))}
+            </div>
+          ) : null}
         </div>
 
         {!datasetMetadata || datasetMetadata.signal_names.length === 0 ? (

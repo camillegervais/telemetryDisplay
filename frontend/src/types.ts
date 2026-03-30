@@ -44,3 +44,9 @@ export type DistanceRange = {
   start: number;
   end: number;
 };
+
+export type MathChannel = {
+  name: string;
+  expression: string;
+  dependencies: string[];
+};

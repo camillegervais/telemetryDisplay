@@ -3,13 +3,15 @@ import type { MouseEvent as ReactMouseEvent } from "react";
 import Plot from "react-plotly.js";
 
 import { queryDataset } from "../api";
+import { evaluateMathChannel } from "../mathChannels";
 import { useTelemetryStore } from "../store/telemetryStore";
-import type { DatasetMetadata, DistanceRange, SignalSeries, TrackMapResponse } from "../types";
+import type { DatasetMetadata, DistanceRange, MathChannel, SignalSeries, TrackMapResponse } from "../types";
 
 type SignalWorkspaceProps = {
   datasetId: string | null;
   datasetMetadata: DatasetMetadata | null;
   trackMap: TrackMapResponse | null;
+  mathChannels: MathChannel[];
   graphOnlyMode: boolean;
 };
 
@@ -528,6 +530,7 @@ export default function SignalWorkspace({
   datasetId,
   datasetMetadata,
   trackMap,
+  mathChannels,
   graphOnlyMode,
 }: SignalWorkspaceProps) {
   const {
@@ -563,9 +566,45 @@ export default function SignalWorkspace({
   const gridRef = useRef<HTMLDivElement | null>(null);
   const queryGenerationRef = useRef(0);
 
-  const availableSignals = datasetMetadata?.signal_names ?? [];
+  const availableSignals = useMemo(
+    () => [...(datasetMetadata?.signal_names ?? []), ...mathChannels.map((channel) => channel.name)],
+    [datasetMetadata, mathChannels]
+  );
+  const mathChannelByName = useMemo(
+    () => Object.fromEntries(mathChannels.map((channel) => [channel.name, channel])),
+    [mathChannels]
+  );
   const canQuery = datasetId !== null && datasetMetadata !== null;
   const isTrajectoryActive = activeTabId === TRAJECTORY_TAB_ID;
+
+  function expandSignalsForQuery(signals: string[]): string[] {
+    const expanded = new Set<string>();
+    signals.forEach((signal) => {
+      const channel = mathChannelByName[signal];
+      if (channel) {
+        channel.dependencies.forEach((dependency) => expanded.add(dependency));
+      } else {
+        expanded.add(signal);
+      }
+    });
+    return Array.from(expanded);
+  }
+
+  function buildComputedSignals(rawSignals: Record<string, number[]>): Record<string, number[]> {
+    const merged = { ...rawSignals };
+    mathChannels.forEach((channel) => {
+      const hasDeps = channel.dependencies.every((dependency) => merged[dependency] !== undefined);
+      if (!hasDeps) {
+        return;
+      }
+      try {
+        merged[channel.name] = evaluateMathChannel(channel, merged);
+      } catch {
+        merged[channel.name] = [];
+      }
+    });
+    return merged;
+  }
 
   useEffect(() => {
     const snapshot = loadWorkspaceSessionSnapshot();
@@ -755,7 +794,11 @@ export default function SignalWorkspace({
     const start = xRange?.start ?? datasetMetadata.lap_distance_min;
     const end = xRange?.end ?? datasetMetadata.lap_distance_max;
 
-    const activeWidgets = widgets.filter((widget) => getWidgetQuerySignals(widget).length > 0);
+    const activeWidgets = widgets.filter((widget) => {
+      const selectedSignals = getWidgetQuerySignals(widget);
+      const querySignals = expandSignalsForQuery(selectedSignals);
+      return querySignals.length > 0;
+    });
     if (activeWidgets.length === 0) {
       return;
     }
@@ -767,9 +810,12 @@ export default function SignalWorkspace({
     activeWidgets.forEach((widget) => {
       setLoadingById((prev) => ({ ...prev, [widget.id]: true }));
 
+      const selectedSignals = getWidgetQuerySignals(widget);
+      const querySignals = expandSignalsForQuery(selectedSignals);
+
       queryDataset({
         datasetId,
-        signals: getWidgetQuerySignals(widget),
+        signals: querySignals,
         startDistance: start,
         endDistance: end,
         maxPoints: 1200,
@@ -779,11 +825,13 @@ export default function SignalWorkspace({
           if (!alive || queryGeneration !== queryGenerationRef.current) {
             return;
           }
+
+          const signalsWithMath = buildComputedSignals(response.signals);
           setSeriesById((prev) => ({
             ...prev,
             [widget.id]: {
               lapDistance: response.lap_distance,
-              signals: response.signals,
+              signals: signalsWithMath,
               decimationFactor: response.decimation_factor,
             },
           }));

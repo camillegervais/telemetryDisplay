@@ -8,8 +8,9 @@ import {
   importDatasetFromPath,
 } from "./api";
 import { ImportPanel, SignalWorkspace } from "./components";
+import { analyzeMathExpression } from "./mathChannels";
 import { useTelemetryStore } from "./store/telemetryStore";
-import type { AppInfo, DatasetMetadata, TrackMapResponse } from "./types";
+import type { AppInfo, DatasetMetadata, MathChannel, TrackMapResponse } from "./types";
 
 export default function App() {
   const [appInfo, setAppInfo] = useState<AppInfo | null>(null);
@@ -20,6 +21,7 @@ export default function App() {
   const [datasetId, setDatasetId] = useState<string | null>(null);
   const [datasetMetadata, setDatasetMetadata] = useState<DatasetMetadata | null>(null);
   const [trackMap, setTrackMap] = useState<TrackMapResponse | null>(null);
+  const [mathChannels, setMathChannels] = useState<MathChannel[]>([]);
   const [graphOnlyMode, setGraphOnlyMode] = useState(false);
 
   const { setXRange, setCursorDistance, triggerHomeReset } = useTelemetryStore();
@@ -90,8 +92,51 @@ export default function App() {
 
     setDatasetMetadata(metadata);
     setTrackMap(map);
+    setMathChannels([]);
     setXRange(null);
     setCursorDistance(null);
+  }
+
+  function handleAddMathChannel(name: string, expression: string): string | null {
+    if (!datasetMetadata) {
+      return "Dataset requis";
+    }
+
+    const trimmedName = name.trim();
+    if (!trimmedName) {
+      return "Nom requis";
+    }
+
+    if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(trimmedName)) {
+      return "Nom invalide (lettres/chiffres/underscore)";
+    }
+
+    const existing = new Set([
+      ...datasetMetadata.signal_names,
+      ...mathChannels.map((channel) => channel.name),
+    ]);
+    if (existing.has(trimmedName)) {
+      return "Nom deja utilise";
+    }
+
+    const { dependencies, error } = analyzeMathExpression(expression, datasetMetadata.signal_names);
+    if (error) {
+      return error;
+    }
+
+    setMathChannels((prev) => [
+      ...prev,
+      {
+        name: trimmedName,
+        expression: expression.trim(),
+        dependencies,
+      },
+    ]);
+    return null;
+  }
+
+  function handleRemoveMathChannel(name: string) {
+    setMathChannels((prev) => prev.filter((channel) => channel.name !== name));
   }
 
   return (
@@ -141,14 +186,18 @@ export default function App() {
             importMessage={importMessage}
             datasetId={datasetId}
             datasetMetadata={datasetMetadata}
+            mathChannels={mathChannels}
             onImport={handleImport}
             onImportFromPath={handleImportFromPath}
+            onAddMathChannel={handleAddMathChannel}
+            onRemoveMathChannel={handleRemoveMathChannel}
           />
         ) : null}
         <SignalWorkspace
           datasetId={datasetId}
           datasetMetadata={datasetMetadata}
           trackMap={trackMap}
+          mathChannels={mathChannels}
           graphOnlyMode={graphOnlyMode}
         />
       </main>
