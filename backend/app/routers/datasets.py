@@ -1,8 +1,8 @@
 """Dataset import, query, and track map endpoints."""
 
 from pathlib import Path
-from tempfile import TemporaryDirectory
 from typing import Dict, Optional
+import uuid
 
 import numpy as np
 import pandas as pd
@@ -63,23 +63,23 @@ async def import_mat_file(file: UploadFile) -> DatasetImportResponse:
 
     try:
         contents = await file.read()
-        
-        # Use temporary directory compatible with Windows and Unix
-        with TemporaryDirectory() as tmpdir:
-            temp_path = Path(tmpdir) / file.filename
-            temp_path.write_bytes(contents)
 
-            df_normalized, metadata = mat_loader.load_and_normalize(str(temp_path))
+        repo_root = Path(__file__).resolve().parents[3]
+        import_cache_dir = repo_root / "data" / "import_cache"
+        import_cache_dir.mkdir(parents=True, exist_ok=True)
 
-            # Optionally cache track map if available
-            # (would be populated from CSV uploaded separately in a full implementation)
+        safe_name = Path(file.filename).name
+        stable_path = import_cache_dir / f"{uuid.uuid4().hex}_{safe_name}"
+        stable_path.write_bytes(contents)
 
-            return DatasetImportResponse(
-                dataset_id=metadata.dataset_id,
-                message=f"Dataset imported: {len(df_normalized)} normalized samples, "
-                f"source step {metadata.source_distance_step_m:.2f}m → "
-                f"reference step {metadata.normalized_distance_step_m:.2f}m",
-            )
+        df_normalized, metadata = mat_loader.load_and_normalize(stable_path)
+
+        return DatasetImportResponse(
+            dataset_id=metadata.dataset_id,
+            message=f"Dataset imported: {len(df_normalized)} normalized samples, "
+            f"source step {metadata.source_distance_step_m:.2f}m -> "
+            f"reference step {metadata.normalized_distance_step_m:.2f}m",
+        )
 
     except MatValidationError as e:
         raise HTTPException(status_code=422, detail=str(e))
