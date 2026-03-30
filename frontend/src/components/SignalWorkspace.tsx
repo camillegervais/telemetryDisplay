@@ -40,6 +40,13 @@ type SavedWorkspaceConfig = {
   activeTabId: string;
 };
 
+type WorkspaceSessionSnapshot = {
+  tabs: WorkspaceTab[];
+  activeTabId: string;
+  currentConfigId: string | null;
+  selectedConfigId: string;
+};
+
 type HoverEvent = {
   points?: Array<{ x?: unknown }>;
 };
@@ -59,6 +66,7 @@ type ResizeState = {
 
 const COLORS = ["#00a8ff", "#ff2d4f", "#ffd447", "#34d399", "#ff8a33", "#ff9aa8"];
 const WORKSPACE_CONFIGS_KEY = "telemetry-display.workspace-configs.v1";
+const WORKSPACE_SESSION_KEY = "telemetry-display.workspace-session.v1";
 const SIGNAL_DRAG_MIME = "application/x-telemetry-signal";
 
 function isAbortError(error: unknown): boolean {
@@ -112,6 +120,47 @@ function storeWorkspaceConfigs(configs: SavedWorkspaceConfig[]): void {
     return;
   }
   window.localStorage.setItem(WORKSPACE_CONFIGS_KEY, JSON.stringify(configs));
+}
+
+function loadWorkspaceSessionSnapshot(): WorkspaceSessionSnapshot | null {
+  if (typeof window === "undefined") {
+    return null;
+  }
+
+  try {
+    const raw = window.localStorage.getItem(WORKSPACE_SESSION_KEY);
+    if (!raw) {
+      return null;
+    }
+
+    const parsed = JSON.parse(raw) as WorkspaceSessionSnapshot;
+    if (!Array.isArray(parsed.tabs) || parsed.tabs.length === 0 || typeof parsed.activeTabId !== "string") {
+      return null;
+    }
+
+    return parsed;
+  } catch {
+    return null;
+  }
+}
+
+function storeWorkspaceSessionSnapshot(snapshot: WorkspaceSessionSnapshot): void {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  const cleanTabs = snapshot.tabs.map((tab) => ({
+    ...tab,
+    widgets: sanitizeWidgetsForStorage(tab.widgets),
+  }));
+
+  window.localStorage.setItem(
+    WORKSPACE_SESSION_KEY,
+    JSON.stringify({
+      ...snapshot,
+      tabs: cleanTabs,
+    })
+  );
 }
 
 function createWidget(id: number, title: string, row: number, col: number): GraphWidget {
@@ -360,10 +409,51 @@ export default function SignalWorkspace({
   const [resizeState, setResizeState] = useState<ResizeState | null>(null);
   const [seriesById, setSeriesById] = useState<Record<number, SignalSeries | null>>({});
   const [loadingById, setLoadingById] = useState<Record<number, boolean>>({});
+  const [sessionHydrated, setSessionHydrated] = useState(false);
   const gridRef = useRef<HTMLDivElement | null>(null);
 
   const availableSignals = datasetMetadata?.signal_names ?? [];
   const canQuery = datasetId !== null && datasetMetadata !== null;
+
+  useEffect(() => {
+    const snapshot = loadWorkspaceSessionSnapshot();
+    if (!snapshot) {
+      setSessionHydrated(true);
+      return;
+    }
+
+    const clonedTabs = snapshot.tabs.map((tab) => ({
+      ...tab,
+      widgets: tab.widgets.map((widget) => ({ ...widget, menuOpen: false })),
+    }));
+    const restoredActiveId = clonedTabs.some((tab) => tab.id === snapshot.activeTabId)
+      ? snapshot.activeTabId
+      : clonedTabs[0].id;
+    const restoredActiveTab = clonedTabs.find((tab) => tab.id === restoredActiveId) ?? clonedTabs[0];
+
+    setTabs(clonedTabs);
+    setActiveTabId(restoredActiveId);
+    setGridCols(restoredActiveTab.gridCols);
+    setGridRows(restoredActiveTab.gridRows);
+    setNextId(restoredActiveTab.nextId);
+    setWidgets(restoredActiveTab.widgets);
+    setCurrentConfigId(snapshot.currentConfigId);
+    setSelectedConfigId(snapshot.selectedConfigId);
+    setSessionHydrated(true);
+  }, []);
+
+  useEffect(() => {
+    if (!sessionHydrated || tabs.length === 0) {
+      return;
+    }
+
+    storeWorkspaceSessionSnapshot({
+      tabs,
+      activeTabId,
+      currentConfigId,
+      selectedConfigId,
+    });
+  }, [sessionHydrated, tabs, activeTabId, currentConfigId, selectedConfigId]);
 
   useEffect(() => {
     if (!resizeState) {
@@ -677,9 +767,7 @@ export default function SignalWorkspace({
   }
 
   function saveCurrentConfiguration() {
-    const defaultName = currentConfigId
-      ? savedConfigs.find((cfg) => cfg.id === currentConfigId)?.name ?? "Configuration"
-      : `Configuration ${savedConfigs.length + 1}`;
+    const defaultName = `Configuration ${savedConfigs.length + 1}`;
     const nextName = window.prompt("Nom de la configuration", defaultName);
     if (!nextName) {
       return;
@@ -690,33 +778,19 @@ export default function SignalWorkspace({
       widgets: sanitizeWidgetsForStorage(tab.widgets),
     }));
 
+    const newId = makeId("cfg");
+    const newConfig: SavedWorkspaceConfig = {
+      id: newId,
+      name: nextName.trim() || defaultName,
+      tabs: normalizedTabs,
+      activeTabId,
+    };
+
+    setCurrentConfigId(newId);
+    setSelectedConfigId(newId);
+
     setSavedConfigs((prev) => {
-      let nextConfigs: SavedWorkspaceConfig[];
-      if (currentConfigId && prev.some((cfg) => cfg.id === currentConfigId)) {
-        nextConfigs = prev.map((cfg) =>
-          cfg.id === currentConfigId
-            ? {
-                ...cfg,
-                name: nextName.trim() || cfg.name,
-                tabs: normalizedTabs,
-                activeTabId,
-              }
-            : cfg
-        );
-      } else {
-        const newId = makeId("cfg");
-        setCurrentConfigId(newId);
-        setSelectedConfigId(newId);
-        nextConfigs = [
-          ...prev,
-          {
-            id: newId,
-            name: nextName.trim() || defaultName,
-            tabs: normalizedTabs,
-            activeTabId,
-          },
-        ];
-      }
+      const nextConfigs = [...prev, newConfig];
       storeWorkspaceConfigs(nextConfigs);
       return nextConfigs;
     });
