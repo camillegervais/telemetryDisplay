@@ -411,6 +411,7 @@ export default function SignalWorkspace({
   const [loadingById, setLoadingById] = useState<Record<number, boolean>>({});
   const [sessionHydrated, setSessionHydrated] = useState(false);
   const gridRef = useRef<HTMLDivElement | null>(null);
+  const queryGenerationRef = useRef(0);
 
   const availableSignals = datasetMetadata?.signal_names ?? [];
   const canQuery = datasetId !== null && datasetMetadata !== null;
@@ -603,6 +604,7 @@ export default function SignalWorkspace({
     }
 
     let alive = true;
+    const queryGeneration = ++queryGenerationRef.current;
     const controller = new AbortController();
 
     activeWidgets.forEach((widget) => {
@@ -617,7 +619,7 @@ export default function SignalWorkspace({
         signal: controller.signal,
       })
         .then((response) => {
-          if (!alive) {
+          if (!alive || queryGeneration !== queryGenerationRef.current) {
             return;
           }
           setSeriesById((prev) => ({
@@ -630,7 +632,7 @@ export default function SignalWorkspace({
           }));
         })
         .catch((error: unknown) => {
-          if (!alive || isAbortError(error)) {
+          if (!alive || queryGeneration !== queryGenerationRef.current || isAbortError(error)) {
             return;
           }
 
@@ -640,7 +642,7 @@ export default function SignalWorkspace({
           }));
         })
         .finally(() => {
-          if (!alive) {
+          if (!alive || queryGeneration !== queryGenerationRef.current) {
             return;
           }
           setLoadingById((prev) => ({ ...prev, [widget.id]: false }));
@@ -751,6 +753,9 @@ export default function SignalWorkspace({
       setGridRows(nextActive.gridRows);
       setNextId(nextActive.nextId);
       setWidgets(nextActive.widgets);
+      setSeriesById({});
+      setLoadingById({});
+      setDragFromId(null);
     }
   }
 
