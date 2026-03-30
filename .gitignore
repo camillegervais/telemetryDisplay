@@ -2,3 +2,5 @@ node_modules
 __pycache__
 *.pyc
 import_cache
+.venv
+*.mat
