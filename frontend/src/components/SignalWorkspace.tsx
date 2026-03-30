@@ -257,7 +257,8 @@ function buildChartConfig(
   selectedSignals: string[],
   cursorDistance: number | null,
   xRange: DistanceRange | null,
-  graphOnlyMode: boolean
+  graphOnlyMode: boolean,
+  homeRevision: number
 ) {
   if (!series || selectedSignals.length === 0) {
     return {
@@ -311,7 +312,7 @@ function buildChartConfig(
       zeroline: false,
     },
     hovermode: "x",
-    uirevision: "telemetry-grid",
+    uirevision: `telemetry-grid-${homeRevision}`,
     showlegend: !graphOnlyMode,
     legend: {
       orientation: "h",
@@ -391,7 +392,7 @@ export default function SignalWorkspace({
   trackMap,
   graphOnlyMode,
 }: SignalWorkspaceProps) {
-  const { cursorDistance, xRange, setCursorDistance, setXRange } = useTelemetryStore();
+  const { cursorDistance, xRange, homeRevision, setCursorDistance, setXRange } = useTelemetryStore();
 
   const initialTab = useMemo(() => createDefaultTab(), []);
   const [tabs, setTabs] = useState<WorkspaceTab[]>([initialTab]);
@@ -1135,7 +1136,8 @@ export default function SignalWorkspace({
             widget.signals,
             cursorDistance,
             xRange,
-            graphOnlyMode
+            graphOnlyMode,
+            homeRevision
           );
 
           return (

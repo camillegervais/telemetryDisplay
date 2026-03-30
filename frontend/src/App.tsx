@@ -22,10 +22,11 @@ export default function App() {
   const [trackMap, setTrackMap] = useState<TrackMapResponse | null>(null);
   const [graphOnlyMode, setGraphOnlyMode] = useState(false);
 
-  const { setXRange, setCursorDistance } = useTelemetryStore();
+  const { setXRange, setCursorDistance, triggerHomeReset } = useTelemetryStore();
 
   function resetAllGraphsToHome() {
     setXRange(null);
+    triggerHomeReset();
   }
 
   useEffect(() => {
