@@ -69,35 +69,49 @@ class MatLoader:
         if lap_key is None:
             raise MatValidationError("Missing mandatory 'lap_distance' (or 'sLap') variable")
 
-        lap_distance = np.asarray(mat_data[lap_key]).flatten()
-        if len(lap_distance) < 2:
+        lap_distance_raw = np.asarray(mat_data[lap_key]).flatten()
+        if len(lap_distance_raw) < 2:
             raise MatValidationError("lap_distance must have at least 2 points")
 
-        if np.any(np.isnan(lap_distance)):
+        if np.any(np.isnan(lap_distance_raw)):
             raise MatValidationError("lap_distance contains NaN values")
+
+        source_points = len(lap_distance_raw)
+
+        # Keep a single clean lap segment and enforce strictly increasing progression.
+        segment_indices = self._select_clean_lap_indices(lap_distance_raw)
+        lap_distance = lap_distance_raw[segment_indices]
+        monotonic_mask = self._strictly_increasing_mask(lap_distance)
+        lap_distance = lap_distance[monotonic_mask]
+
+        if len(lap_distance) < 2:
+            raise MatValidationError("Could not build a clean increasing lap from lap_distance/sLap")
 
         # Detect or compute spatial step
         source_step_m = self._detect_spatial_step(mat_data, lap_distance)
 
         # Collect signal variables (exclude metadata)
-        signal_names = self._extract_signal_names(mat_data, lap_distance)
+        signal_names = self._extract_signal_names(mat_data, source_points)
 
         if not signal_names:
             raise MatValidationError("No signal variables found in .mat file")
 
+        trimmed_signals: dict[str, np.ndarray] = {}
+
         # Validate all signals have same length as lap_distance
         for signal_name in signal_names:
             signal_data = np.asarray(mat_data[signal_name]).flatten()
-            if len(signal_data) != len(lap_distance):
+            if len(signal_data) != source_points:
                 raise MatValidationError(
                     f"Signal '{signal_name}' has {len(signal_data)} points, "
-                    f"expected {len(lap_distance)}"
+                    f"expected {source_points}"
                 )
 
+            signal_segment = signal_data[segment_indices]
+            trimmed_signals[signal_name] = signal_segment[monotonic_mask]
+
         # Normalize all signals to reference spatial step
-        df_normalized = self._resample_to_reference_step(
-            lap_distance, mat_data, signal_names
-        )
+        df_normalized = self._resample_to_reference_step(lap_distance, trimmed_signals)
 
         # Create metadata
         metadata = DatasetMetadata(
@@ -144,13 +158,13 @@ class MatLoader:
 
         return step
 
-    def _extract_signal_names(self, mat_data: dict, lap_distance: np.ndarray) -> list[str]:
+    def _extract_signal_names(self, mat_data: dict, expected_length: int) -> list[str]:
         """
         Extract signal variable names, excluding metadata and structural keys.
 
         Args:
             mat_data: loaded .mat dictionary
-            lap_distance: for length comparison
+            expected_length: required source length for candidate signals
 
         Returns:
             List of signal variable names
@@ -172,23 +186,72 @@ class MatLoader:
             # Check if it's an array matching lap_distance length
             try:
                 arr = np.asarray(value).flatten()
-                if len(arr) == len(lap_distance):
+                if len(arr) == expected_length:
                     signals.append(key)
             except Exception:
                 pass
 
         return sorted(signals)
 
+    def _select_clean_lap_indices(self, lap_distance: np.ndarray) -> np.ndarray:
+        """
+        Select a single clean lap segment when progression wraps (e.g. starts near sMax then resets to 0).
+        """
+        if len(lap_distance) < 2:
+            return np.arange(len(lap_distance))
+
+        wrap_points = np.where(np.diff(lap_distance) < 0)[0]
+        if len(wrap_points) == 0:
+            return np.arange(len(lap_distance))
+
+        best_start = 0
+        best_end = len(lap_distance)
+        best_span = float(lap_distance[-1] - lap_distance[0])
+        best_len = len(lap_distance)
+
+        segment_starts = [0, *(wrap_points + 1)]
+        segment_ends = [*(wrap_points + 1), len(lap_distance)]
+
+        for start, end in zip(segment_starts, segment_ends):
+            segment = lap_distance[start:end]
+            if len(segment) < 2:
+                continue
+
+            span = float(segment[-1] - segment[0])
+            if span > best_span or (span == best_span and len(segment) > best_len):
+                best_start = start
+                best_end = end
+                best_span = span
+                best_len = len(segment)
+
+        return np.arange(best_start, best_end)
+
+    def _strictly_increasing_mask(self, lap_distance: np.ndarray) -> np.ndarray:
+        """
+        Keep only strictly increasing progression points (drops duplicates/non-increasing noise).
+        """
+        if len(lap_distance) == 0:
+            return np.array([], dtype=bool)
+
+        keep = np.ones(len(lap_distance), dtype=bool)
+        last = lap_distance[0]
+        for idx in range(1, len(lap_distance)):
+            if lap_distance[idx] <= last:
+                keep[idx] = False
+            else:
+                last = lap_distance[idx]
+
+        return keep
+
     def _resample_to_reference_step(
-        self, lap_distance: np.ndarray, mat_data: dict, signal_names: list[str]
+        self, lap_distance: np.ndarray, signals: dict[str, np.ndarray]
     ) -> pd.DataFrame:
         """
         Resample all signals to reference spatial step using linear interpolation.
 
         Args:
             lap_distance: original distance array
-            mat_data: original .mat data
-            signal_names: list of signal variable names
+            signals: trimmed source signals keyed by signal name
 
         Returns:
             DataFrame with resampled signals, indexed by normalized lap_distance
@@ -200,8 +263,7 @@ class MatLoader:
 
         # Interpolate each signal
         resampled = {"lap_distance": new_distance}
-        for signal_name in signal_names:
-            original_signal = np.asarray(mat_data[signal_name]).flatten()
+        for signal_name, original_signal in signals.items():
             # Linear interpolation, no extrapolation
             resampled_signal = np.interp(new_distance, lap_distance, original_signal)
             resampled[signal_name] = resampled_signal
