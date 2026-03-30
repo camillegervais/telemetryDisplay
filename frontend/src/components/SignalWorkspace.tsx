@@ -321,6 +321,7 @@ function buildChartConfig(
     xAxisMode === "time"
       ? series.lapDistance.map((_, index) => index / safeRate)
       : series.lapDistance;
+  const useSharedYAxis = alignZero && selectedSignals.length > 1;
 
   const data = selectedSignals.map((signal, index) => ({
     type: "scattergl" as const,
@@ -332,7 +333,7 @@ function buildChartConfig(
       color: COLORS[index % COLORS.length],
       width: 2,
     },
-    yaxis: index === 0 ? "y" : `y${index + 1}`,
+    yaxis: useSharedYAxis ? "y" : index === 0 ? "y" : `y${index + 1}`,
     hovertemplate: `%{y:.3f}<extra></extra>`,
   }));
 
@@ -357,7 +358,7 @@ function buildChartConfig(
           }),
     },
     yaxis: {
-      title: graphOnlyMode ? undefined : selectedSignals[0],
+      title: graphOnlyMode ? undefined : useSharedYAxis ? "Valeur" : selectedSignals[0],
       gridcolor: "rgba(255, 93, 120, 0.22)",
       zeroline: true,
       zerolinecolor: "rgba(255, 255, 255, 0.45)",
@@ -375,17 +376,19 @@ function buildChartConfig(
     },
   };
 
-  selectedSignals.slice(1).forEach((signal, index) => {
-    layout[`yaxis${index + 2}`] = {
-      title: graphOnlyMode ? undefined : signal,
-      overlaying: "y",
-      side: index % 2 === 0 ? "right" : "left",
-      gridcolor: "rgba(0,0,0,0)",
-      zeroline: true,
-      zerolinecolor: "rgba(255, 255, 255, 0.45)",
-      ...(alignZero ? { rangemode: "tozero" } : {}),
-    };
-  });
+  if (!useSharedYAxis) {
+    selectedSignals.slice(1).forEach((signal, index) => {
+      layout[`yaxis${index + 2}`] = {
+        title: graphOnlyMode ? undefined : signal,
+        overlaying: "y",
+        side: index % 2 === 0 ? "right" : "left",
+        gridcolor: "rgba(0,0,0,0)",
+        zeroline: true,
+        zerolinecolor: "rgba(255, 255, 255, 0.45)",
+        ...(alignZero ? { rangemode: "tozero" } : {}),
+      };
+    });
+  }
 
   if (cursorDistance !== null) {
     layout.shapes = [
