@@ -64,11 +64,12 @@ class MatLoader:
         except Exception as e:
             raise MatValidationError(f"Failed to load {mat_path}: {e}")
 
-        # Validate lap_distance
-        if "lap_distance" not in mat_data:
-            raise MatValidationError("Missing mandatory 'lap_distance' variable")
+        # Validate lap progression key (supports legacy/alternate naming).
+        lap_key = "lap_distance" if "lap_distance" in mat_data else "sLap" if "sLap" in mat_data else None
+        if lap_key is None:
+            raise MatValidationError("Missing mandatory 'lap_distance' (or 'sLap') variable")
 
-        lap_distance = np.asarray(mat_data["lap_distance"]).flatten()
+        lap_distance = np.asarray(mat_data[lap_key]).flatten()
         if len(lap_distance) < 2:
             raise MatValidationError("lap_distance must have at least 2 points")
 
@@ -159,6 +160,7 @@ class MatLoader:
             "__version__",
             "__globals__",
             "lap_distance",
+            "sLap",
             "distance_step_m",
         }
 
