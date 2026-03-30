@@ -28,15 +28,52 @@ mat_loader = MatLoader(reference_step_m=config.reference_distance_step_m)
 track_maps: Dict[str, pd.DataFrame] = {}
 
 
-def _track_csv_path_from_metadata(source_path: str) -> Path:
-    source_name = Path(source_path).stem
+def _track_csv_path_from_metadata(source_path: str) -> Optional[Path]:
+    """
+    Resolve track CSV from MAT filename using circuit token matching.
+
+    Priority:
+    1) Any CSV stem present in MAT stem (e.g. imola_track in run_imola_track_v2.mat)
+    2) Any CSV stem without trailing '_track' present in MAT stem (e.g. imola in run_imola_v2.mat)
+    3) Legacy exact fallback: <mat_stem>_track.csv
+    """
+    source_stem = Path(source_path).stem.lower()
     repo_root = Path(__file__).resolve().parents[3]
-    return repo_root / "data" / f"{source_name}_track.csv"
+    data_dir = repo_root / "data"
+
+    if not data_dir.exists():
+        return None
+
+    csv_files = list(data_dir.glob("*.csv"))
+    if not csv_files:
+        return None
+
+    candidates: list[tuple[int, Path]] = []
+    for csv_path in csv_files:
+        csv_stem = csv_path.stem.lower()
+        tokens = [csv_stem]
+        if csv_stem.endswith("_track"):
+            tokens.append(csv_stem[: -len("_track")])
+
+        best_token_len = max((len(token) for token in tokens if token and token in source_stem), default=0)
+        if best_token_len > 0:
+            candidates.append((best_token_len, csv_path))
+
+    if candidates:
+        # Prefer the most specific token match (longest circuit key found in filename).
+        candidates.sort(key=lambda item: item[0], reverse=True)
+        return candidates[0][1]
+
+    legacy_path = data_dir / f"{Path(source_path).stem}_track.csv"
+    if legacy_path.exists():
+        return legacy_path
+
+    return None
 
 
 def _load_trackmap_dataframe(source_path: str) -> Optional[pd.DataFrame]:
     csv_path = _track_csv_path_from_metadata(source_path)
-    if not csv_path.exists():
+    if csv_path is None or not csv_path.exists():
         return None
 
     df = pd.read_csv(csv_path)
