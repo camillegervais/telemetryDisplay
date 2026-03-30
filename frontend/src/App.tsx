@@ -5,6 +5,7 @@ import {
   fetchDatasetMetadata,
   fetchTrackMap,
   importDataset,
+  importDatasetFromPath,
 } from "./api";
 import { ImportPanel, SignalWorkspace } from "./components";
 import { useTelemetryStore } from "./store/telemetryStore";
@@ -55,23 +56,41 @@ export default function App() {
 
     try {
       const imported = await importDataset(file);
-      setDatasetId(imported.dataset_id);
-      setImportMessage(imported.message);
-
-      const [metadata, map] = await Promise.all([
-        fetchDatasetMetadata(imported.dataset_id),
-        fetchTrackMap(imported.dataset_id),
-      ]);
-
-      setDatasetMetadata(metadata);
-      setTrackMap(map);
-      setXRange(null);
-      setCursorDistance(null);
+      await loadImportedDataset(imported.dataset_id, imported.message);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Import failed");
     } finally {
       setImporting(false);
     }
+  }
+
+  async function handleImportFromPath(matPath: string) {
+    setImporting(true);
+    setError(null);
+
+    try {
+      const imported = await importDatasetFromPath(matPath);
+      await loadImportedDataset(imported.dataset_id, imported.message);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Import failed");
+    } finally {
+      setImporting(false);
+    }
+  }
+
+  async function loadImportedDataset(nextDatasetId: string, message: string) {
+    setDatasetId(nextDatasetId);
+    setImportMessage(message);
+
+    const [metadata, map] = await Promise.all([
+      fetchDatasetMetadata(nextDatasetId),
+      fetchTrackMap(nextDatasetId),
+    ]);
+
+    setDatasetMetadata(metadata);
+    setTrackMap(map);
+    setXRange(null);
+    setCursorDistance(null);
   }
 
   return (
@@ -113,6 +132,7 @@ export default function App() {
             datasetId={datasetId}
             datasetMetadata={datasetMetadata}
             onImport={handleImport}
+            onImportFromPath={handleImportFromPath}
           />
         ) : null}
         <SignalWorkspace

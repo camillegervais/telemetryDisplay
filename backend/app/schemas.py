@@ -19,6 +19,7 @@ class AppInfoResponse(BaseModel):
 # === Dataset Metadata ===
 class DatasetMetadataResponse(BaseModel):
     dataset_id: str
+    source_path: str
     source_distance_step_m: float
     normalized_distance_step_m: float
     num_samples: int
@@ -60,3 +61,7 @@ class TrackMapResponse(BaseModel):
 class DatasetImportResponse(BaseModel):
     dataset_id: str
     message: str
+
+
+class DatasetImportFromPathRequest(BaseModel):
+    mat_path: str = Field(..., min_length=1, description="Absolute or server-local path to a .mat file")

@@ -12,6 +12,7 @@ type ImportPanelProps = {
   datasetId: string | null;
   datasetMetadata: DatasetMetadata | null;
   onImport: (file: File) => Promise<void>;
+  onImportFromPath: (matPath: string) => Promise<void>;
 };
 
 type SignalStats = {
@@ -21,6 +22,9 @@ type SignalStats = {
   max: number;
 };
 
+const LAST_MAT_PATH_KEY = "telemetry-display.last-mat-path.v1";
+const LAST_PICKER_PATH_KEY = "telemetry-display.last-picker-path.v1";
+
 export default function ImportPanel({
   appInfo,
   loadingAppInfo,
@@ -29,8 +33,11 @@ export default function ImportPanel({
   datasetId,
   datasetMetadata,
   onImport,
+  onImportFromPath,
 }: ImportPanelProps) {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [matPath, setMatPath] = useState("");
+  const [lastPickerPath, setLastPickerPath] = useState("");
   const [importSectionOpen, setImportSectionOpen] = useState(true);
   const [signalFilter, setSignalFilter] = useState("");
   const [signalStats, setSignalStats] = useState<Record<string, SignalStats>>({});
@@ -38,6 +45,11 @@ export default function ImportPanel({
   const [statsError, setStatsError] = useState<string | null>(null);
 
   const canImport = useMemo(() => selectedFile !== null && !importing, [importing, selectedFile]);
+  const canImportFromPath = useMemo(() => matPath.trim().length > 0 && !importing, [importing, matPath]);
+  const canRefreshFromLastSelection = useMemo(
+    () => (!importing && matPath.trim().length > 0) || (!importing && selectedFile !== null),
+    [importing, matPath, selectedFile]
+  );
   const filteredSignals = useMemo(() => {
     const allSignals = datasetMetadata?.signal_names ?? [];
     const filter = signalFilter.trim().toLowerCase();
@@ -46,6 +58,25 @@ export default function ImportPanel({
     }
     return allSignals.filter((signal) => signal.toLowerCase().includes(filter));
   }, [datasetMetadata, signalFilter]);
+
+  useEffect(() => {
+    const savedPath = window.localStorage.getItem(LAST_MAT_PATH_KEY);
+    if (savedPath) {
+      setMatPath(savedPath);
+    }
+
+    const savedPickerPath = window.localStorage.getItem(LAST_PICKER_PATH_KEY);
+    if (savedPickerPath) {
+      setLastPickerPath(savedPickerPath);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (datasetMetadata?.source_path) {
+      setMatPath(datasetMetadata.source_path);
+      window.localStorage.setItem(LAST_MAT_PATH_KEY, datasetMetadata.source_path);
+    }
+  }, [datasetMetadata?.source_path]);
 
   useEffect(() => {
     if (!datasetId || !datasetMetadata || datasetMetadata.signal_names.length === 0) {
@@ -122,6 +153,28 @@ export default function ImportPanel({
     await onImport(selectedFile);
   }
 
+  async function handleRefreshFromLastSelectionClick() {
+    const path = matPath.trim();
+    if (path) {
+      window.localStorage.setItem(LAST_MAT_PATH_KEY, path);
+      await onImportFromPath(path);
+      return;
+    }
+
+    if (selectedFile) {
+      await onImport(selectedFile);
+    }
+  }
+
+  async function handleImportFromPathClick() {
+    const path = matPath.trim();
+    if (!path) {
+      return;
+    }
+    window.localStorage.setItem(LAST_MAT_PATH_KEY, path);
+    await onImportFromPath(path);
+  }
+
   return (
     <section className="panel import-panel">
       <div className="panel-header">
@@ -151,14 +204,59 @@ export default function ImportPanel({
               type="file"
               accept=".mat"
               className="file-input"
-              onChange={(event) => setSelectedFile(event.target.files?.[0] ?? null)}
+              onChange={(event) => {
+                const pickedFile = event.target.files?.[0] ?? null;
+                setSelectedFile(pickedFile);
+
+                const pickerPath = event.target.value?.trim() ?? "";
+                if (pickerPath.length > 0) {
+                  setLastPickerPath(pickerPath);
+                  window.localStorage.setItem(LAST_PICKER_PATH_KEY, pickerPath);
+
+                  // Browser file inputs often return C:\\fakepath\\..., which cannot be reused by backend path import.
+                  const normalized = pickerPath.replace(/\\\\/g, "/");
+                  const isFakePath = normalized.toLowerCase().includes("/fakepath/");
+                  if (!isFakePath && normalized.toLowerCase().endsWith(".mat")) {
+                    setMatPath(normalized);
+                    window.localStorage.setItem(LAST_MAT_PATH_KEY, normalized);
+                  }
+                }
+              }}
             />
 
             <button className="import-button" disabled={!canImport} onClick={handleImportClick}>
               {importing ? "Import en cours..." : "Importer le dataset"}
             </button>
 
+            <button
+              className="import-button"
+              disabled={!canRefreshFromLastSelection}
+              onClick={handleRefreshFromLastSelectionClick}
+            >
+              {importing ? "Import en cours..." : "Refresh depuis derniere selection"}
+            </button>
+
+            <label className="field-label" htmlFor="mat-path-input">
+              MAT path (serveur local)
+            </label>
+            <input
+              id="mat-path-input"
+              type="text"
+              className="signals-filter-input"
+              value={matPath}
+              onChange={(event) => setMatPath(event.target.value)}
+              placeholder="Ex: C:/Users/camil/Documents/Code/telemetryDisplay/data/imola.mat"
+            />
+            <button
+              className="import-button"
+              disabled={!canImportFromPath}
+              onClick={handleImportFromPathClick}
+            >
+              {importing ? "Import en cours..." : "Importer depuis chemin"}
+            </button>
+
             {selectedFile ? <p className="panel-text file-picked">{selectedFile.name}</p> : null}
+            {lastPickerPath ? <p className="panel-text file-picked">Dernier chemin picker: {lastPickerPath}</p> : null}
             {importMessage ? <p className="panel-text import-message">{importMessage}</p> : null}
 
             <div className="meta-grid">

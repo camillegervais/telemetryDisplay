@@ -11,6 +11,7 @@ from fastapi import APIRouter, HTTPException, UploadFile
 from app.config import config
 from app.schemas import (
     DatasetImportResponse,
+    DatasetImportFromPathRequest,
     DatasetMetadataResponse,
     DatasetQueryRequest,
     DatasetQueryResponse,
@@ -86,6 +87,36 @@ async def import_mat_file(file: UploadFile) -> DatasetImportResponse:
         raise HTTPException(status_code=500, detail=f"Import failed: {str(e)}")
 
 
+@router.post("/import-from-path", response_model=DatasetImportResponse)
+def import_mat_file_from_path(request: DatasetImportFromPathRequest) -> DatasetImportResponse:
+    """
+    Import a .mat file directly from a server-local path.
+
+    This endpoint is intended for repeated simulation workflows where the same file
+    is updated on disk and reloaded often.
+    """
+    mat_path = Path(request.mat_path).expanduser().resolve()
+
+    if mat_path.suffix.lower() != ".mat":
+        raise HTTPException(status_code=400, detail="File must be .mat")
+
+    if not mat_path.exists() or not mat_path.is_file():
+        raise HTTPException(status_code=404, detail="MAT file path not found")
+
+    try:
+        df_normalized, metadata = mat_loader.load_and_normalize(mat_path)
+        return DatasetImportResponse(
+            dataset_id=metadata.dataset_id,
+            message=f"Dataset imported from path: {len(df_normalized)} normalized samples, "
+            f"source step {metadata.source_distance_step_m:.2f}m -> "
+            f"reference step {metadata.normalized_distance_step_m:.2f}m",
+        )
+    except MatValidationError as e:
+        raise HTTPException(status_code=422, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Import failed: {str(e)}")
+
+
 @router.get("/{dataset_id}/metadata", response_model=DatasetMetadataResponse)
 def get_dataset_metadata(dataset_id: str) -> DatasetMetadataResponse:
     """
@@ -104,6 +135,7 @@ def get_dataset_metadata(dataset_id: str) -> DatasetMetadataResponse:
     _, metadata = dataset
     return DatasetMetadataResponse(
         dataset_id=metadata.dataset_id,
+        source_path=metadata.source_path,
         source_distance_step_m=metadata.source_distance_step_m,
         normalized_distance_step_m=metadata.normalized_distance_step_m,
         num_samples=metadata.num_samples,

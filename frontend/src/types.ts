@@ -11,6 +11,7 @@ export type DatasetImportResponse = {
 
 export type DatasetMetadata = {
   dataset_id: string;
+  source_path: string;
   source_distance_step_m: number;
   normalized_distance_step_m: number;
   num_samples: number;

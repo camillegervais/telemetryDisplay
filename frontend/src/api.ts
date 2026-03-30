@@ -34,6 +34,23 @@ export async function importDataset(file: File): Promise<DatasetImportResponse> 
   return (await response.json()) as DatasetImportResponse;
 }
 
+export async function importDatasetFromPath(matPath: string): Promise<DatasetImportResponse> {
+  const response = await fetch(`${API_BASE_URL}/datasets/import-from-path`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ mat_path: matPath }),
+  });
+
+  if (!response.ok) {
+    const payload = await response.json().catch(() => ({ detail: "Import failed" }));
+    throw new Error(payload.detail ?? "Import failed");
+  }
+
+  return (await response.json()) as DatasetImportResponse;
+}
+
 export async function fetchDatasetMetadata(datasetId: string): Promise<DatasetMetadata> {
   const response = await fetch(`${API_BASE_URL}/datasets/${datasetId}/metadata`);
   if (!response.ok) {
