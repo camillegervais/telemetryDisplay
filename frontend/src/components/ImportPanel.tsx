@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 
 import { queryDataset } from "../api";
+import { useTelemetryStore } from "../store/telemetryStore";
 
 import type { AppInfo, DatasetMetadata } from "../types";
 
@@ -39,6 +40,7 @@ export default function ImportPanel({
   onImport,
   onImportFromPath,
 }: ImportPanelProps) {
+  const { xAxisMode, sampleRateHz, setXAxisMode, setSampleRateHz } = useTelemetryStore();
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [matPath, setMatPath] = useState("");
   const [lastPickerPath, setLastPickerPath] = useState("");
@@ -329,6 +331,37 @@ export default function ImportPanel({
           onChange={(event) => setSignalFilter(event.target.value)}
           placeholder="Filtrer les signaux..."
         />
+
+        <div className="meta-grid" style={{ marginBottom: "0.5rem" }}>
+          <div className="meta-item">
+            <span>Axe X</span>
+            <select
+              className="mini-select"
+              value={xAxisMode}
+              onChange={(event) => setXAxisMode(event.target.value as "distance" | "time")}
+            >
+              <option value="distance">Distance</option>
+              <option value="time">Temps</option>
+            </select>
+          </div>
+          <div className="meta-item">
+            <span>Frequence (Hz)</span>
+            <input
+              type="number"
+              className="signals-filter-input"
+              min={0.1}
+              step={0.1}
+              value={sampleRateHz}
+              onChange={(event) => {
+                const next = Number(event.target.value);
+                if (Number.isFinite(next) && next > 0) {
+                  setSampleRateHz(next);
+                }
+              }}
+              placeholder="Ex: 100"
+            />
+          </div>
+        </div>
 
         {!datasetMetadata || datasetMetadata.signal_names.length === 0 ? (
           <p className="panel-text">Importez un dataset pour afficher les signaux.</p>

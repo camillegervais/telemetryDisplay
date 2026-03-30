@@ -298,7 +298,9 @@ function buildChartConfig(
   xRange: DistanceRange | null,
   graphOnlyMode: boolean,
   homeRevision: number,
-  alignZero: boolean
+  alignZero: boolean,
+  xAxisMode: "distance" | "time",
+  sampleRateHz: number
 ) {
   if (!series || selectedSignals.length === 0) {
     return {
@@ -312,11 +314,17 @@ function buildChartConfig(
     };
   }
 
+  const safeRate = Number.isFinite(sampleRateHz) && sampleRateHz > 0 ? sampleRateHz : 100;
+  const xValues =
+    xAxisMode === "time"
+      ? series.lapDistance.map((_, index) => index / safeRate)
+      : series.lapDistance;
+
   const data = selectedSignals.map((signal, index) => ({
     type: "scattergl" as const,
     mode: "lines" as const,
     name: signal,
-    x: series.lapDistance,
+    x: xValues,
     y: series.signals[signal] ?? [],
     line: {
       color: COLORS[index % COLORS.length],
@@ -334,10 +342,10 @@ function buildChartConfig(
     font: { color: "#e5e7eb" },
     margin: graphOnlyMode ? { l: 26, r: 26, t: 8, b: 22 } : { l: 36, r: 36, t: 30, b: 28 },
     xaxis: {
-      title: graphOnlyMode ? undefined : "Distance (m)",
+      title: graphOnlyMode ? undefined : xAxisMode === "time" ? "Temps (s)" : "Distance (m)",
       gridcolor: "rgba(255, 93, 120, 0.22)",
       zeroline: false,
-      ...(xRange
+      ...(xAxisMode === "distance" && xRange
         ? {
             range: [xRange.start, xRange.end],
             autorange: false,
@@ -522,7 +530,15 @@ export default function SignalWorkspace({
   trackMap,
   graphOnlyMode,
 }: SignalWorkspaceProps) {
-  const { cursorDistance, xRange, homeRevision, setCursorDistance, setXRange } = useTelemetryStore();
+  const {
+    cursorDistance,
+    xRange,
+    homeRevision,
+    xAxisMode,
+    sampleRateHz,
+    setCursorDistance,
+    setXRange,
+  } = useTelemetryStore();
 
   const initialTab = useMemo(() => createDefaultTab(), []);
   const [tabs, setTabs] = useState<WorkspaceTab[]>([initialTab]);
@@ -1522,7 +1538,9 @@ export default function SignalWorkspace({
                   xRange,
                   graphOnlyMode,
                   homeRevision,
-                  widget.alignZero ?? false
+                  widget.alignZero ?? false,
+                  xAxisMode,
+                  sampleRateHz
                 );
 
           return (
@@ -1788,7 +1806,7 @@ export default function SignalWorkspace({
                     config={{ displaylogo: false, responsive: true }}
                     style={{ width: "100%", height: "100%" }}
                     onHover={(evt: HoverEvent) => {
-                      if (widgetKind === "xy") {
+                      if (widgetKind === "xy" || xAxisMode !== "distance") {
                         return;
                       }
                       const hoveredX = evt.points?.[0]?.x;
@@ -1797,7 +1815,7 @@ export default function SignalWorkspace({
                       }
                     }}
                     onRelayout={(eventData) => {
-                      if (widgetKind === "xy") {
+                      if (widgetKind === "xy" || xAxisMode !== "distance") {
                         return;
                       }
                       const min = eventData["xaxis.range[0]"];
