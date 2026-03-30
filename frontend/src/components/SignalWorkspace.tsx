@@ -19,6 +19,7 @@ type GraphWidget = {
   kind?: "timeseries" | "xy";
   signals: string[];
   xSignal?: string | null;
+  alignZero?: boolean;
   menuOpen: boolean;
   row: number;
   col: number;
@@ -174,6 +175,7 @@ function createWidget(id: number, title: string, row: number, col: number): Grap
     kind: "timeseries",
     signals: [],
     xSignal: null,
+    alignZero: false,
     menuOpen: false,
     row,
     col,
@@ -295,7 +297,8 @@ function buildChartConfig(
   cursorDistance: number | null,
   xRange: DistanceRange | null,
   graphOnlyMode: boolean,
-  homeRevision: number
+  homeRevision: number,
+  alignZero: boolean
 ) {
   if (!series || selectedSignals.length === 0) {
     return {
@@ -346,7 +349,9 @@ function buildChartConfig(
     yaxis: {
       title: graphOnlyMode ? undefined : selectedSignals[0],
       gridcolor: "rgba(255, 93, 120, 0.22)",
-      zeroline: false,
+      zeroline: true,
+      zerolinecolor: "rgba(255, 255, 255, 0.45)",
+      ...(alignZero ? { rangemode: "tozero" } : {}),
     },
     hovermode: "x",
     uirevision: `telemetry-grid-${homeRevision}`,
@@ -366,7 +371,9 @@ function buildChartConfig(
       overlaying: "y",
       side: index % 2 === 0 ? "right" : "left",
       gridcolor: "rgba(0,0,0,0)",
-      zeroline: false,
+      zeroline: true,
+      zerolinecolor: "rgba(255, 255, 255, 0.45)",
+      ...(alignZero ? { rangemode: "tozero" } : {}),
     };
   });
 
@@ -1509,7 +1516,8 @@ export default function SignalWorkspace({
                   cursorDistance,
                   xRange,
                   graphOnlyMode,
-                  homeRevision
+                  homeRevision,
+                  widget.alignZero ?? false
                 );
 
           return (
@@ -1665,6 +1673,26 @@ export default function SignalWorkspace({
                       </label>
                     ))}
                   </div>
+
+                  {widgetKind === "timeseries" ? (
+                    <label className="signal-checkbox" style={{ marginTop: "0.4rem" }}>
+                      <input
+                        type="checkbox"
+                        checked={widget.alignZero ?? false}
+                        onChange={(event) => {
+                          const checked = event.target.checked;
+                          setWidgets((prev) =>
+                            prev.map((item) =>
+                              item.id === widget.id ? { ...item, alignZero: checked } : item
+                            )
+                          );
+                        }}
+                      />
+                      <span className="signal-badge" style={{ borderColor: "#e5e7eb" }}>
+                        Origine commune (0)
+                      </span>
+                    </label>
+                  ) : null}
 
                   <p className="menu-help">Taille du graphe</p>
                   <div className="size-selector">
