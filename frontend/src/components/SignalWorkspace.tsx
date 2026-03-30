@@ -16,7 +16,9 @@ type SignalWorkspaceProps = {
 type GraphWidget = {
   id: number;
   title: string;
+  kind?: "timeseries" | "xy";
   signals: string[];
+  xSignal?: string | null;
   menuOpen: boolean;
   row: number;
   col: number;
@@ -68,6 +70,8 @@ const COLORS = ["#00a8ff", "#ff2d4f", "#ffd447", "#34d399", "#ff8a33", "#ff9aa8"
 const WORKSPACE_CONFIGS_KEY = "telemetry-display.workspace-configs.v1";
 const WORKSPACE_SESSION_KEY = "telemetry-display.workspace-session.v1";
 const SIGNAL_DRAG_MIME = "application/x-telemetry-signal";
+const TRAJECTORY_TAB_ID = "tab-trajectory";
+const TRAJECTORY_SIGNALS = ["xCar", "yCar", "xRef", "yRef", "xTrack", "yTrack"] as const;
 
 function isAbortError(error: unknown): boolean {
   return error instanceof DOMException && error.name === "AbortError";
@@ -167,7 +171,9 @@ function createWidget(id: number, title: string, row: number, col: number): Grap
   return {
     id,
     title,
+    kind: "timeseries",
     signals: [],
+    xSignal: null,
     menuOpen: false,
     row,
     col,
@@ -249,6 +255,37 @@ function nearestIndex(values: number[], target: number | null): number {
   }
 
   return bestIdx;
+}
+
+function computeStartFinishLine(
+  xValues: number[],
+  yValues: number[],
+  lineLength: number
+): { x1: number; y1: number; x2: number; y2: number } | null {
+  if (xValues.length < 2 || yValues.length < 2) {
+    return null;
+  }
+
+  const x0 = xValues[0];
+  const y0 = yValues[0];
+  const dx = xValues[1] - x0;
+  const dy = yValues[1] - y0;
+  const tangentNorm = Math.hypot(dx, dy);
+  if (tangentNorm <= 0) {
+    return null;
+  }
+
+  // Perpendicular to local tangent at lap start.
+  const nx = -dy / tangentNorm;
+  const ny = dx / tangentNorm;
+  const half = lineLength / 2;
+
+  return {
+    x1: x0 - nx * half,
+    y1: y0 - ny * half,
+    x2: x0 + nx * half,
+    y2: y0 + ny * half,
+  };
 }
 
 function buildChartConfig(
@@ -353,6 +390,92 @@ function buildChartConfig(
   return { data, layout };
 }
 
+function buildXYChartConfig(
+  title: string,
+  series: SignalSeries | null,
+  xSignal: string | null,
+  ySignals: string[],
+  graphOnlyMode: boolean,
+  homeRevision: number
+) {
+  if (!series || !xSignal || ySignals.length === 0) {
+    return {
+      data: [],
+      layout: {
+        title,
+        paper_bgcolor: "#14080b",
+        plot_bgcolor: "#1b0a0e",
+        font: { color: "#e5e7eb" },
+      },
+    };
+  }
+
+  const xValues = series.signals[xSignal] ?? [];
+  const data = ySignals.map((signal, index) => ({
+    type: "scattergl" as const,
+    mode: "markers" as const,
+    name: `${signal} vs ${xSignal}`,
+    x: xValues,
+    y: series.signals[signal] ?? [],
+    marker: {
+      color: COLORS[index % COLORS.length],
+      size: 5,
+      opacity: 0.8,
+    },
+    hovertemplate: `%{y:.3f}<extra></extra>`,
+  }));
+
+  const layout: Record<string, unknown> = {
+    title: graphOnlyMode ? undefined : title,
+    autosize: true,
+    paper_bgcolor: "#14080b",
+    plot_bgcolor: "#1b0a0e",
+    font: { color: "#e5e7eb" },
+    margin: graphOnlyMode ? { l: 26, r: 26, t: 8, b: 22 } : { l: 36, r: 36, t: 30, b: 28 },
+    xaxis: {
+      title: graphOnlyMode ? undefined : xSignal,
+      gridcolor: "rgba(255, 93, 120, 0.22)",
+      zeroline: false,
+      autorange: true,
+    },
+    yaxis: {
+      title: graphOnlyMode ? undefined : "Y",
+      gridcolor: "rgba(255, 93, 120, 0.22)",
+      zeroline: false,
+      autorange: true,
+    },
+    hovermode: "closest",
+    uirevision: `telemetry-xy-${homeRevision}`,
+    showlegend: !graphOnlyMode,
+    legend: {
+      orientation: "h",
+      yanchor: "bottom",
+      y: 1.02,
+      xanchor: "left",
+      x: 0,
+    },
+  };
+
+  return { data, layout };
+}
+
+function getWidgetKind(widget: GraphWidget): "timeseries" | "xy" {
+  return widget.kind ?? "timeseries";
+}
+
+function getWidgetQuerySignals(widget: GraphWidget): string[] {
+  const widgetKind = getWidgetKind(widget);
+  if (widgetKind === "timeseries") {
+    return widget.signals;
+  }
+
+  if (!widget.xSignal || widget.signals.length === 0) {
+    return [];
+  }
+
+  return Array.from(new Set([widget.xSignal, ...widget.signals]));
+}
+
 function firstFreeCell(
   widgets: GraphWidget[],
   rows: number,
@@ -410,12 +533,16 @@ export default function SignalWorkspace({
   const [resizeState, setResizeState] = useState<ResizeState | null>(null);
   const [seriesById, setSeriesById] = useState<Record<number, SignalSeries | null>>({});
   const [loadingById, setLoadingById] = useState<Record<number, boolean>>({});
+  const [trajectorySeries, setTrajectorySeries] = useState<Record<string, number[]>>({});
+  const [trajectoryLoading, setTrajectoryLoading] = useState(false);
+  const [trajectoryError, setTrajectoryError] = useState<string | null>(null);
   const [sessionHydrated, setSessionHydrated] = useState(false);
   const gridRef = useRef<HTMLDivElement | null>(null);
   const queryGenerationRef = useRef(0);
 
   const availableSignals = datasetMetadata?.signal_names ?? [];
   const canQuery = datasetId !== null && datasetMetadata !== null;
+  const isTrajectoryActive = activeTabId === TRAJECTORY_TAB_ID;
 
   useEffect(() => {
     const snapshot = loadWorkspaceSessionSnapshot();
@@ -428,17 +555,23 @@ export default function SignalWorkspace({
       ...tab,
       widgets: tab.widgets.map((widget) => ({ ...widget, menuOpen: false })),
     }));
-    const restoredActiveId = clonedTabs.some((tab) => tab.id === snapshot.activeTabId)
+    const restoredActiveId =
+      snapshot.activeTabId === TRAJECTORY_TAB_ID
+        ? TRAJECTORY_TAB_ID
+        : clonedTabs.some((tab) => tab.id === snapshot.activeTabId)
       ? snapshot.activeTabId
       : clonedTabs[0].id;
-    const restoredActiveTab = clonedTabs.find((tab) => tab.id === restoredActiveId) ?? clonedTabs[0];
+    const restoredActiveTab =
+      clonedTabs.find((tab) => tab.id === restoredActiveId) ?? clonedTabs[0];
 
     setTabs(clonedTabs);
     setActiveTabId(restoredActiveId);
-    setGridCols(restoredActiveTab.gridCols);
-    setGridRows(restoredActiveTab.gridRows);
-    setNextId(restoredActiveTab.nextId);
-    setWidgets(restoredActiveTab.widgets);
+    if (restoredActiveId !== TRAJECTORY_TAB_ID) {
+      setGridCols(restoredActiveTab.gridCols);
+      setGridRows(restoredActiveTab.gridRows);
+      setNextId(restoredActiveTab.nextId);
+      setWidgets(restoredActiveTab.widgets);
+    }
     setCurrentConfigId(snapshot.currentConfigId);
     setSelectedConfigId(snapshot.selectedConfigId);
     setSessionHydrated(true);
@@ -599,7 +732,7 @@ export default function SignalWorkspace({
     const start = xRange?.start ?? datasetMetadata.lap_distance_min;
     const end = xRange?.end ?? datasetMetadata.lap_distance_max;
 
-    const activeWidgets = widgets.filter((widget) => widget.signals.length > 0);
+    const activeWidgets = widgets.filter((widget) => getWidgetQuerySignals(widget).length > 0);
     if (activeWidgets.length === 0) {
       return;
     }
@@ -613,7 +746,7 @@ export default function SignalWorkspace({
 
       queryDataset({
         datasetId,
-        signals: widget.signals,
+        signals: getWidgetQuerySignals(widget),
         startDistance: start,
         endDistance: end,
         maxPoints: 1200,
@@ -656,6 +789,171 @@ export default function SignalWorkspace({
     };
   }, [canQuery, datasetId, datasetMetadata, widgets, xRange]);
 
+  useEffect(() => {
+    if (!isTrajectoryActive || !canQuery || !datasetId || !datasetMetadata) {
+      return;
+    }
+
+    const requestedSignals = TRAJECTORY_SIGNALS.filter((signal) =>
+      datasetMetadata.signal_names.includes(signal)
+    );
+    if (!requestedSignals.includes("xCar") || !requestedSignals.includes("yCar")) {
+      setTrajectorySeries({});
+      setTrajectoryError("Signaux trajectoire manquants: xCar/yCar");
+      return;
+    }
+
+    let alive = true;
+    const controller = new AbortController();
+    setTrajectoryLoading(true);
+    setTrajectoryError(null);
+
+    queryDataset({
+      datasetId,
+      signals: requestedSignals as string[],
+      startDistance: datasetMetadata.lap_distance_min,
+      endDistance: datasetMetadata.lap_distance_max,
+      maxPoints: 5000,
+      signal: controller.signal,
+    })
+      .then((response) => {
+        if (!alive) {
+          return;
+        }
+        setTrajectorySeries(response.signals);
+      })
+      .catch((error: unknown) => {
+        if (!alive || isAbortError(error)) {
+          return;
+        }
+        setTrajectoryError(error instanceof Error ? error.message : "Impossible de charger la trajectoire");
+      })
+      .finally(() => {
+        if (!alive) {
+          return;
+        }
+        setTrajectoryLoading(false);
+      });
+
+    return () => {
+      alive = false;
+      controller.abort();
+    };
+  }, [isTrajectoryActive, canQuery, datasetId, datasetMetadata]);
+
+  const trajectoryChart = useMemo(() => {
+    const xCar = trajectorySeries.xCar ?? [];
+    const yCar = trajectorySeries.yCar ?? [];
+    const xRef = trajectorySeries.xRef ?? [];
+    const yRef = trajectorySeries.yRef ?? [];
+    const xTrack = trajectorySeries.xTrack ?? [];
+    const yTrack = trajectorySeries.yTrack ?? [];
+
+    const hasCar = xCar.length > 0 && yCar.length > 0;
+    const hasRef = xRef.length > 0 && yRef.length > 0;
+    const hasTrackFromSignals = xTrack.length > 0 && yTrack.length > 0;
+    const hasTrackFromMap = !!trackMap && trackMap.x_position.length > 0 && trackMap.y_position.length > 0;
+    const trackLineX = hasTrackFromSignals ? xTrack : trackMap?.x_position ?? [];
+    const trackLineY = hasTrackFromSignals ? yTrack : trackMap?.y_position ?? [];
+
+    const data: Array<Record<string, unknown>> = [];
+    if (hasTrackFromSignals) {
+      data.push({
+        type: "scattergl",
+        mode: "lines",
+        name: "Track",
+        x: xTrack,
+        y: yTrack,
+        line: { color: "#ffd447", width: 1.5 },
+      });
+    } else if (hasTrackFromMap) {
+      data.push({
+        type: "scattergl",
+        mode: "lines",
+        name: "Track",
+        x: trackMap?.x_position ?? [],
+        y: trackMap?.y_position ?? [],
+        line: { color: "#ffd447", width: 1.5 },
+      });
+    }
+
+    let startFinishShape: Record<string, unknown> | null = null;
+    if (trackLineX.length > 1 && trackLineY.length > 1) {
+      const minTrackX = Math.min(...trackLineX);
+      const maxTrackX = Math.max(...trackLineX);
+      const minTrackY = Math.min(...trackLineY);
+      const maxTrackY = Math.max(...trackLineY);
+      const diagonal = Math.hypot(maxTrackX - minTrackX, maxTrackY - minTrackY);
+      const startFinish = computeStartFinishLine(trackLineX, trackLineY, Math.max(diagonal * 0.03, 1));
+      if (startFinish) {
+        startFinishShape = {
+          type: "line",
+          x0: startFinish.x1,
+          y0: startFinish.y1,
+          x1: startFinish.x2,
+          y1: startFinish.y2,
+          line: {
+            color: "#f8fafc",
+            width: 3,
+          },
+        };
+      }
+    }
+
+    if (hasRef) {
+      data.push({
+        type: "scattergl",
+        mode: "lines",
+        name: "Reference",
+        x: xRef,
+        y: yRef,
+        line: { color: "#34d399", width: 2 },
+      });
+    }
+
+    if (hasCar) {
+      data.push({
+        type: "scattergl",
+        mode: "lines",
+        name: "Car",
+        x: xCar,
+        y: yCar,
+        line: { color: "#ff2d4f", width: 2 },
+      });
+    }
+
+    const layout: Record<string, unknown> = {
+      title: graphOnlyMode ? undefined : "Trajectoire vs Reference",
+      autosize: true,
+      paper_bgcolor: "#14080b",
+      plot_bgcolor: "#1b0a0e",
+      font: { color: "#e5e7eb" },
+      margin: graphOnlyMode ? { l: 18, r: 18, t: 8, b: 18 } : { l: 32, r: 32, t: 30, b: 28 },
+      xaxis: {
+        title: graphOnlyMode ? undefined : "X",
+        gridcolor: "rgba(255, 93, 120, 0.16)",
+        zeroline: false,
+        scaleanchor: "y",
+        scaleratio: 1,
+      },
+      yaxis: {
+        title: graphOnlyMode ? undefined : "Y",
+        gridcolor: "rgba(255, 93, 120, 0.16)",
+        zeroline: false,
+      },
+      hovermode: "closest",
+      showlegend: true,
+      uirevision: `trajectory-${homeRevision}`,
+      shapes: startFinishShape ? [startFinishShape] : undefined,
+    };
+
+    return {
+      hasCar,
+      data,
+      layout,
+    };
+  }, [trajectorySeries, trackMap, graphOnlyMode, homeRevision]);
+
   const gridStyle = useMemo(
     () => ({
       gridTemplateColumns: `repeat(${gridCols}, minmax(0, 1fr))`,
@@ -692,10 +990,12 @@ export default function SignalWorkspace({
       : xs.map((x, i) => `${x},${ys[i]}`).join(" ");
 
     const idx = nearestIndex(trackMap.lap_distance, cursorDistance);
+    const startFinish = computeStartFinishLine(xs, ys, 14);
     return {
       width,
       height,
       points,
+      startFinish,
       markerX: xs[idx],
       markerY: ys[idx],
       markerDistance: trackMap.lap_distance[idx],
@@ -709,6 +1009,22 @@ export default function SignalWorkspace({
     setWidgets((prev) => {
       const free = firstFreeCell(prev, gridRows, gridCols);
       return [...prev, createWidget(id, `G${id}`, free.row, free.col)];
+    });
+  }
+
+  function addXYWidget() {
+    const id = nextId;
+    setNextId((prev) => prev + 1);
+
+    setWidgets((prev) => {
+      const free = firstFreeCell(prev, gridRows, gridCols);
+      return [
+        ...prev,
+        {
+          ...createWidget(id, `XY${id}`, free.row, free.col),
+          kind: "xy",
+        },
+      ];
     });
   }
 
@@ -973,12 +1289,24 @@ export default function SignalWorkspace({
     });
   }
 
-  function addSignalToWidget(widgetId: number, signal: string) {
+  function addDroppedSignalToWidget(widgetId: number, signal: string) {
     setWidgets((prev) =>
       prev.map((item) => {
         if (item.id !== widgetId) {
           return item;
         }
+
+        const widgetKind = getWidgetKind(item);
+        if (widgetKind === "xy") {
+          if (!item.xSignal) {
+            return { ...item, xSignal: signal };
+          }
+          if (item.xSignal === signal || item.signals.includes(signal)) {
+            return item;
+          }
+          return { ...item, signals: [...item.signals, signal] };
+        }
+
         if (item.signals.includes(signal)) {
           return item;
         }
@@ -1094,6 +1422,9 @@ export default function SignalWorkspace({
           <button className="small-button" onClick={addWidget}>
             + Graphe
           </button>
+          <button className="small-button" onClick={addXYWidget}>
+            + Graphe XY
+          </button>
         </div>
       </div>
 
@@ -1119,26 +1450,67 @@ export default function SignalWorkspace({
             </button>
           </div>
         ))}
+        <div className={`workspace-tab ${isTrajectoryActive ? "workspace-tab-active" : ""}`}>
+          <button className="workspace-tab-name" onClick={() => setActiveTabId(TRAJECTORY_TAB_ID)}>
+            Trajectoire
+          </button>
+        </div>
         <button className="workspace-tab-add" onClick={addTab} title="Nouvel onglet">
           + Onglet
         </button>
       </div>
 
+      {isTrajectoryActive ? (
+        <div className="graph-grid" style={{ gridTemplateColumns: "1fr", gridTemplateRows: "1fr" }}>
+          <article className="graph-tile" style={{ gridColumn: "1 / span 1", gridRow: "1 / span 1" }}>
+            {trajectoryLoading ? <div className="loading-plot">Chargement...</div> : null}
+            {trajectoryError ? <p className="panel-text">{trajectoryError}</p> : null}
+            {!trajectoryError && !trajectoryChart.hasCar ? (
+              <div className="placeholder-graph" aria-label="Trajectoire indisponible">
+                <div className="placeholder-graph-mark">!</div>
+                <div className="placeholder-graph-text">Trajectoire indisponible</div>
+                <div className="placeholder-graph-help">Signaux requis: xCar et yCar</div>
+              </div>
+            ) : (
+              <div className="plot-fill">
+                <Plot
+                  data={trajectoryChart.data}
+                  layout={trajectoryChart.layout}
+                  useResizeHandler
+                  config={{ displaylogo: false, responsive: true }}
+                  style={{ width: "100%", height: "100%" }}
+                />
+              </div>
+            )}
+          </article>
+        </div>
+      ) : (
       <div
         ref={gridRef}
         className={`graph-grid ${expandedWidgetId !== null ? "graph-grid-has-expanded" : ""} ${resizeState ? "graph-grid-resizing" : ""}`}
         style={gridStyle}
       >
         {widgets.map((widget) => {
-          const chart = buildChartConfig(
-            widget.title,
-            seriesById[widget.id] ?? null,
-            widget.signals,
-            cursorDistance,
-            xRange,
-            graphOnlyMode,
-            homeRevision
-          );
+          const widgetKind = getWidgetKind(widget);
+          const chart =
+            widgetKind === "xy"
+              ? buildXYChartConfig(
+                  widget.title,
+                  seriesById[widget.id] ?? null,
+                  widget.xSignal ?? null,
+                  widget.signals,
+                  graphOnlyMode,
+                  homeRevision
+                )
+              : buildChartConfig(
+                  widget.title,
+                  seriesById[widget.id] ?? null,
+                  widget.signals,
+                  cursorDistance,
+                  xRange,
+                  graphOnlyMode,
+                  homeRevision
+                );
 
           return (
             <article
@@ -1164,7 +1536,7 @@ export default function SignalWorkspace({
                 } else {
                   const droppedSignal = event.dataTransfer.getData(SIGNAL_DRAG_MIME);
                   if (droppedSignal) {
-                    addSignalToWidget(widget.id, droppedSignal);
+                    addDroppedSignalToWidget(widget.id, droppedSignal);
                   }
                 }
                 setDragFromId(null);
@@ -1239,6 +1611,31 @@ export default function SignalWorkspace({
 
               {widget.menuOpen ? (
                 <div className="graph-menu">
+                  {widgetKind === "xy" ? (
+                    <>
+                      <label className="field-label">Signal X</label>
+                      <select
+                        className="mini-select"
+                        value={widget.xSignal ?? ""}
+                        onChange={(event) => {
+                          const nextX = event.target.value || null;
+                          setWidgets((prev) =>
+                            prev.map((item) =>
+                              item.id === widget.id ? { ...item, xSignal: nextX } : item
+                            )
+                          );
+                        }}
+                      >
+                        <option value="">Selectionner X...</option>
+                        {availableSignals.map((signal) => (
+                          <option key={`x-${widget.id}-${signal}`} value={signal}>
+                            {signal}
+                          </option>
+                        ))}
+                      </select>
+                    </>
+                  ) : null}
+
                   <label className="field-label">Signaux</label>
                   <div className="signal-grid">
                     {availableSignals.map((signal, idx) => (
@@ -1335,10 +1732,13 @@ export default function SignalWorkspace({
 
               {loadingById[widget.id] ? <div className="loading-plot">Chargement...</div> : null}
 
-              {widget.signals.length === 0 ? (
+              {(widgetKind === "xy" && (!widget.xSignal || widget.signals.length === 0)) ||
+              (widgetKind === "timeseries" && widget.signals.length === 0) ? (
                 <div className="placeholder-graph" aria-label="Aucun signal sélectionné">
                   <div className="placeholder-graph-mark">+</div>
-                  <div className="placeholder-graph-text">Ajoutez un signal</div>
+                  <div className="placeholder-graph-text">
+                    {widgetKind === "xy" ? "Choisissez X et ajoutez Y" : "Ajoutez un signal"}
+                  </div>
                   <div className="placeholder-graph-help">Glissez un signal ici ou ouvrez les paramètres</div>
                 </div>
               ) : (
@@ -1350,12 +1750,18 @@ export default function SignalWorkspace({
                     config={{ displaylogo: false, responsive: true }}
                     style={{ width: "100%", height: "100%" }}
                     onHover={(evt: HoverEvent) => {
+                      if (widgetKind === "xy") {
+                        return;
+                      }
                       const hoveredX = evt.points?.[0]?.x;
                       if (typeof hoveredX === "number") {
                         setCursorDistance(hoveredX);
                       }
                     }}
                     onRelayout={(eventData) => {
+                      if (widgetKind === "xy") {
+                        return;
+                      }
                       const min = eventData["xaxis.range[0]"];
                       const max = eventData["xaxis.range[1]"];
                       if (typeof min === "number" && typeof max === "number") {
@@ -1431,6 +1837,16 @@ export default function SignalWorkspace({
           ) : (
             <svg viewBox={`0 0 ${trackMapped.width} ${trackMapped.height}`} className="track-svg">
               <polyline points={trackMapped.points} fill="none" stroke="#ffd447" strokeWidth="2.4" />
+              {trackMapped.startFinish ? (
+                <line
+                  x1={trackMapped.startFinish.x1}
+                  y1={trackMapped.startFinish.y1}
+                  x2={trackMapped.startFinish.x2}
+                  y2={trackMapped.startFinish.y2}
+                  stroke="#f8fafc"
+                  strokeWidth="2.2"
+                />
+              ) : null}
               <circle cx={trackMapped.markerX} cy={trackMapped.markerY} r="5" fill="#ff4fd8" />
               <circle
                 cx={trackMapped.markerX}
@@ -1447,6 +1863,7 @@ export default function SignalWorkspace({
           )}
         </article>
       </div>
+      )}
 
       {!canQuery ? <p className="panel-text">Import requis.</p> : null}
     </section>

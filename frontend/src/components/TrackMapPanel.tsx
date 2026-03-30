@@ -29,6 +29,36 @@ function findMarkerIndex(lapDistance: number[], cursorDistance: number | null): 
   return bestIndex;
 }
 
+function computeStartFinishLine(
+  xValues: number[],
+  yValues: number[],
+  lineLength: number
+): { x1: number; y1: number; x2: number; y2: number } | null {
+  if (xValues.length < 2 || yValues.length < 2) {
+    return null;
+  }
+
+  const x0 = xValues[0];
+  const y0 = yValues[0];
+  const dx = xValues[1] - x0;
+  const dy = yValues[1] - y0;
+  const tangentNorm = Math.hypot(dx, dy);
+  if (tangentNorm <= 0) {
+    return null;
+  }
+
+  const nx = -dy / tangentNorm;
+  const ny = dx / tangentNorm;
+  const half = lineLength / 2;
+
+  return {
+    x1: x0 - nx * half,
+    y1: y0 - ny * half,
+    x2: x0 + nx * half,
+    y2: y0 + ny * half,
+  };
+}
+
 export default function TrackMapPanel({ trackMap }: TrackMapPanelProps) {
   const cursorDistance = useTelemetryStore((state) => state.cursorDistance);
 
@@ -50,12 +80,14 @@ export default function TrackMapPanel({ trackMap }: TrackMapPanelProps) {
     const ys = normalize(trackMap.y_position, minY, maxY, height - pad, pad);
 
     const points = xs.map((x, idx) => `${x},${ys[idx]}`).join(" ");
+    const startFinish = computeStartFinishLine(xs, ys, 16);
 
     const markerIndex = findMarkerIndex(trackMap.lap_distance, cursorDistance);
     return {
       width,
       height,
       points,
+      startFinish,
       markerX: xs[markerIndex],
       markerY: ys[markerIndex],
       markerDistance: trackMap.lap_distance[markerIndex],
@@ -74,6 +106,16 @@ export default function TrackMapPanel({ trackMap }: TrackMapPanelProps) {
         ) : (
           <svg viewBox={`0 0 ${mapped.width} ${mapped.height}`} className="track-svg">
             <polyline points={mapped.points} fill="none" stroke="#ffd447" strokeWidth="2.5" />
+            {mapped.startFinish ? (
+              <line
+                x1={mapped.startFinish.x1}
+                y1={mapped.startFinish.y1}
+                x2={mapped.startFinish.x2}
+                y2={mapped.startFinish.y2}
+                stroke="#f8fafc"
+                strokeWidth="2.2"
+              />
+            ) : null}
             <circle cx={mapped.markerX} cy={mapped.markerY} r="5" fill="#ff4fd8" />
             <circle
               cx={mapped.markerX}
