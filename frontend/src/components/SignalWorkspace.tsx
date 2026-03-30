@@ -61,6 +61,10 @@ const COLORS = ["#00a8ff", "#ff2d4f", "#ffd447", "#34d399", "#ff8a33", "#ff9aa8"
 const WORKSPACE_CONFIGS_KEY = "telemetry-display.workspace-configs.v1";
 const SIGNAL_DRAG_MIME = "application/x-telemetry-signal";
 
+function isAbortError(error: unknown): boolean {
+  return error instanceof DOMException && error.name === "AbortError";
+}
+
 function clamp(value: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, value));
 }
@@ -509,6 +513,7 @@ export default function SignalWorkspace({
     }
 
     let alive = true;
+    const controller = new AbortController();
 
     activeWidgets.forEach((widget) => {
       setLoadingById((prev) => ({ ...prev, [widget.id]: true }));
@@ -519,6 +524,7 @@ export default function SignalWorkspace({
         startDistance: start,
         endDistance: end,
         maxPoints: 1200,
+        signal: controller.signal,
       })
         .then((response) => {
           if (!alive) {
@@ -533,6 +539,16 @@ export default function SignalWorkspace({
             },
           }));
         })
+        .catch((error: unknown) => {
+          if (!alive || isAbortError(error)) {
+            return;
+          }
+
+          setSeriesById((prev) => ({
+            ...prev,
+            [widget.id]: null,
+          }));
+        })
         .finally(() => {
           if (!alive) {
             return;
@@ -543,6 +559,7 @@ export default function SignalWorkspace({
 
     return () => {
       alive = false;
+      controller.abort();
     };
   }, [canQuery, datasetId, datasetMetadata, widgets, xRange]);
 

@@ -25,6 +25,10 @@ type SignalStats = {
 const LAST_MAT_PATH_KEY = "telemetry-display.last-mat-path.v1";
 const LAST_PICKER_PATH_KEY = "telemetry-display.last-picker-path.v1";
 
+function isAbortError(error: unknown): boolean {
+  return error instanceof DOMException && error.name === "AbortError";
+}
+
 export default function ImportPanel({
   appInfo,
   loadingAppInfo,
@@ -86,6 +90,7 @@ export default function ImportPanel({
     }
 
     let alive = true;
+    const controller = new AbortController();
     setLoadingStats(true);
     setStatsError(null);
 
@@ -95,6 +100,7 @@ export default function ImportPanel({
       startDistance: datasetMetadata.lap_distance_min,
       endDistance: datasetMetadata.lap_distance_max,
       maxPoints: 5000,
+      signal: controller.signal,
     })
       .then((response) => {
         if (!alive) {
@@ -128,6 +134,9 @@ export default function ImportPanel({
         if (!alive) {
           return;
         }
+        if (isAbortError(error)) {
+          return;
+        }
         setStatsError(error instanceof Error ? error.message : "Impossible de calculer les stats");
       })
       .finally(() => {
@@ -139,6 +148,7 @@ export default function ImportPanel({
 
     return () => {
       alive = false;
+      controller.abort();
     };
   }, [datasetId, datasetMetadata]);
 

@@ -66,6 +66,7 @@ type QueryParams = {
   startDistance: number;
   endDistance: number;
   maxPoints?: number;
+  signal?: AbortSignal;
 };
 
 export async function queryDataset({
@@ -74,12 +75,14 @@ export async function queryDataset({
   startDistance,
   endDistance,
   maxPoints = 900,
+  signal,
 }: QueryParams): Promise<DatasetQueryResponse> {
   const response = await fetch(`${API_BASE_URL}/datasets/${datasetId}/query`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
     },
+    signal,
     body: JSON.stringify({
       signals,
       start_distance: startDistance,
