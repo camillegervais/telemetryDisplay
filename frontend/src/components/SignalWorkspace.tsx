@@ -780,26 +780,60 @@ export default function SignalWorkspace({
 
     setWidgets((prev) =>
       prev.map((widget, idx) => {
-        if (widget.signals.length > 0) {
-          return widget;
+        const widgetKind = getWidgetKind(widget);
+        const cleanedSignals = widget.signals.filter((signal) => availableSignals.includes(signal));
+        const cleanedXSignal = widget.xSignal && availableSignals.includes(widget.xSignal) ? widget.xSignal : null;
+
+        if (widgetKind === "xy") {
+          if (cleanedSignals.length === widget.signals.length && cleanedXSignal === (widget.xSignal ?? null)) {
+            return widget;
+          }
+
+          return {
+            ...widget,
+            signals: cleanedSignals,
+            xSignal: cleanedXSignal,
+          };
         }
+
+        if (cleanedSignals.length > 0) {
+          if (cleanedSignals.length === widget.signals.length) {
+            return widget;
+          }
+          return {
+            ...widget,
+            signals: cleanedSignals,
+          };
+        }
+
         const fallback = datasetMetadata.signal_names[idx % Math.max(datasetMetadata.signal_names.length, 1)];
         return fallback ? { ...widget, signals: [fallback] } : widget;
       })
     );
-  }, [datasetMetadata]);
+  }, [datasetMetadata, availableSignals, widgets.length]);
 
   useEffect(() => {
     if (!canQuery || !datasetId || !datasetMetadata) {
       return;
     }
 
-    const start = xRange?.start ?? datasetMetadata.lap_distance_min;
-    const end = xRange?.end ?? datasetMetadata.lap_distance_max;
+    const datasetSignalSet = new Set(datasetMetadata.signal_names);
+    const lapMin = datasetMetadata.lap_distance_min;
+    const lapMax = datasetMetadata.lap_distance_max;
+    const rawStart = xRange?.start ?? lapMin;
+    const rawEnd = xRange?.end ?? lapMax;
+    const clampedStart = Math.max(lapMin, Math.min(rawStart, lapMax));
+    const clampedEnd = Math.max(lapMin, Math.min(rawEnd, lapMax));
+    const start = Math.min(clampedStart, clampedEnd);
+    const end = Math.max(clampedStart, clampedEnd);
 
     const activeWidgets = widgets.filter((widget) => {
-      const selectedSignals = getWidgetQuerySignals(widget);
-      const querySignals = expandSignalsForQuery(selectedSignals);
+      const selectedSignals = getWidgetQuerySignals(widget).filter(
+        (signal) => !!mathChannelByName[signal] || datasetSignalSet.has(signal)
+      );
+      const querySignals = expandSignalsForQuery(selectedSignals).filter((signal) =>
+        datasetSignalSet.has(signal)
+      );
       return querySignals.length > 0;
     });
     if (activeWidgets.length === 0) {
@@ -813,8 +847,18 @@ export default function SignalWorkspace({
     activeWidgets.forEach((widget) => {
       setLoadingById((prev) => ({ ...prev, [widget.id]: true }));
 
-      const selectedSignals = getWidgetQuerySignals(widget);
-      const querySignals = expandSignalsForQuery(selectedSignals);
+      const selectedSignals = getWidgetQuerySignals(widget).filter(
+        (signal) => !!mathChannelByName[signal] || datasetSignalSet.has(signal)
+      );
+      const querySignals = expandSignalsForQuery(selectedSignals).filter((signal) =>
+        datasetSignalSet.has(signal)
+      );
+
+      if (querySignals.length === 0) {
+        setSeriesById((prev) => ({ ...prev, [widget.id]: null }));
+        setLoadingById((prev) => ({ ...prev, [widget.id]: false }));
+        return;
+      }
 
       queryDataset({
         datasetId,
