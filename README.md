@@ -63,3 +63,19 @@ Data files are saved to `data/` directory.
 3. `npm run dev`
 
 Frontend runs on `http://localhost:5173` and expects API on `http://localhost:8000`.
+
+## Single-command dev startup (frontend + backend)
+
+From repository root:
+
+1. Ensure backend venv exists at `.venv/` (already used in project workflows).
+2. Install backend runtime dependencies in this venv: `.venv/Scripts/python.exe -m pip install -r backend/requirements-runtime.txt`
+3. Install root tooling once: `npm install`
+4. Start both services: `npm run dev`
+
+Optional for data-generation scripts using FastF1:
+- `.venv/Scripts/python.exe -m pip install -r backend/requirements.txt`
+
+This starts:
+- Backend on `http://localhost:8000`
+- Frontend on `http://localhost:5173`

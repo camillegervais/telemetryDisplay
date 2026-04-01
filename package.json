@@ -1,0 +1,13 @@
+{
+  "name": "telemetry-display",
+  "private": true,
+  "version": "0.1.0",
+  "scripts": {
+    "dev": "concurrently -k -n backend,frontend -c green,cyan \"npm run dev:backend\" \"npm run dev:frontend\"",
+    "dev:backend": ".\\.venv\\Scripts\\python.exe -m uvicorn app.main:app --reload --port 8000 --app-dir backend",
+    "dev:frontend": "npm --prefix frontend run dev"
+  },
+  "devDependencies": {
+    "concurrently": "^9.0.1"
+  }
+}
