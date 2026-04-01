@@ -99,6 +99,20 @@ function createDefaultTab(name: string = "Onglet 1"): WorkspaceTab {
   };
 }
 
+function createEmptyTab(name: string): WorkspaceTab {
+  return {
+    id: makeId("tab"),
+    name,
+    gridCols: 2,
+    gridRows: 2,
+    nextId: 3,
+    widgets: [
+      { ...createWidget(1, "G1", 1, 1), signals: [] },
+      { ...createWidget(2, "G2", 1, 2), signals: [] },
+    ],
+  };
+}
+
 function sanitizeWidgetsForStorage(widgets: GraphWidget[]): GraphWidget[] {
   return widgets.map((widget) => ({ ...widget, menuOpen: false }));
 }
@@ -815,6 +829,17 @@ export default function SignalWorkspace({
           };
         }
 
+        const isEmptyDefaultWidget =
+          widgetKind === "timeseries" &&
+          cleanedSignals.length === 0 &&
+          /^G\d+$/.test(widget.title);
+        if (isEmptyDefaultWidget) {
+          return {
+            ...widget,
+            signals: [],
+          };
+        }
+
         const fallback = datasetMetadata.signal_names[idx % Math.max(datasetMetadata.signal_names.length, 1)];
         return fallback ? { ...widget, signals: [fallback] } : widget;
       })
@@ -1228,7 +1253,7 @@ export default function SignalWorkspace({
   }
 
   function addTab() {
-    const newTab = createDefaultTab(`Onglet ${tabs.length + 1}`);
+    const newTab = createEmptyTab(`Onglet ${tabs.length + 1}`);
     setTabs((prev) => [...prev, newTab]);
     setActiveTabId(newTab.id);
     setGridCols(newTab.gridCols);
