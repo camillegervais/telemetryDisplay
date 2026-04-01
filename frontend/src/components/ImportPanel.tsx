@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 
 import { queryDataset } from "../api";
+import { evaluateMathChannel } from "../mathChannels";
 import { useTelemetryStore } from "../store/telemetryStore";
 
 import type { AppInfo, DatasetMetadata, MathChannel } from "../types";
@@ -158,9 +159,14 @@ export default function ImportPanel({
     setLoadingStats(true);
     setStatsError(null);
 
+    const statsQuerySignals = new Set(datasetMetadata.signal_names);
+    mathChannels.forEach((channel) => {
+      channel.dependencies.forEach((dependency) => statsQuerySignals.add(dependency));
+    });
+
     queryDataset({
       datasetId,
-      signals: datasetMetadata.signal_names,
+      signals: Array.from(statsQuerySignals),
       startDistance: datasetMetadata.lap_distance_min,
       endDistance: datasetMetadata.lap_distance_max,
       maxPoints: 5000,
@@ -171,9 +177,23 @@ export default function ImportPanel({
           return;
         }
 
+        const signalsWithMath: Record<string, number[]> = { ...response.signals };
+        mathChannels.forEach((channel) => {
+          try {
+            signalsWithMath[channel.name] = evaluateMathChannel(channel, signalsWithMath);
+          } catch {
+            signalsWithMath[channel.name] = [];
+          }
+        });
+
         const computed: Record<string, SignalStats> = {};
-        datasetMetadata.signal_names.forEach((signal) => {
-          const values = response.signals[signal] ?? [];
+        const statsSignals = [
+          ...datasetMetadata.signal_names,
+          ...mathChannels.map((channel) => channel.name),
+        ];
+
+        statsSignals.forEach((signal) => {
+          const values = signalsWithMath[signal] ?? [];
           if (values.length === 0) {
             return;
           }
@@ -214,7 +234,7 @@ export default function ImportPanel({
       alive = false;
       controller.abort();
     };
-  }, [datasetId, datasetMetadata]);
+  }, [datasetId, datasetMetadata, mathChannels]);
 
   function formatStat(value: number): string {
     return Number.isFinite(value) ? value.toFixed(3) : "-";
@@ -335,6 +355,7 @@ export default function ImportPanel({
             </button>
 
             {selectedFile ? <p className="panel-text file-picked">{selectedFile.name}</p> : null}
+            {lastPickerPath ? <p className="panel-text file-picked">Dernier chemin picker: {lastPickerPath}</p> : null}
             {importMessageLines.length > 0 ? (
               <p className="panel-text import-message">
                 {importMessageLines.map((line, index) => (
