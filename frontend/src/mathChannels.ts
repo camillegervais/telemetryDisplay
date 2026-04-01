@@ -11,7 +11,15 @@ type RpnToken =
   | { type: "number"; value: number }
   | { type: "identifier"; value: string }
   | { type: "operator"; value: "+" | "-" | "*" | "/" }
-  | { type: "function"; name: "gain"; arity: 2 };
+  | { type: "function"; name: "gain" | "sqrt" | "abs" | "min" | "max"; arity: 1 | 2 };
+
+const SUPPORTED_FUNCTIONS: Record<string, 1 | 2> = {
+  gain: 2,
+  sqrt: 1,
+  abs: 1,
+  min: 2,
+  max: 2,
+};
 
 const OP_PRECEDENCE: Record<string, number> = {
   "+": 1,
@@ -129,7 +137,7 @@ function toRpn(tokens: Token[]): { rpn: RpnToken[]; dependencies: string[] } {
     if (token.type === "identifier") {
       const next = idx + 1 < tokens.length ? tokens[idx + 1] : null;
       if (next?.type === "left-paren") {
-        if (token.value !== "gain") {
+        if (!(token.value in SUPPORTED_FUNCTIONS)) {
           throw new Error(`Fonction non supportee: ${token.value}`);
         }
         stack.push({ ...token, functionName: token.value });
@@ -195,9 +203,13 @@ function toRpn(tokens: Token[]): { rpn: RpnToken[]; dependencies: string[] } {
       }
 
       const maybeFunction = stack[stack.length - 1];
-      if (maybeFunction?.type === "identifier" && maybeFunction.functionName === "gain") {
+      if (maybeFunction?.type === "identifier" && maybeFunction.functionName) {
         stack.pop();
-        output.push({ type: "function", name: "gain", arity: 2 });
+        output.push({
+          type: "function",
+          name: maybeFunction.functionName as "gain" | "sqrt" | "abs" | "min" | "max",
+          arity: SUPPORTED_FUNCTIONS[maybeFunction.functionName],
+        });
       }
       continue;
     }
@@ -268,6 +280,32 @@ function evaluateRpnAtIndex(rpn: RpnToken[], signalValues: Record<string, number
           throw new Error("gain() attend 2 arguments");
         }
         stack.push(value * factor);
+      } else if (token.name === "sqrt") {
+        const value = stack.pop();
+        if (value === undefined) {
+          throw new Error("sqrt() attend 1 argument");
+        }
+        stack.push(Math.sqrt(value));
+      } else if (token.name === "abs") {
+        const value = stack.pop();
+        if (value === undefined) {
+          throw new Error("abs() attend 1 argument");
+        }
+        stack.push(Math.abs(value));
+      } else if (token.name === "min") {
+        const right = stack.pop();
+        const left = stack.pop();
+        if (left === undefined || right === undefined) {
+          throw new Error("min() attend 2 arguments");
+        }
+        stack.push(Math.min(left, right));
+      } else if (token.name === "max") {
+        const right = stack.pop();
+        const left = stack.pop();
+        if (left === undefined || right === undefined) {
+          throw new Error("max() attend 2 arguments");
+        }
+        stack.push(Math.max(left, right));
       }
     }
   }
