@@ -192,7 +192,7 @@ export default function ImportPanel({
   }
 
   async function handleImportFromPathClick() {
-    const path = matPath.trim();
+    const path = matPath.trim().replace('"', "").replace('"', ""); // Remove potential quotes at the beginning and end of the path
     if (!path) {
       return;
     }
