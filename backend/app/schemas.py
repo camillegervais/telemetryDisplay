@@ -1,4 +1,4 @@
-from typing import Literal
+from typing import Literal, Optional
 
 from pydantic import BaseModel, Field
 
@@ -26,7 +26,7 @@ class DatasetMetadataResponse(BaseModel):
     lap_distance_min: float
     lap_distance_max: float
     signal_names: list[str]
-    source_sample_rate_hz: float | None
+    source_sample_rate_hz: Optional[float]
     has_time_axis: bool
     interpolation_method: str
     enrichment_factor: float
@@ -48,7 +48,7 @@ class DatasetQueryRequest(BaseModel):
 
 class DatasetQueryResponse(BaseModel):
     lap_distance: list[float]
-    lap_time: list[float] | None = None
+    lap_time: Optional[list[float]] = None
     signals: dict[str, list[float]]
     decimation_factor: int = Field(description="Points were averaged by this factor")
 

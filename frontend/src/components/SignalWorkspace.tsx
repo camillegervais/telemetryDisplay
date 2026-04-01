@@ -559,6 +559,7 @@ export default function SignalWorkspace({
   const [signalDropCell, setSignalDropCell] = useState<string | null>(null);
   const [expandedWidgetId, setExpandedWidgetId] = useState<number | null>(null);
   const [resizeState, setResizeState] = useState<ResizeState | null>(null);
+  const [isTabSwitching, setIsTabSwitching] = useState(false);
   const [seriesById, setSeriesById] = useState<Record<number, SignalSeries | null>>({});
   const [loadingById, setLoadingById] = useState<Record<number, boolean>>({});
   const [trajectorySeries, setTrajectorySeries] = useState<Record<string, number[]>>({});
@@ -567,6 +568,7 @@ export default function SignalWorkspace({
   const [sessionHydrated, setSessionHydrated] = useState(false);
   const gridRef = useRef<HTMLDivElement | null>(null);
   const queryGenerationRef = useRef(0);
+  const tabSwitchGenerationRef = useRef(0);
 
   const availableSignals = useMemo(
     () => [...(datasetMetadata?.signal_names ?? []), ...mathChannels.map((channel) => channel.name)],
@@ -753,6 +755,10 @@ export default function SignalWorkspace({
   }, [gridCols, gridRows, resizeState]);
 
   useEffect(() => {
+    if (isTabSwitching) {
+      return;
+    }
+
     setTabs((prev) =>
       prev.map((tab) =>
         tab.id === activeTabId
@@ -766,7 +772,7 @@ export default function SignalWorkspace({
           : tab
       )
     );
-  }, [activeTabId, gridCols, gridRows, nextId, widgets]);
+  }, [activeTabId, gridCols, gridRows, nextId, widgets, isTabSwitching]);
 
   useEffect(() => {
     setWidgets((prev) => fitWidgetsToGrid(prev, gridRows, gridCols));
@@ -1151,14 +1157,28 @@ export default function SignalWorkspace({
     if (!targetTab) {
       return;
     }
-    setActiveTabId(tabId);
-    setGridCols(targetTab.gridCols);
-    setGridRows(targetTab.gridRows);
-    setNextId(targetTab.nextId);
-    setWidgets(targetTab.widgets);
+
+    const switchGeneration = ++tabSwitchGenerationRef.current;
+    setIsTabSwitching(true);
     setSeriesById({});
     setLoadingById({});
+    setWidgets([]);
     setDragFromId(null);
+    setSignalDropCell(null);
+    setExpandedWidgetId(null);
+
+    window.setTimeout(() => {
+      if (switchGeneration !== tabSwitchGenerationRef.current) {
+        return;
+      }
+
+      setActiveTabId(tabId);
+      setGridCols(targetTab.gridCols);
+      setGridRows(targetTab.gridRows);
+      setNextId(targetTab.nextId);
+      setWidgets(targetTab.widgets);
+      setIsTabSwitching(false);
+    }, 0);
   }
 
   function addTab() {
@@ -1605,6 +1625,15 @@ export default function SignalWorkspace({
                 />
               </div>
             )}
+          </article>
+        </div>
+      ) : isTabSwitching ? (
+        <div className="graph-grid" style={gridStyle}>
+          <article className="graph-tile" style={{ gridColumn: "1 / span 1", gridRow: "1 / span 1" }}>
+            <div className="loading-plot">
+              <span className="loading-spinner" aria-hidden="true" />
+              Changement d'onglet...
+            </div>
           </article>
         </div>
       ) : (
