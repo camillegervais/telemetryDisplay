@@ -15,12 +15,19 @@ type SignalWorkspaceProps = {
   graphOnlyMode: boolean;
 };
 
+type WidgetOptions = {
+  alignZero?: boolean;
+  [key: string]: unknown;
+};
+
 type GraphWidget = {
   id: number;
   title: string;
   kind?: "timeseries" | "xy";
   signals: string[];
   xSignal?: string | null;
+  options?: WidgetOptions;
+  // Legacy field kept for backward compatibility with old localStorage snapshots/configs.
   alignZero?: boolean;
   menuOpen: boolean;
   row: number;
@@ -114,11 +121,29 @@ function createEmptyTab(name: string): WorkspaceTab {
 }
 
 function sanitizeWidgetsForStorage(widgets: GraphWidget[]): GraphWidget[] {
-  return widgets.map((widget) => ({ ...widget, menuOpen: false }));
+  return widgets.map((widget) => normalizeWidget(widget, true));
 }
 
 function closeAllWidgetMenus(widgets: GraphWidget[]): GraphWidget[] {
-  return widgets.map((widget) => ({ ...widget, menuOpen: false }));
+  return widgets.map((widget) => normalizeWidget(widget, true));
+}
+
+function normalizeWidget(widget: GraphWidget, forceCloseMenu: boolean): GraphWidget {
+  const { alignZero: legacyAlignZero, options, ...rest } = widget;
+  const normalizedOptions: WidgetOptions = {
+    ...(options ?? {}),
+    alignZero: options?.alignZero ?? legacyAlignZero ?? false,
+  };
+
+  return {
+    ...rest,
+    options: normalizedOptions,
+    menuOpen: forceCloseMenu ? false : widget.menuOpen,
+  };
+}
+
+function getWidgetAlignZero(widget: GraphWidget): boolean {
+  return widget.options?.alignZero ?? widget.alignZero ?? false;
 }
 
 function loadSavedWorkspaceConfigs(): SavedWorkspaceConfig[] {
@@ -134,7 +159,15 @@ function loadSavedWorkspaceConfigs(): SavedWorkspaceConfig[] {
     if (!Array.isArray(parsed)) {
       return [];
     }
-    return parsed.filter((cfg) => Array.isArray(cfg.tabs) && cfg.tabs.length > 0);
+    return parsed
+      .filter((cfg) => Array.isArray(cfg.tabs) && cfg.tabs.length > 0)
+      .map((cfg) => ({
+        ...cfg,
+        tabs: cfg.tabs.map((tab) => ({
+          ...tab,
+          widgets: tab.widgets.map((widget) => normalizeWidget(widget, true)),
+        })),
+      }));
   } catch {
     return [];
   }
@@ -195,7 +228,7 @@ function createWidget(id: number, title: string, row: number, col: number): Grap
     kind: "timeseries",
     signals: [],
     xSignal: null,
-    alignZero: false,
+    options: { alignZero: false },
     menuOpen: false,
     row,
     col,
@@ -637,7 +670,7 @@ export default function SignalWorkspace({
 
     const clonedTabs = snapshot.tabs.map((tab) => ({
       ...tab,
-      widgets: tab.widgets.map((widget) => ({ ...widget, menuOpen: false })),
+      widgets: tab.widgets.map((widget) => normalizeWidget(widget, true)),
     }));
     const restoredActiveId =
       snapshot.activeTabId === TRAJECTORY_TAB_ID
@@ -1335,7 +1368,7 @@ export default function SignalWorkspace({
 
     const clonedTabs = config.tabs.map((tab) => ({
       ...tab,
-      widgets: tab.widgets.map((widget) => ({ ...widget, menuOpen: false })),
+      widgets: tab.widgets.map((widget) => normalizeWidget(widget, true)),
     }));
     const nextActiveId = clonedTabs.some((tab) => tab.id === config.activeTabId)
       ? config.activeTabId
@@ -1529,14 +1562,8 @@ export default function SignalWorkspace({
       const newId = prevId;
       setWidgets((prev) => {
         const candidate = {
-          id: newId,
-          title: `G${newId}`,
+          ...createWidget(newId, `G${newId}`, targetRow, targetCol),
           signals: [signal],
-          menuOpen: false,
-          row: targetRow,
-          col: targetCol,
-          widthSpan: 1,
-          heightSpan: 1,
         };
 
         if (!canPlaceWidget(candidate, targetRow, targetCol, gridRows, gridCols, prev)) {
@@ -1733,7 +1760,7 @@ export default function SignalWorkspace({
                   xRange,
                   graphOnlyMode,
                   homeRevision,
-                  widget.alignZero ?? false,
+                  getWidgetAlignZero(widget),
                   xAxisMode
                 );
 
@@ -1895,12 +1922,20 @@ export default function SignalWorkspace({
                     <label className="signal-checkbox" style={{ marginTop: "0.4rem" }}>
                       <input
                         type="checkbox"
-                        checked={widget.alignZero ?? false}
+                        checked={getWidgetAlignZero(widget)}
                         onChange={(event) => {
                           const checked = event.target.checked;
                           setWidgets((prev) =>
                             prev.map((item) =>
-                              item.id === widget.id ? { ...item, alignZero: checked } : item
+                              item.id === widget.id
+                                ? {
+                                    ...item,
+                                    options: {
+                                      ...(item.options ?? {}),
+                                      alignZero: checked,
+                                    },
+                                  }
+                                : item
                             )
                           );
                         }}
