@@ -33,6 +33,49 @@ function isAbortError(error: unknown): boolean {
   return error instanceof DOMException && error.name === "AbortError";
 }
 
+function formatImportMessageLines(message: string): string[] {
+  const normalized = message.replace(/\r?\n/g, " ").replace(/\s+/g, " ").trim();
+  if (!normalized) {
+    return [];
+  }
+
+  const lines: string[] = [];
+  const firstCommaIndex = normalized.indexOf(",");
+  if (firstCommaIndex > 0) {
+    lines.push(normalized.slice(0, firstCommaIndex).trim());
+  } else {
+    lines.push(normalized);
+  }
+
+  const sourceStepMatch = normalized.match(/source step\s*([^,\-\s]+m?)/i);
+  const referenceStepMatch = normalized.match(/reference step\s*([^,\s]+m?)/i);
+
+  if (sourceStepMatch) {
+    lines.push(`Source step: ${sourceStepMatch[1]}`);
+  }
+  if (referenceStepMatch) {
+    lines.push(`Reference step: ${referenceStepMatch[1]}`);
+  }
+
+  if (lines.length < 3) {
+    const chunks = normalized
+      .split(",")
+      .map((part) => part.trim())
+      .filter(Boolean);
+
+    chunks.forEach((chunk) => {
+      if (lines.length >= 3) {
+        return;
+      }
+      if (!lines.includes(chunk)) {
+        lines.push(chunk);
+      }
+    });
+  }
+
+  return lines.slice(0, 3);
+}
+
 export default function ImportPanel({
   appInfo,
   loadingAppInfo,
@@ -65,10 +108,6 @@ export default function ImportPanel({
 
   const canImport = useMemo(() => selectedFile !== null && !importing, [importing, selectedFile]);
   const canImportFromPath = useMemo(() => matPath.trim().length > 0 && !importing, [importing, matPath]);
-  const canRefreshFromLastSelection = useMemo(
-    () => (!importing && matPath.trim().length > 0) || (!importing && selectedFile !== null),
-    [importing, matPath, selectedFile]
-  );
   const filteredSignals = useMemo(() => {
     const allSignals = [...(datasetMetadata?.signal_names ?? []), ...mathChannels.map((channel) => channel.name)];
     const filter = signalFilter.trim().toLowerCase();
@@ -77,6 +116,10 @@ export default function ImportPanel({
     }
     return allSignals.filter((signal) => signal.toLowerCase().includes(filter));
   }, [datasetMetadata, mathChannels, signalFilter]);
+  const importMessageLines = useMemo(
+    () => (importMessage ? formatImportMessageLines(importMessage) : []),
+    [importMessage]
+  );
 
   useEffect(() => {
     const savedPath = window.localStorage.getItem(LAST_MAT_PATH_KEY);
@@ -184,21 +227,8 @@ export default function ImportPanel({
     await onImport(selectedFile);
   }
 
-  async function handleRefreshFromLastSelectionClick() {
-    const path = matPath.trim();
-    if (path) {
-      window.localStorage.setItem(LAST_MAT_PATH_KEY, path);
-      await onImportFromPath(path);
-      return;
-    }
-
-    if (selectedFile) {
-      await onImport(selectedFile);
-    }
-  }
-
   async function handleImportFromPathClick() {
-    const path = matPath.trim().replace('"', "").replace('"', ""); // Remove potential quotes at the beginning and end of the path
+    const path = matPath.trim().replace(/^"|"$/g, "");
     if (!path) {
       return;
     }
@@ -240,7 +270,7 @@ export default function ImportPanel({
             <p className="panel-text">Chargez un MAT.</p>
 
             <label className="field-label" htmlFor="mat-file-input">
-              MAT file
+              MAT file - Load un fichier une seule fois
             </label>
             <input
               id="mat-file-input"
@@ -278,23 +308,8 @@ export default function ImportPanel({
               )}
             </button>
 
-            <button
-              className="import-button"
-              disabled={!canRefreshFromLastSelection}
-              onClick={handleRefreshFromLastSelectionClick}
-            >
-              {importing ? (
-                <span className="loading-inline">
-                  <span className="loading-spinner" aria-hidden="true" />
-                  Import en cours...
-                </span>
-              ) : (
-                "Refresh depuis derniere selection"
-              )}
-            </button>
-
             <label className="field-label" htmlFor="mat-path-input">
-              MAT path (serveur local)
+              MAT path - Permet de refresh entre les simulations
             </label>
             <input
               id="mat-path-input"
@@ -320,8 +335,16 @@ export default function ImportPanel({
             </button>
 
             {selectedFile ? <p className="panel-text file-picked">{selectedFile.name}</p> : null}
-            {lastPickerPath ? <p className="panel-text file-picked">Dernier chemin picker: {lastPickerPath}</p> : null}
-            {importMessage ? <p className="panel-text import-message">{importMessage}</p> : null}
+            {importMessageLines.length > 0 ? (
+              <p className="panel-text import-message">
+                {importMessageLines.map((line, index) => (
+                  <span key={`import-msg-${index}`}>
+                    {line}
+                    {index < importMessageLines.length - 1 ? <br /> : null}
+                  </span>
+                ))}
+              </p>
+            ) : null}
 
             <div className="meta-grid">
               <div className="meta-item">

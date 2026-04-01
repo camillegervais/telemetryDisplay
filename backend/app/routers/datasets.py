@@ -113,9 +113,9 @@ async def import_mat_file(file: UploadFile) -> DatasetImportResponse:
 
         return DatasetImportResponse(
             dataset_id=metadata.dataset_id,
-            message=f"Dataset imported: {len(df_normalized)} normalized samples, "
-            f"source step {metadata.source_distance_step_m:.2f}m -> "
-            f"reference step {metadata.normalized_distance_step_m:.2f}m",
+            message=f"Dataset imported: {len(df_normalized)} normalized samples,"
+            f" Source step {metadata.source_distance_step_m:.2f}m,"
+            f" Reference step {metadata.normalized_distance_step_m:.2f}m",
         )
 
     except MatValidationError as e:
@@ -144,9 +144,9 @@ def import_mat_file_from_path(request: DatasetImportFromPathRequest) -> DatasetI
         df_normalized, metadata = mat_loader.load_and_normalize(mat_path)
         return DatasetImportResponse(
             dataset_id=metadata.dataset_id,
-            message=f"Dataset imported from path: {len(df_normalized)} normalized samples, "
-            f"source step {metadata.source_distance_step_m:.2f}m -> "
-            f"reference step {metadata.normalized_distance_step_m:.2f}m",
+            message=f"Dataset imported from path: {len(df_normalized)} normalized samples,"
+            f" Source step {metadata.source_distance_step_m:.2f}m,"
+            f" Reference step {metadata.normalized_distance_step_m:.2f}m",
         )
     except MatValidationError as e:
         raise HTTPException(status_code=422, detail=str(e))
