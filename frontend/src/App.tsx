@@ -12,6 +12,8 @@ import { analyzeMathExpression } from "./mathChannels";
 import { useTelemetryStore } from "./store/telemetryStore";
 import type { AppInfo, DatasetMetadata, MathChannel, TrackMapResponse } from "./types";
 
+const USER_DISPLAY_NAME_KEY = "telemetry-display.user-display-name.v1";
+
 export default function App() {
   const [appInfo, setAppInfo] = useState<AppInfo | null>(null);
   const [loadingAppInfo, setLoadingAppInfo] = useState(true);
@@ -23,6 +25,7 @@ export default function App() {
   const [trackMap, setTrackMap] = useState<TrackMapResponse | null>(null);
   const [mathChannels, setMathChannels] = useState<MathChannel[]>([]);
   const [graphOnlyMode, setGraphOnlyMode] = useState(false);
+  const [userDisplayName, setUserDisplayName] = useState("");
 
   const { setXRange, setCursorDistance, triggerHomeReset } = useTelemetryStore();
 
@@ -32,8 +35,12 @@ export default function App() {
   }
 
   useEffect(() => {
-    let active = true;
+    const savedName = window.localStorage.getItem(USER_DISPLAY_NAME_KEY);
+    if (savedName) {
+      setUserDisplayName(savedName);
+    }
 
+    let active = true;
     fetchAppInfo()
       .then((data) => {
         if (!active) return;
@@ -52,6 +59,10 @@ export default function App() {
       active = false;
     };
   }, []);
+
+  useEffect(() => {
+    window.localStorage.setItem(USER_DISPLAY_NAME_KEY, userDisplayName.trim());
+  }, [userDisplayName]);
 
   async function handleImport(file: File) {
     setImporting(true);
@@ -149,10 +160,30 @@ export default function App() {
           </div>
           <div>
             <h1>Telemetry Display</h1>
-            <p>Race Telemetry Console</p>
+            <p>
+              Race Telemetry Console
+              {userDisplayName.trim() ? ` - ${userDisplayName.trim()}` : ""}
+            </p>
           </div>
         </div>
         <div className="topbar-actions">
+          <details className="topbar-user-menu">
+            <summary className="small-button">Profil</summary>
+            <div className="topbar-user-menu-content">
+              <label className="field-label" htmlFor="topbar-user-input">
+                Prenom
+              </label>
+              <input
+                id="topbar-user-input"
+                type="text"
+                className="topbar-user-input"
+                value={userDisplayName}
+                onChange={(event) => setUserDisplayName(event.target.value)}
+                placeholder="Votre prenom"
+                aria-label="Prenom utilisateur"
+              />
+            </div>
+          </details>
           <button className="small-button" onClick={resetAllGraphsToHome}>
             Maison
           </button>

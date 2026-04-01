@@ -91,6 +91,43 @@ body {
   gap: 0.45rem;
 }
 
+.topbar-user-input {
+  width: 160px;
+  border: 1px solid rgba(255, 70, 93, 0.42);
+  background: rgba(18, 7, 10, 0.86);
+  color: var(--fg-1);
+  border-radius: 0;
+  padding: 0.32rem 0.45rem;
+  font-size: 0.75rem;
+}
+
+.topbar-user-input::placeholder {
+  color: #89a4be;
+}
+
+.topbar-user-menu {
+  position: relative;
+}
+
+.topbar-user-menu > summary {
+  list-style: none;
+}
+
+.topbar-user-menu > summary::-webkit-details-marker {
+  display: none;
+}
+
+.topbar-user-menu-content {
+  position: absolute;
+  top: calc(100% + 0.35rem);
+  right: 0;
+  min-width: 190px;
+  border: 1px solid rgba(255, 70, 93, 0.42);
+  background: rgba(18, 7, 10, 0.96);
+  padding: 0.45rem;
+  z-index: 50;
+}
+
 .graph-only-mode .topbar {
   display: none;
 }
