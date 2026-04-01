@@ -13,6 +13,43 @@ type SignalWorkspaceProps = {
   trackMap: TrackMapResponse | null;
   mathChannels: MathChannel[];
   graphOnlyMode: boolean;
+  inspectorSelectedWidgetId?: number | null;
+  onInspectorSelectedWidgetIdChange?: (widgetId: number | null) => void;
+  onInspectorSnapshotChange?: (snapshot: InspectorSnapshot) => void;
+  inspectorCommand?: InspectorCommand | null;
+};
+
+export type InspectorWidgetSummary = {
+  id: number;
+  title: string;
+  kind: "timeseries" | "xy";
+  signalsCount: number;
+  xSignal: string | null;
+  row: number;
+  col: number;
+  widthSpan: number;
+  heightSpan: number;
+  alignZero: boolean;
+  menuOpen: boolean;
+};
+
+export type InspectorSnapshot = {
+  activeTabId: string;
+  activeTabName: string;
+  gridCols: number;
+  gridRows: number;
+  widgets: InspectorWidgetSummary[];
+  selectedWidgetId: number | null;
+};
+
+export type InspectorCommand = {
+  type: "toggle-menu" | "set-align-zero" | "set-size" | "set-position";
+  widgetId: number;
+  alignZero?: boolean;
+  widthSpan?: number;
+  heightSpan?: number;
+  row?: number;
+  col?: number;
 };
 
 type WidgetOptions = {
@@ -638,6 +675,10 @@ export default function SignalWorkspace({
   trackMap,
   mathChannels,
   graphOnlyMode,
+  inspectorSelectedWidgetId,
+  onInspectorSelectedWidgetIdChange,
+  onInspectorSnapshotChange,
+  inspectorCommand,
 }: SignalWorkspaceProps) {
   const {
     cursorDistance,
@@ -670,6 +711,10 @@ export default function SignalWorkspace({
   const [trajectoryLoading, setTrajectoryLoading] = useState(false);
   const [trajectoryError, setTrajectoryError] = useState<string | null>(null);
   const [sessionHydrated, setSessionHydrated] = useState(false);
+  const [focusSignalsOpen, setFocusSignalsOpen] = useState(true);
+  const [focusTargetWidgetId, setFocusTargetWidgetId] = useState<string>("auto");
+  const [focusSignalFilter, setFocusSignalFilter] = useState("");
+  const [localSelectedWidgetId, setLocalSelectedWidgetId] = useState<number | null>(null);
   const gridRef = useRef<HTMLDivElement | null>(null);
   const queryGenerationRef = useRef(0);
   const tabSwitchGenerationRef = useRef(0);
@@ -682,8 +727,165 @@ export default function SignalWorkspace({
     () => Object.fromEntries(mathChannels.map((channel) => [channel.name, channel])),
     [mathChannels]
   );
+  const filteredFocusSignals = useMemo(() => {
+    const q = focusSignalFilter.trim().toLowerCase();
+    if (q.length === 0) {
+      return availableSignals;
+    }
+    return availableSignals.filter((signal) => signal.toLowerCase().includes(q));
+  }, [availableSignals, focusSignalFilter]);
   const canQuery = datasetId !== null && datasetMetadata !== null;
   const isTrajectoryActive = activeTabId === TRAJECTORY_TAB_ID;
+  const selectedWidgetId = inspectorSelectedWidgetId ?? localSelectedWidgetId;
+
+  function updateSelectedWidgetId(next: number | null) {
+    if (inspectorSelectedWidgetId !== undefined) {
+      onInspectorSelectedWidgetIdChange?.(next);
+      return;
+    }
+    setLocalSelectedWidgetId(next);
+  }
+
+  useEffect(() => {
+    if (focusTargetWidgetId === "auto") {
+      return;
+    }
+    const selectedId = Number(focusTargetWidgetId);
+    const stillExists = widgets.some((widget) => widget.id === selectedId);
+    if (!stillExists) {
+      setFocusTargetWidgetId("auto");
+    }
+  }, [widgets, focusTargetWidgetId]);
+
+  useEffect(() => {
+    if (selectedWidgetId === null) {
+      return;
+    }
+    const exists = widgets.some((widget) => widget.id === selectedWidgetId);
+    if (!exists) {
+      updateSelectedWidgetId(null);
+    }
+  }, [widgets, selectedWidgetId]);
+
+  useEffect(() => {
+    if (!onInspectorSnapshotChange) {
+      return;
+    }
+
+    const activeTabName =
+      activeTabId === TRAJECTORY_TAB_ID
+        ? "Trajectoire"
+        : tabs.find((tab) => tab.id === activeTabId)?.name ?? "Onglet";
+
+    const widgetSummaries: InspectorWidgetSummary[] = widgets.map((widget) => ({
+      id: widget.id,
+      title: widget.title,
+      kind: getWidgetKind(widget),
+      signalsCount: widget.signals.length,
+      xSignal: widget.xSignal ?? null,
+      row: widget.row,
+      col: widget.col,
+      widthSpan: widget.widthSpan,
+      heightSpan: widget.heightSpan,
+      alignZero: getWidgetAlignZero(widget),
+      menuOpen: widget.menuOpen,
+    }));
+
+    onInspectorSnapshotChange({
+      activeTabId,
+      activeTabName,
+      gridCols,
+      gridRows,
+      widgets: widgetSummaries,
+      selectedWidgetId,
+    });
+  }, [activeTabId, tabs, gridCols, gridRows, widgets, selectedWidgetId, onInspectorSnapshotChange]);
+
+  useEffect(() => {
+    if (!inspectorCommand) {
+      return;
+    }
+
+    if (inspectorCommand.type === "toggle-menu") {
+      setWidgets((prev) =>
+        prev.map((item) =>
+          item.id === inspectorCommand.widgetId ? { ...item, menuOpen: !item.menuOpen } : item
+        )
+      );
+      return;
+    }
+
+    if (inspectorCommand.type === "set-align-zero") {
+      const checked = Boolean(inspectorCommand.alignZero);
+      setWidgets((prev) =>
+        prev.map((item) =>
+          item.id === inspectorCommand.widgetId && getWidgetKind(item) === "timeseries"
+            ? {
+                ...item,
+                options: {
+                  ...(item.options ?? {}),
+                  alignZero: checked,
+                },
+              }
+            : item
+        )
+      );
+      return;
+    }
+
+    if (inspectorCommand.type === "set-size") {
+      setWidgets((prev) => {
+        const widget = prev.find((item) => item.id === inspectorCommand.widgetId);
+        if (!widget) {
+          return prev;
+        }
+        const widthSpan = inspectorCommand.widthSpan ?? widget.widthSpan;
+        const heightSpan = inspectorCommand.heightSpan ?? widget.heightSpan;
+        if (
+          !canPlaceWidget(
+            { ...widget, widthSpan, heightSpan },
+            widget.row,
+            widget.col,
+            gridRows,
+            gridCols,
+            prev.filter((w) => w.id !== inspectorCommand.widgetId)
+          )
+        ) {
+          return prev;
+        }
+        return prev.map((item) =>
+          item.id === inspectorCommand.widgetId ? { ...item, widthSpan, heightSpan } : item
+        );
+      });
+      return;
+    }
+
+    if (inspectorCommand.type === "set-position") {
+      setWidgets((prev) => {
+        const widget = prev.find((item) => item.id === inspectorCommand.widgetId);
+        if (!widget) {
+          return prev;
+        }
+        const row = inspectorCommand.row ?? widget.row;
+        const col = inspectorCommand.col ?? widget.col;
+        if (
+          !canPlaceWidget(
+            widget,
+            row,
+            col,
+            gridRows,
+            gridCols,
+            prev.filter((w) => w.id !== inspectorCommand.widgetId)
+          )
+        ) {
+          return prev;
+        }
+        return prev.map((item) =>
+          item.id === inspectorCommand.widgetId ? { ...item, row, col } : item
+        );
+      });
+    }
+  }, [inspectorCommand, gridCols, gridRows]);
 
   function expandSignalsForQuery(signals: string[]): string[] {
     const expanded = new Set<string>();
@@ -1330,6 +1532,7 @@ export default function SignalWorkspace({
     setWidgets((prev) => closeAllWidgetMenus(prev));
     setActiveTabId(TRAJECTORY_TAB_ID);
     setExpandedWidgetId(null);
+    updateSelectedWidgetId(null);
     setDragFromId(null);
     setSignalDropCell(null);
   }
@@ -1487,6 +1690,9 @@ export default function SignalWorkspace({
 
   function removeWidget(id: number) {
     setWidgets((prev) => prev.filter((widget) => widget.id !== id));
+    if (selectedWidgetId === id) {
+      updateSelectedWidgetId(null);
+    }
     setSeriesById((prev) => {
       const clone = { ...prev };
       delete clone[id];
@@ -1606,6 +1812,25 @@ export default function SignalWorkspace({
     );
   }
 
+  function addSignalFromFocusToolbar(signal: string) {
+    if (!canQuery) {
+      return;
+    }
+
+    const preferredId = focusTargetWidgetId === "auto" ? null : Number(focusTargetWidgetId);
+    const existingTarget = preferredId !== null
+      ? widgets.find((widget) => widget.id === preferredId)
+      : widgets.find((widget) => widget.id === expandedWidgetId) ?? widgets[0];
+
+    if (existingTarget) {
+      addDroppedSignalToWidget(existingTarget.id, signal);
+      return;
+    }
+
+    const free = firstFreeCell([], gridRows, gridCols, 1, 1);
+    addWidgetWithSignalAtPosition(free.row, free.col, signal);
+  }
+
   function addWidgetWithSignalAtPosition(targetRow: number, targetCol: number, signal: string) {
     setNextId((prevId) => {
       const newId = prevId;
@@ -1713,6 +1938,92 @@ export default function SignalWorkspace({
         </div>
       </div>
 
+      {graphOnlyMode ? (
+        <div className="focus-mini-toolbar" aria-label="Actions rapides focus">
+          <button className="small-button" onClick={() => setFocusSignalsOpen((prev) => !prev)}>
+            {focusSignalsOpen ? "Masquer signaux" : "Montrer signaux"}
+          </button>
+          <button className="small-button" onClick={addWidget}>
+            + Graphe
+          </button>
+          <button className="small-button" onClick={addXYWidget}>
+            + Graphe XY
+          </button>
+          <label>
+            Col
+            <select
+              className="mini-select"
+              value={gridCols}
+              onChange={(event) => setGridCols(Number(event.target.value))}
+            >
+              <option value={1}>1</option>
+              <option value={2}>2</option>
+              <option value={3}>3</option>
+              <option value={4}>4</option>
+            </select>
+          </label>
+          <label>
+            Lig
+            <select
+              className="mini-select"
+              value={gridRows}
+              onChange={(event) => setGridRows(Number(event.target.value))}
+            >
+              <option value={1}>1</option>
+              <option value={2}>2</option>
+              <option value={3}>3</option>
+              <option value={4}>4</option>
+            </select>
+          </label>
+          <label>
+            Cible
+            <select
+              className="mini-select"
+              value={focusTargetWidgetId}
+              onChange={(event) => setFocusTargetWidgetId(event.target.value)}
+            >
+              <option value="auto">Auto</option>
+              {widgets.map((widget) => (
+                <option key={`focus-target-${widget.id}`} value={String(widget.id)}>
+                  {widget.title}
+                </option>
+              ))}
+            </select>
+          </label>
+          <div className={`focus-signal-drawer ${focusSignalsOpen ? "focus-signal-drawer-open" : "focus-signal-drawer-closed"}`}>
+            <input
+              className="focus-signal-filter"
+              type="text"
+              value={focusSignalFilter}
+              onChange={(event) => setFocusSignalFilter(event.target.value)}
+              placeholder="Filtrer les signaux..."
+              aria-label="Filtrer les signaux"
+            />
+            <div className="focus-signal-list" aria-label="Signaux disponibles">
+              {filteredFocusSignals.map((signal) => (
+                <button
+                  key={`focus-signal-${signal}`}
+                  className="sidebar-signal-chip focus-signal-chip"
+                  draggable
+                  onDragStart={(event) => {
+                    event.dataTransfer.setData(SIGNAL_DRAG_MIME, signal);
+                    event.dataTransfer.effectAllowed = "copy";
+                  }}
+                  onClick={() => addSignalFromFocusToolbar(signal)}
+                  disabled={!canQuery}
+                  title={`Cliquer ou glisser: ${signal}`}
+                >
+                  {signal}
+                </button>
+              ))}
+              {filteredFocusSignals.length === 0 ? (
+                <span className="focus-signal-empty">Aucun signal</span>
+              ) : null}
+            </div>
+          </div>
+        </div>
+      ) : null}
+
       <div className={`workspace-tabs ${graphOnlyMode ? "workspace-tabs-hidden" : ""}`}>
         {tabs.map((tab) => (
           <div
@@ -1816,11 +2127,12 @@ export default function SignalWorkspace({
           return (
             <article
               key={widget.id}
-              className={`graph-tile ${dragFromId === widget.id ? "graph-tile-dragging" : ""} ${widget.menuOpen ? "has-open-menu" : ""} ${expandedWidgetId === widget.id ? "graph-tile-expanded" : ""}`}
+              className={`graph-tile ${dragFromId === widget.id ? "graph-tile-dragging" : ""} ${widget.menuOpen ? "has-open-menu" : ""} ${expandedWidgetId === widget.id ? "graph-tile-expanded" : ""} ${selectedWidgetId === widget.id ? "graph-tile-inspector-active" : ""}`}
               style={{
                 gridColumn: `${widget.col} / span ${widget.widthSpan}`,
                 gridRow: `${widget.row} / span ${widget.heightSpan}`,
               }}
+              onClick={() => updateSelectedWidgetId(widget.id)}
               onDragOver={(event) => {
                 const canDropSignal = event.dataTransfer.types.includes(SIGNAL_DRAG_MIME);
                 if (dragFromId !== null || canDropSignal) {
@@ -1848,7 +2160,10 @@ export default function SignalWorkspace({
                 <button
                   className="icon-button"
                   draggable
-                  onDragStart={() => setDragFromId(widget.id)}
+                  onDragStart={() => {
+                    updateSelectedWidgetId(widget.id);
+                    setDragFromId(widget.id);
+                  }}
                   onDragEnd={() => setDragFromId(null)}
                   title="Déplacer"
                 >
@@ -1857,11 +2172,14 @@ export default function SignalWorkspace({
                 <button
                   className="icon-button"
                   onClick={() =>
-                    setWidgets((prev) =>
-                      prev.map((item) =>
-                        item.id === widget.id ? { ...item, menuOpen: !item.menuOpen } : item
-                      )
-                    )
+                    {
+                      updateSelectedWidgetId(widget.id);
+                      setWidgets((prev) =>
+                        prev.map((item) =>
+                          item.id === widget.id ? { ...item, menuOpen: !item.menuOpen } : item
+                        )
+                      );
+                    }
                   }
                   title="Paramètres"
                 >
@@ -1877,7 +2195,10 @@ export default function SignalWorkspace({
                 <button
                   className="icon-button"
                   onClick={() =>
-                    setExpandedWidgetId((prev) => (prev === widget.id ? null : widget.id))
+                    {
+                      updateSelectedWidgetId(widget.id);
+                      setExpandedWidgetId((prev) => (prev === widget.id ? null : widget.id));
+                    }
                   }
                   title={expandedWidgetId === widget.id ? "Réduire" : "Plein écran"}
                 >

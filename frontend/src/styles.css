@@ -134,11 +134,106 @@ body {
 
 .graph-only-overlay-controls {
   position: fixed;
-  left: 10px;
+  left: 50%;
+  transform: translateX(-50%);
   top: 10px;
   z-index: 20;
   display: flex;
   gap: 0.4rem;
+}
+
+.focus-mini-toolbar {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: nowrap;
+  gap: 0.45rem;
+  margin: 0 auto 0.45rem;
+  padding: 0.35rem 0.5rem;
+  border: 1px solid rgba(255, 70, 93, 0.45);
+  background: rgba(17, 7, 10, 0.9);
+  width: max-content;
+  max-width: calc(100vw - 20px);
+  overflow-x: auto;
+  overflow-y: hidden;
+  min-height: 3rem;
+}
+
+.focus-mini-toolbar label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-size: 0.72rem;
+  color: var(--fg-2);
+  white-space: nowrap;
+}
+
+.focus-signal-drawer {
+  overflow: hidden;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  transform-origin: left center;
+  transition: max-width 0.24s ease, opacity 0.2s ease, transform 0.24s ease;
+}
+
+.focus-signal-drawer-open {
+  max-width: min(62vw, 780px);
+  opacity: 1;
+  transform: translateX(0);
+  flex-basis: auto;
+}
+
+.focus-signal-drawer-closed {
+  max-width: 0;
+  opacity: 0;
+  transform: translateX(-12px);
+  flex-basis: 0;
+  margin-left: -0.45rem;
+  pointer-events: none;
+}
+
+.focus-signal-list {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: nowrap;
+  gap: 0.35rem;
+  max-width: min(42vw, 520px);
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding-left: 0.15rem;
+}
+
+.focus-signal-filter {
+  width: min(220px, 30vw);
+  min-width: 130px;
+  border: 1px solid rgba(255, 70, 93, 0.45);
+  background: rgba(22, 8, 12, 0.95);
+  color: var(--fg-1);
+  padding: 0.24rem 0.45rem;
+  font-size: 0.72rem;
+}
+
+.focus-signal-filter::placeholder {
+  color: #a2afbb;
+}
+
+.focus-signal-chip {
+  border-radius: 0;
+  background: rgba(255, 70, 93, 0.14);
+  color: #ffd9df;
+  padding: 0.22rem 0.52rem;
+  white-space: nowrap;
+}
+
+.focus-signal-chip:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.focus-signal-empty {
+  color: var(--fg-2);
+  font-size: 0.72rem;
+  padding: 0.12rem 0.2rem;
 }
 
 .topbar h1 {
@@ -220,6 +315,15 @@ body {
   height: 100%;
 }
 
+.dashboard-grid-panel-right {
+  grid-template-columns: 1fr 300px;
+}
+
+.global-side-panel {
+  min-height: 0;
+  min-width: 0;
+}
+
 .graph-only-mode .dashboard-grid {
   grid-template-columns: 1fr;
   gap: 0;
@@ -230,6 +334,11 @@ body {
 .import-panel {
   min-height: 0;
   overflow: auto;
+}
+
+.inspector-panel {
+  display: grid;
+  grid-template-rows: auto 1fr;
 }
 
 .import-submenu {
@@ -349,6 +458,89 @@ body {
   border-radius: 0;
   background: rgba(18, 7, 10, 0.78);
   padding: 0.42rem 0.5rem;
+}
+
+.inspector-widget-list {
+  display: grid;
+  gap: 0.35rem;
+  max-height: 170px;
+  overflow-y: auto;
+}
+
+.inspector-widget-item {
+  border: 1px solid rgba(255, 70, 93, 0.4);
+  background: rgba(22, 8, 12, 0.8);
+  color: var(--fg-1);
+  border-radius: 0;
+  padding: 0.32rem 0.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  cursor: pointer;
+  font-size: 0.76rem;
+}
+
+.inspector-widget-item strong {
+  color: #ff9dad;
+  font-family: "Rajdhani", sans-serif;
+  letter-spacing: 0.05em;
+}
+
+.inspector-widget-item-active {
+  border-color: rgba(255, 70, 93, 0.78);
+  background: rgba(255, 70, 93, 0.2);
+  box-shadow: 0 0 0 1px rgba(255, 70, 93, 0.26) inset;
+}
+
+.inspector-grid {
+  display: grid;
+  gap: 0.45rem;
+}
+
+.inspector-layout {
+  display: grid;
+  gap: 0.55rem;
+}
+
+.inspector-grid-info {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  max-height: 50%;
+  overflow-y: auto;
+  padding-right: 0.15rem;
+  align-content: start;
+}
+
+.inspector-grid-info .meta-item {
+  padding: 0.45rem 0.5rem;
+}
+
+.inspector-grid-actions {
+  align-content: start;
+}
+
+.inspector-empty {
+  margin-top: 0.55rem;
+}
+
+.inspector-actions {
+  display: grid;
+  gap: 0.35rem;
+}
+
+.inspector-controls-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+
+.inspector-controls-row label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  font-size: 0.72rem;
+  color: var(--fg-2);
 }
 
 .signals-stats-title {
@@ -658,6 +850,11 @@ body {
   background: linear-gradient(180deg, rgba(22, 8, 12, 0.9), rgba(15, 6, 9, 0.84));
   overflow: hidden;
   min-height: 0;
+}
+
+.graph-tile-inspector-active {
+  border-color: rgba(255, 70, 93, 0.85);
+  box-shadow: 0 0 0 1px rgba(255, 70, 93, 0.3) inset;
 }
 
 .graph-only-mode .graph-tile {
