@@ -336,16 +336,20 @@ function nearestIndex(values: number[], target: number | null): number {
 function computeStartFinishLine(
   xValues: number[],
   yValues: number[],
-  lineLength: number
+  lineLength: number,
+  startIndex: number = 0
 ): { x1: number; y1: number; x2: number; y2: number } | null {
   if (xValues.length < 2 || yValues.length < 2) {
     return null;
   }
 
-  const x0 = xValues[0];
-  const y0 = yValues[0];
-  const dx = xValues[1] - x0;
-  const dy = yValues[1] - y0;
+  const safeStart = ((startIndex % xValues.length) + xValues.length) % xValues.length;
+  const nextIndex = (safeStart + 1) % xValues.length;
+
+  const x0 = xValues[safeStart];
+  const y0 = yValues[safeStart];
+  const dx = xValues[nextIndex] - x0;
+  const dy = yValues[nextIndex] - y0;
   const tangentNorm = Math.hypot(dx, dy);
   if (tangentNorm <= 0) {
     return null;
@@ -362,6 +366,33 @@ function computeStartFinishLine(
     x2: x0 + nx * half,
     y2: y0 + ny * half,
   };
+}
+
+function startIndexForOffset(lapDistance: number[], offsetM: number): number {
+  if (lapDistance.length === 0) {
+    return 0;
+  }
+
+  const min = lapDistance[0];
+  const max = lapDistance[lapDistance.length - 1];
+  const span = Math.max(max - min, 1e-9);
+  const normalizedOffset = ((offsetM % span) + span) % span;
+  const target = min + normalizedOffset;
+  return nearestIndex(lapDistance, target);
+}
+
+function applyOffsetToDistance(lapDistance: number[], distance: number | null, offsetM: number): number | null {
+  if (distance === null || lapDistance.length === 0) {
+    return distance;
+  }
+
+  const min = lapDistance[0];
+  const max = lapDistance[lapDistance.length - 1];
+  const span = Math.max(max - min, 1e-9);
+  const normalizedOffset = ((offsetM % span) + span) % span;
+  const shifted = distance + normalizedOffset;
+  const wrapped = ((shifted - min) % span + span) % span + min;
+  return wrapped;
 }
 
 function buildChartConfig(
@@ -613,6 +644,7 @@ export default function SignalWorkspace({
     xRange,
     homeRevision,
     xAxisMode,
+    startFinishOffsetM,
     setCursorDistance,
     setXRange,
   } = useTelemetryStore();
@@ -1190,8 +1222,10 @@ export default function SignalWorkspace({
       ? [...xs.map((x, i) => `${x},${ys[i]}`), `${firstX},${firstY}`].join(" ")
       : xs.map((x, i) => `${x},${ys[i]}`).join(" ");
 
-    const idx = nearestIndex(trackMap.lap_distance, cursorDistance);
-    const startFinish = computeStartFinishLine(xs, ys, 14);
+    const shiftedCursorDistance = applyOffsetToDistance(trackMap.lap_distance, cursorDistance, startFinishOffsetM);
+    const idx = nearestIndex(trackMap.lap_distance, shiftedCursorDistance);
+    const startIndex = startIndexForOffset(trackMap.lap_distance, startFinishOffsetM);
+    const startFinish = computeStartFinishLine(xs, ys, 14, startIndex);
     return {
       width,
       height,
@@ -1201,7 +1235,7 @@ export default function SignalWorkspace({
       markerY: ys[idx],
       markerDistance: trackMap.lap_distance[idx],
     };
-  }, [cursorDistance, trackMap]);
+  }, [cursorDistance, trackMap, startFinishOffsetM]);
 
   function addWidget() {
     const id = nextId;

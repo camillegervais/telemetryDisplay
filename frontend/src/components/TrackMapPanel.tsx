@@ -53,16 +53,20 @@ function findMarkerIndex(lapDistance: number[], cursorDistance: number | null): 
 function computeStartFinishLine(
   xValues: number[],
   yValues: number[],
-  lineLength: number
+  lineLength: number,
+  startIndex: number = 0
 ): { x1: number; y1: number; x2: number; y2: number } | null {
   if (xValues.length < 2 || yValues.length < 2) {
     return null;
   }
 
-  const x0 = xValues[0];
-  const y0 = yValues[0];
-  const dx = xValues[1] - x0;
-  const dy = yValues[1] - y0;
+  const safeStart = ((startIndex % xValues.length) + xValues.length) % xValues.length;
+  const nextIndex = (safeStart + 1) % xValues.length;
+
+  const x0 = xValues[safeStart];
+  const y0 = yValues[safeStart];
+  const dx = xValues[nextIndex] - x0;
+  const dy = yValues[nextIndex] - y0;
   const tangentNorm = Math.hypot(dx, dy);
   if (tangentNorm <= 0) {
     return null;
@@ -80,8 +84,36 @@ function computeStartFinishLine(
   };
 }
 
+function startIndexForOffset(lapDistance: number[], offsetM: number): number {
+  if (lapDistance.length === 0) {
+    return 0;
+  }
+
+  const min = lapDistance[0];
+  const max = lapDistance[lapDistance.length - 1];
+  const span = Math.max(max - min, 1e-9);
+  const normalizedOffset = ((offsetM % span) + span) % span;
+  const target = min + normalizedOffset;
+  return findMarkerIndex(lapDistance, target);
+}
+
+function applyOffsetToDistance(lapDistance: number[], distance: number | null, offsetM: number): number | null {
+  if (distance === null || lapDistance.length === 0) {
+    return distance;
+  }
+
+  const min = lapDistance[0];
+  const max = lapDistance[lapDistance.length - 1];
+  const span = Math.max(max - min, 1e-9);
+  const normalizedOffset = ((offsetM % span) + span) % span;
+  const shifted = distance + normalizedOffset;
+  const wrapped = ((shifted - min) % span + span) % span + min;
+  return wrapped;
+}
+
 export default function TrackMapPanel({ trackMap }: TrackMapPanelProps) {
   const cursorDistance = useTelemetryStore((state) => state.cursorDistance);
+  const startFinishOffsetM = useTelemetryStore((state) => state.startFinishOffsetM);
 
   const mapped = useMemo(() => {
     if (!trackMap || trackMap.x_position.length === 0) {
@@ -95,9 +127,11 @@ export default function TrackMapPanel({ trackMap }: TrackMapPanelProps) {
     const { xs, ys } = mapTrackToViewportEqual(trackMap.x_position, trackMap.y_position, width, height, pad);
 
     const points = xs.map((x, idx) => `${x},${ys[idx]}`).join(" ");
-    const startFinish = computeStartFinishLine(xs, ys, 16);
+    const startIndex = startIndexForOffset(trackMap.lap_distance, startFinishOffsetM);
+    const startFinish = computeStartFinishLine(xs, ys, 16, startIndex);
 
-    const markerIndex = findMarkerIndex(trackMap.lap_distance, cursorDistance);
+    const shiftedCursorDistance = applyOffsetToDistance(trackMap.lap_distance, cursorDistance, startFinishOffsetM);
+    const markerIndex = findMarkerIndex(trackMap.lap_distance, shiftedCursorDistance);
     return {
       width,
       height,
@@ -107,7 +141,7 @@ export default function TrackMapPanel({ trackMap }: TrackMapPanelProps) {
       markerY: ys[markerIndex],
       markerDistance: trackMap.lap_distance[markerIndex],
     };
-  }, [cursorDistance, trackMap]);
+  }, [cursorDistance, trackMap, startFinishOffsetM]);
 
   return (
     <section className="panel track-map-panel floating-track-map">

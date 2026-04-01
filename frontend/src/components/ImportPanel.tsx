@@ -90,7 +90,7 @@ export default function ImportPanel({
   onAddMathChannel,
   onRemoveMathChannel,
 }: ImportPanelProps) {
-  const { xAxisMode, setXAxisMode } = useTelemetryStore();
+  const { xAxisMode, startFinishOffsetM, setXAxisMode, setStartFinishOffsetM } = useTelemetryStore();
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [matPath, setMatPath] = useState("");
   const [lastPickerPath, setLastPickerPath] = useState("");
@@ -474,6 +474,29 @@ export default function ImportPanel({
                   </strong>
                 </div>
               </div>
+
+              <details style={{ marginTop: "0.5rem" }}>
+                <summary className="panel-text" style={{ cursor: "pointer" }}>
+                  Avance: ligne depart/arrivee
+                </summary>
+                <label className="field-label" htmlFor="start-finish-offset-input">
+                  Decalage (m)
+                </label>
+                <input
+                  id="start-finish-offset-input"
+                  type="number"
+                  className="signals-filter-input"
+                  value={Number.isFinite(startFinishOffsetM) ? startFinishOffsetM : 0}
+                  step={1}
+                  onChange={(event) => {
+                    const next = Number(event.target.value);
+                    if (Number.isFinite(next)) {
+                      setStartFinishOffsetM(next);
+                    }
+                  }}
+                  placeholder="Ex: 15"
+                />
+              </details>
             </div>
           ) : null}
         </div>
