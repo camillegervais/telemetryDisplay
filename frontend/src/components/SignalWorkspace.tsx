@@ -103,6 +103,10 @@ function sanitizeWidgetsForStorage(widgets: GraphWidget[]): GraphWidget[] {
   return widgets.map((widget) => ({ ...widget, menuOpen: false }));
 }
 
+function closeAllWidgetMenus(widgets: GraphWidget[]): GraphWidget[] {
+  return widgets.map((widget) => ({ ...widget, menuOpen: false }));
+}
+
 function loadSavedWorkspaceConfigs(): SavedWorkspaceConfig[] {
   if (typeof window === "undefined") {
     return [];
@@ -1159,6 +1163,26 @@ export default function SignalWorkspace({
     }
 
     const switchGeneration = ++tabSwitchGenerationRef.current;
+    const closedTargetWidgets = closeAllWidgetMenus(targetTab.widgets);
+
+    setTabs((prev) =>
+      prev.map((tab) => {
+        if (tab.id === tabId) {
+          return {
+            ...tab,
+            widgets: closedTargetWidgets,
+          };
+        }
+        if (tab.id === activeTabId) {
+          return {
+            ...tab,
+            widgets: closeAllWidgetMenus(tab.widgets),
+          };
+        }
+        return tab;
+      })
+    );
+
     setIsTabSwitching(true);
     setSeriesById({});
     setLoadingById({});
@@ -1176,9 +1200,31 @@ export default function SignalWorkspace({
       setGridCols(targetTab.gridCols);
       setGridRows(targetTab.gridRows);
       setNextId(targetTab.nextId);
-      setWidgets(targetTab.widgets);
+      setWidgets(closedTargetWidgets);
       setIsTabSwitching(false);
     }, 0);
+  }
+
+  function switchToTrajectoryTab() {
+    if (isTrajectoryActive) {
+      return;
+    }
+
+    setTabs((prev) =>
+      prev.map((tab) =>
+        tab.id === activeTabId
+          ? {
+              ...tab,
+              widgets: closeAllWidgetMenus(tab.widgets),
+            }
+          : tab
+      )
+    );
+    setWidgets((prev) => closeAllWidgetMenus(prev));
+    setActiveTabId(TRAJECTORY_TAB_ID);
+    setExpandedWidgetId(null);
+    setDragFromId(null);
+    setSignalDropCell(null);
   }
 
   function addTab() {
@@ -1589,7 +1635,7 @@ export default function SignalWorkspace({
           </div>
         ))}
         <div className={`workspace-tab ${isTrajectoryActive ? "workspace-tab-active" : ""}`}>
-          <button className="workspace-tab-name" onClick={() => setActiveTabId(TRAJECTORY_TAB_ID)}>
+          <button className="workspace-tab-name" onClick={switchToTrajectoryTab}>
             Trajectoire
           </button>
         </div>
