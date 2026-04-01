@@ -301,8 +301,7 @@ function buildChartConfig(
   graphOnlyMode: boolean,
   homeRevision: number,
   alignZero: boolean,
-  xAxisMode: "distance" | "time",
-  sampleRateHz: number
+  xAxisMode: "distance" | "time"
 ) {
   if (!series || selectedSignals.length === 0) {
     return {
@@ -316,10 +315,11 @@ function buildChartConfig(
     };
   }
 
-  const safeRate = Number.isFinite(sampleRateHz) && sampleRateHz > 0 ? sampleRateHz : 100;
+  const hasTimeAxis = Array.isArray(series.lapTime) && series.lapTime.length === series.lapDistance.length;
+  const useTimeAxis = xAxisMode === "time" && hasTimeAxis;
   const xValues =
-    xAxisMode === "time"
-      ? series.lapDistance.map((_, index) => index / safeRate)
+    useTimeAxis
+      ? (series.lapTime as number[])
       : series.lapDistance;
   const useSharedYAxis = alignZero && selectedSignals.length > 1;
 
@@ -345,10 +345,10 @@ function buildChartConfig(
     font: { color: "#e5e7eb" },
     margin: graphOnlyMode ? { l: 26, r: 26, t: 8, b: 22 } : { l: 36, r: 36, t: 30, b: 28 },
     xaxis: {
-      title: graphOnlyMode ? undefined : xAxisMode === "time" ? "Temps (s)" : "Distance (m)",
+      title: graphOnlyMode ? undefined : useTimeAxis ? "Temps (s)" : "Distance (m)",
       gridcolor: "rgba(255, 93, 120, 0.22)",
       zeroline: false,
-      ...(xAxisMode === "distance" && xRange
+      ...(!useTimeAxis && xRange
         ? {
             range: [xRange.start, xRange.end],
             autorange: false,
@@ -541,7 +541,6 @@ export default function SignalWorkspace({
     xRange,
     homeRevision,
     xAxisMode,
-    sampleRateHz,
     setCursorDistance,
     setXRange,
   } = useTelemetryStore();
@@ -878,6 +877,7 @@ export default function SignalWorkspace({
             ...prev,
             [widget.id]: {
               lapDistance: response.lap_distance,
+              lapTime: response.lap_time,
               signals: signalsWithMath,
               decimationFactor: response.decimation_factor,
             },
@@ -1634,8 +1634,7 @@ export default function SignalWorkspace({
                   graphOnlyMode,
                   homeRevision,
                   widget.alignZero ?? false,
-                  xAxisMode,
-                  sampleRateHz
+                  xAxisMode
                 );
 
           return (

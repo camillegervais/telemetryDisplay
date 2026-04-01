@@ -46,7 +46,7 @@ export default function ImportPanel({
   onAddMathChannel,
   onRemoveMathChannel,
 }: ImportPanelProps) {
-  const { xAxisMode, sampleRateHz, setXAxisMode, setSampleRateHz } = useTelemetryStore();
+  const { xAxisMode, setXAxisMode } = useTelemetryStore();
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [matPath, setMatPath] = useState("");
   const [lastPickerPath, setLastPickerPath] = useState("");
@@ -96,6 +96,12 @@ export default function ImportPanel({
       window.localStorage.setItem(LAST_MAT_PATH_KEY, datasetMetadata.source_path);
     }
   }, [datasetMetadata?.source_path]);
+
+  useEffect(() => {
+    if (xAxisMode === "time" && datasetMetadata && !datasetMetadata.has_time_axis) {
+      setXAxisMode("distance");
+    }
+  }, [datasetMetadata, xAxisMode, setXAxisMode]);
 
   useEffect(() => {
     if (!datasetId || !datasetMetadata || datasetMetadata.signal_names.length === 0) {
@@ -410,25 +416,18 @@ export default function ImportPanel({
                     onChange={(event) => setXAxisMode(event.target.value as "distance" | "time")}
                   >
                     <option value="distance">Distance</option>
-                    <option value="time">Temps</option>
+                    <option value="time" disabled={!datasetMetadata?.has_time_axis}>
+                      Temps
+                    </option>
                   </select>
                 </div>
                 <div className="meta-item">
-                  <span>Frequence (Hz)</span>
-                  <input
-                    type="number"
-                    className="signals-filter-input"
-                    min={0.1}
-                    step={0.1}
-                    value={sampleRateHz}
-                    onChange={(event) => {
-                      const next = Number(event.target.value);
-                      if (Number.isFinite(next) && next > 0) {
-                        setSampleRateHz(next);
-                      }
-                    }}
-                    placeholder="Ex: 100"
-                  />
+                  <span>Frequence source</span>
+                  <strong>
+                    {datasetMetadata?.source_sample_rate_hz
+                      ? `${datasetMetadata.source_sample_rate_hz.toFixed(2)} Hz`
+                      : "Non disponible"}
+                  </strong>
                 </div>
               </div>
             </div>

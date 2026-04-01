@@ -26,6 +26,8 @@ class DatasetMetadataResponse(BaseModel):
     lap_distance_min: float
     lap_distance_max: float
     signal_names: list[str]
+    source_sample_rate_hz: float | None
+    has_time_axis: bool
     interpolation_method: str
     enrichment_factor: float
 
@@ -46,6 +48,7 @@ class DatasetQueryRequest(BaseModel):
 
 class DatasetQueryResponse(BaseModel):
     lap_distance: list[float]
+    lap_time: list[float] | None = None
     signals: dict[str, list[float]]
     decimation_factor: int = Field(description="Points were averaged by this factor")
 

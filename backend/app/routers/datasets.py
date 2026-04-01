@@ -179,6 +179,8 @@ def get_dataset_metadata(dataset_id: str) -> DatasetMetadataResponse:
         lap_distance_min=metadata.lap_distance_range[0],
         lap_distance_max=metadata.lap_distance_range[1],
         signal_names=metadata.signal_names,
+        source_sample_rate_hz=metadata.source_sample_rate_hz,
+        has_time_axis=metadata.has_time_axis,
         interpolation_method=metadata.interpolation_method,
         enrichment_factor=metadata.enrichment_factor,
     )
@@ -229,10 +231,12 @@ def query_dataset(dataset_id: str, request: DatasetQueryRequest) -> DatasetQuery
 
     # Build response
     lap_distance = df_decimated.index.tolist()
+    lap_time = df_decimated["__time_s__"].tolist() if "__time_s__" in df_decimated.columns else None
     signals = {signal: df_decimated[signal].tolist() for signal in request.signals}
 
     return DatasetQueryResponse(
         lap_distance=lap_distance,
+        lap_time=lap_time,
         signals=signals,
         decimation_factor=decimation_factor,
     )

@@ -32,6 +32,8 @@ class DatasetMetadata:
     num_samples: int
     lap_distance_range: tuple[float, float]
     signal_names: list[str]
+    source_sample_rate_hz: Optional[float] = None
+    has_time_axis: bool = False
     interpolation_method: str = "linear"
     enrichment_factor: float = 1.0
 
@@ -89,6 +91,7 @@ class MatLoader:
 
         # Detect or compute spatial step
         source_step_m = self._detect_spatial_step(mat_data, lap_distance)
+        sample_rate_hz = self._detect_sample_rate_hz(mat_data)
 
         # Collect signal variables (exclude metadata)
         signal_names = self._extract_signal_names(mat_data, source_points)
@@ -97,6 +100,11 @@ class MatLoader:
             raise MatValidationError("No signal variables found in .mat file")
 
         trimmed_signals: dict[str, np.ndarray] = {}
+        source_time: Optional[np.ndarray] = None
+        if sample_rate_hz is not None and sample_rate_hz > 0:
+            source_time_raw = np.arange(source_points, dtype=float) / sample_rate_hz
+            source_time_segment = source_time_raw[segment_indices]
+            source_time = source_time_segment[monotonic_mask]
 
         # Validate all signals have same length as lap_distance
         for signal_name in signal_names:
@@ -111,7 +119,7 @@ class MatLoader:
             trimmed_signals[signal_name] = signal_segment[monotonic_mask]
 
         # Normalize all signals to reference spatial step
-        df_normalized = self._resample_to_reference_step(lap_distance, trimmed_signals)
+        df_normalized = self._resample_to_reference_step(lap_distance, trimmed_signals, source_time)
 
         # Create metadata
         metadata = DatasetMetadata(
@@ -125,6 +133,8 @@ class MatLoader:
                 float(df_normalized.index.max()),
             ),
             signal_names=signal_names,
+            source_sample_rate_hz=sample_rate_hz,
+            has_time_axis=source_time is not None,
             enrichment_factor=source_step_m / self.reference_step_m if source_step_m > 0 else 1.0,
         )
 
@@ -176,6 +186,11 @@ class MatLoader:
             "lap_distance",
             "sLap",
             "distance_step_m",
+            "sample_rate_hz",
+            "sampling_rate_hz",
+            "sampling_frequency_hz",
+            "fs",
+            "dt",
         }
 
         signals = []
@@ -192,6 +207,32 @@ class MatLoader:
                 pass
 
         return sorted(signals)
+
+    def _detect_sample_rate_hz(self, mat_data: dict) -> Optional[float]:
+        """Detect source sampling rate (Hz) from common MAT keys."""
+        frequency_keys = (
+            "sample_rate_hz",
+            "sampling_rate_hz",
+            "sampling_frequency_hz",
+            "fs",
+        )
+        for key in frequency_keys:
+            if key in mat_data:
+                value = np.asarray(mat_data[key]).flatten()
+                if value.size == 0:
+                    continue
+                rate = float(value[0])
+                if np.isfinite(rate) and rate > 0:
+                    return rate
+
+        if "dt" in mat_data:
+            value = np.asarray(mat_data["dt"]).flatten()
+            if value.size > 0:
+                dt = float(value[0])
+                if np.isfinite(dt) and dt > 0:
+                    return 1.0 / dt
+
+        return None
 
     def _select_clean_lap_indices(self, lap_distance: np.ndarray) -> np.ndarray:
         """
@@ -244,7 +285,10 @@ class MatLoader:
         return keep
 
     def _resample_to_reference_step(
-        self, lap_distance: np.ndarray, signals: dict[str, np.ndarray]
+        self,
+        lap_distance: np.ndarray,
+        signals: dict[str, np.ndarray],
+        source_time: Optional[np.ndarray] = None,
     ) -> pd.DataFrame:
         """
         Resample all signals to reference spatial step using linear interpolation.
@@ -267,6 +311,9 @@ class MatLoader:
             # Linear interpolation, no extrapolation
             resampled_signal = np.interp(new_distance, lap_distance, original_signal)
             resampled[signal_name] = resampled_signal
+
+        if source_time is not None and len(source_time) == len(lap_distance):
+            resampled["__time_s__"] = np.interp(new_distance, lap_distance, source_time)
 
         df = pd.DataFrame(resampled)
         df.set_index("lap_distance", inplace=True)

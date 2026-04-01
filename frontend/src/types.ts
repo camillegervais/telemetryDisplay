@@ -18,12 +18,15 @@ export type DatasetMetadata = {
   lap_distance_min: number;
   lap_distance_max: number;
   signal_names: string[];
+  source_sample_rate_hz: number | null;
+  has_time_axis: boolean;
   interpolation_method: string;
   enrichment_factor: number;
 };
 
 export type DatasetQueryResponse = {
   lap_distance: number[];
+  lap_time: number[] | null;
   signals: Record<string, number[]>;
   decimation_factor: number;
 };
@@ -36,6 +39,7 @@ export type TrackMapResponse = {
 
 export type SignalSeries = {
   lapDistance: number[];
+  lapTime: number[] | null;
   signals: Record<string, number[]>;
   decimationFactor: number;
 };
