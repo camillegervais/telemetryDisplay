@@ -7,9 +7,30 @@ type TrackMapPanelProps = {
   trackMap: TrackMapResponse | null;
 };
 
-function normalize(values: number[], min: number, max: number, outMin: number, outMax: number): number[] {
-  const span = max - min || 1;
-  return values.map((value) => outMin + ((value - min) / span) * (outMax - outMin));
+function mapTrackToViewportEqual(
+  xValues: number[],
+  yValues: number[],
+  width: number,
+  height: number,
+  pad: number
+): { xs: number[]; ys: number[] } {
+  const minX = Math.min(...xValues);
+  const maxX = Math.max(...xValues);
+  const minY = Math.min(...yValues);
+  const maxY = Math.max(...yValues);
+
+  const spanX = Math.max(maxX - minX, 1e-9);
+  const spanY = Math.max(maxY - minY, 1e-9);
+  const drawableW = Math.max(width - 2 * pad, 1);
+  const drawableH = Math.max(height - 2 * pad, 1);
+  const scale = Math.min(drawableW / spanX, drawableH / spanY);
+
+  const offsetX = pad + (drawableW - spanX * scale) / 2;
+  const offsetY = pad + (drawableH - spanY * scale) / 2;
+
+  const xs = xValues.map((value) => offsetX + (value - minX) * scale);
+  const ys = yValues.map((value) => height - (offsetY + (value - minY) * scale));
+  return { xs, ys };
 }
 
 function findMarkerIndex(lapDistance: number[], cursorDistance: number | null): number {
@@ -71,13 +92,7 @@ export default function TrackMapPanel({ trackMap }: TrackMapPanelProps) {
     const height = 190;
     const pad = 12;
 
-    const minX = Math.min(...trackMap.x_position);
-    const maxX = Math.max(...trackMap.x_position);
-    const minY = Math.min(...trackMap.y_position);
-    const maxY = Math.max(...trackMap.y_position);
-
-    const xs = normalize(trackMap.x_position, minX, maxX, pad, width - pad);
-    const ys = normalize(trackMap.y_position, minY, maxY, height - pad, pad);
+    const { xs, ys } = mapTrackToViewportEqual(trackMap.x_position, trackMap.y_position, width, height, pad);
 
     const points = xs.map((x, idx) => `${x},${ys[idx]}`).join(" ");
     const startFinish = computeStartFinishLine(xs, ys, 16);
