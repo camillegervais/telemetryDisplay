@@ -52,7 +52,7 @@ Scalable baseline for a racing telemetry web application.
 5. **Generate demo data** (choose one):
    - Losail with real circuit coordinates (requires FastF1): `python scripts/generate_losail_data.py`
    - Generic demo data: `python scripts/generate_demo_data.py`
-6. `uvicorn app.main:app --reload --port 8000`
+6. `uvicorn app.main:app --reload --port 8001`
 
 Data files are saved to `data/` directory.
 
@@ -62,7 +62,7 @@ Data files are saved to `data/` directory.
 2. `npm install`
 3. `npm run dev`
 
-Frontend runs on `http://localhost:5173` and expects API on `http://localhost:8000`.
+Frontend runs on `http://localhost:5173` and expects API on `http://localhost:8001`.
 
 ## Single-command dev startup (frontend + backend)
 
@@ -77,5 +77,5 @@ Optional for data-generation scripts using FastF1:
 - `.venv/Scripts/python.exe -m pip install -r backend/requirements.txt`
 
 This starts:
-- Backend on `http://localhost:8000`
+- Backend on `http://localhost:8001`
 - Frontend on `http://localhost:5173`
