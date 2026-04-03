@@ -632,6 +632,7 @@ body {
   color: #c2e6ff;
   margin-top: 0.65rem;
   margin-bottom: 0.35rem;
+  overflow: hidden;
 }
 
 .import-message {

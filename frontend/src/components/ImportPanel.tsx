@@ -93,9 +93,8 @@ export default function ImportPanel({
   const { xAxisMode, startFinishOffsetM, setXAxisMode, setStartFinishOffsetM } = useTelemetryStore();
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [matPath, setMatPath] = useState("");
-  const [lastPickerPath, setLastPickerPath] = useState("");
   const [importSectionOpen, setImportSectionOpen] = useState(true);
-  const [signalsSectionOpen, setSignalsSectionOpen] = useState(false);
+  const [signalsSectionOpen, setSignalsSectionOpen] = useState(true);
   const [axisSectionOpen, setAxisSectionOpen] = useState(false);
   const [mathSectionOpen, setMathSectionOpen] = useState(false);
   const [statsSectionOpen, setStatsSectionOpen] = useState(false);
@@ -126,11 +125,6 @@ export default function ImportPanel({
     const savedPath = window.localStorage.getItem(LAST_MAT_PATH_KEY);
     if (savedPath) {
       setMatPath(savedPath);
-    }
-
-    const savedPickerPath = window.localStorage.getItem(LAST_PICKER_PATH_KEY);
-    if (savedPickerPath) {
-      setLastPickerPath(savedPickerPath);
     }
   }, []);
 
@@ -279,6 +273,52 @@ export default function ImportPanel({
         <button
           type="button"
           className="import-submenu-toggle"
+          onClick={() => setSignalsSectionOpen((prev) => !prev)}
+        >
+          <span>{signalsSectionOpen ? "▾" : "▸"}</span>
+          <span>Signaux ({filteredSignals.length})</span>
+        </button>
+        {signalsSectionOpen ? (
+          <div className="import-submenu-content">
+            <input
+              type="text"
+              className="signals-filter-input"
+              value={signalFilter}
+              onChange={(event) => setSignalFilter(event.target.value)}
+              placeholder="Filtrer les signaux..."
+            />
+
+            {!datasetMetadata || datasetMetadata.signal_names.length === 0 ? (
+              <p className="panel-text">Importez un dataset pour afficher les signaux.</p>
+            ) : filteredSignals.length === 0 ? (
+              <p className="panel-text">Aucun signal ne correspond au filtre.</p>
+            ) : (
+              <div className="sidebar-signals-list">
+                {filteredSignals.map((signal) => (
+                  <button
+                    key={signal}
+                    type="button"
+                    className="sidebar-signal-chip"
+                    draggable
+                    onDragStart={(event) => {
+                      event.dataTransfer.setData("application/x-telemetry-signal", signal);
+                      event.dataTransfer.effectAllowed = "copy";
+                    }}
+                    title="Glisser vers un graphe pour ajouter"
+                  >
+                    {signal}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        ) : null}
+      </div>
+
+      <div className="import-submenu">
+        <button
+          type="button"
+          className="import-submenu-toggle"
           onClick={() => setImportSectionOpen((prev) => !prev)}
         >
           <span>{importSectionOpen ? "▾" : "▸"}</span>
@@ -303,7 +343,6 @@ export default function ImportPanel({
 
                 const pickerPath = event.target.value?.trim() ?? "";
                 if (pickerPath.length > 0) {
-                  setLastPickerPath(pickerPath);
                   window.localStorage.setItem(LAST_PICKER_PATH_KEY, pickerPath);
 
                   // Browser file inputs often return C:\\fakepath\\..., which cannot be reused by backend path import.
@@ -355,7 +394,6 @@ export default function ImportPanel({
             </button>
 
             {selectedFile ? <p className="panel-text file-picked">{selectedFile.name}</p> : null}
-            {lastPickerPath ? <p className="panel-text file-picked">Dernier chemin picker: {lastPickerPath}</p> : null}
             {importMessageLines.length > 0 ? (
               <p className="panel-text import-message">
                 {importMessageLines.map((line, index) => (
@@ -393,208 +431,160 @@ export default function ImportPanel({
         ) : null}
       </div>
 
-      <div className="sidebar-signals">
-        <div className="import-submenu">
-          <button
-            type="button"
-            className="import-submenu-toggle"
-            onClick={() => setSignalsSectionOpen((prev) => !prev)}
-          >
-            <span>{signalsSectionOpen ? "▾" : "▸"}</span>
-            <span>Signaux ({filteredSignals.length})</span>
-          </button>
-          {signalsSectionOpen ? (
-            <div className="import-submenu-content">
-              <input
-                type="text"
-                className="signals-filter-input"
-                value={signalFilter}
-                onChange={(event) => setSignalFilter(event.target.value)}
-                placeholder="Filtrer les signaux..."
-              />
-
-              {!datasetMetadata || datasetMetadata.signal_names.length === 0 ? (
-                <p className="panel-text">Importez un dataset pour afficher les signaux.</p>
-              ) : filteredSignals.length === 0 ? (
-                <p className="panel-text">Aucun signal ne correspond au filtre.</p>
-              ) : (
-                <div className="sidebar-signals-list">
-                  {filteredSignals.map((signal) => (
-                    <button
-                      key={signal}
-                      type="button"
-                      className="sidebar-signal-chip"
-                      draggable
-                      onDragStart={(event) => {
-                        event.dataTransfer.setData("application/x-telemetry-signal", signal);
-                        event.dataTransfer.effectAllowed = "copy";
-                      }}
-                      title="Glisser vers un graphe pour ajouter"
-                    >
-                      {signal}
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-          ) : null}
-        </div>
-
-        <div className="import-submenu">
-          <button
-            type="button"
-            className="import-submenu-toggle"
-            onClick={() => setAxisSectionOpen((prev) => !prev)}
-          >
-            <span>{axisSectionOpen ? "▾" : "▸"}</span>
-            <span>Axe X</span>
-          </button>
-          {axisSectionOpen ? (
-            <div className="import-submenu-content">
-              <div className="meta-grid" style={{ marginBottom: "0" }}>
-                <div className="meta-item">
-                  <span>Axe X</span>
-                  <select
-                    className="mini-select"
-                    value={xAxisMode}
-                    onChange={(event) => setXAxisMode(event.target.value as "distance" | "time")}
-                  >
-                    <option value="distance">Distance</option>
-                    <option value="time" disabled={!datasetMetadata?.has_time_axis}>
-                      Temps
-                    </option>
-                  </select>
-                </div>
-                <div className="meta-item">
-                  <span>Frequence source</span>
-                  <strong>
-                    {datasetMetadata?.source_sample_rate_hz
-                      ? `${datasetMetadata.source_sample_rate_hz.toFixed(2)} Hz`
-                      : "Non disponible"}
-                  </strong>
-                </div>
+      <div className="import-submenu">
+        <button
+          type="button"
+          className="import-submenu-toggle"
+          onClick={() => setAxisSectionOpen((prev) => !prev)}
+        >
+          <span>{axisSectionOpen ? "▾" : "▸"}</span>
+          <span>Axe X</span>
+        </button>
+        {axisSectionOpen ? (
+          <div className="import-submenu-content">
+            <div className="meta-grid" style={{ marginBottom: "0" }}>
+              <div className="meta-item">
+                <span>Axe X</span>
+                <select
+                  className="mini-select"
+                  value={xAxisMode}
+                  onChange={(event) => setXAxisMode(event.target.value as "distance" | "time")}
+                >
+                  <option value="distance">Distance</option>
+                  <option value="time" disabled={!datasetMetadata?.has_time_axis}>
+                    Temps
+                  </option>
+                </select>
               </div>
-
-              <details style={{ marginTop: "0.5rem" }}>
-                <summary className="panel-text" style={{ cursor: "pointer" }}>
-                  Avance: ligne depart/arrivee
-                </summary>
-                <label className="field-label" htmlFor="start-finish-offset-input">
-                  Decalage (m)
-                </label>
-                <input
-                  id="start-finish-offset-input"
-                  type="number"
-                  className="signals-filter-input"
-                  value={Number.isFinite(startFinishOffsetM) ? startFinishOffsetM : 0}
-                  step={1}
-                  onChange={(event) => {
-                    const next = Number(event.target.value);
-                    if (Number.isFinite(next)) {
-                      setStartFinishOffsetM(next);
-                    }
-                  }}
-                  placeholder="Ex: 15"
-                />
-              </details>
+              <div className="meta-item">
+                <span>Frequence source</span>
+                <strong>
+                  {datasetMetadata?.source_sample_rate_hz
+                    ? `${datasetMetadata.source_sample_rate_hz.toFixed(2)} Hz`
+                    : "Non disponible"}
+                </strong>
+              </div>
             </div>
-          ) : null}
-        </div>
 
-        <div className="import-submenu">
-          <button
-            type="button"
-            className="import-submenu-toggle"
-            onClick={() => setMathSectionOpen((prev) => !prev)}
-          >
-            <span>{mathSectionOpen ? "▾" : "▸"}</span>
-            <span>Math channel ({mathChannels.length})</span>
-          </button>
-          {mathSectionOpen ? (
-            <div className="import-submenu-content math-channel-content">
+            <details style={{ marginTop: "0.5rem" }}>
+              <summary className="panel-text" style={{ cursor: "pointer" }}>
+                Avance: ligne depart/arrivee
+              </summary>
+              <label className="field-label" htmlFor="start-finish-offset-input">
+                Decalage (m)
+              </label>
               <input
-                type="text"
+                id="start-finish-offset-input"
+                type="number"
                 className="signals-filter-input"
-                value={mathName}
-                onChange={(event) => setMathName(event.target.value)}
-                placeholder="Nom du canal (ex: speed_gain)"
+                value={Number.isFinite(startFinishOffsetM) ? startFinishOffsetM : 0}
+                step={1}
+                onChange={(event) => {
+                  const next = Number(event.target.value);
+                  if (Number.isFinite(next)) {
+                    setStartFinishOffsetM(next);
+                  }
+                }}
+                placeholder="Ex: 15"
               />
-              <input
-                type="text"
-                className="signals-filter-input"
-                value={mathExpression}
-                onChange={(event) => setMathExpression(event.target.value)}
-                placeholder="Expression (ex: gain(speed_kmh, 1.05) - 3)"
-              />
-              <button className="small-button" onClick={handleAddMathChannelClick}>
-                Ajouter math
-              </button>
-              {mathError ? <p className="panel-text">{mathError}</p> : null}
-              {mathChannels.length > 0 ? (
-                <div className="signals-stats-list math-channel-list">
-                  {mathChannels.map((channel) => (
-                    <div key={channel.name} className="signals-stats-item">
-                      <div className="signals-stats-title">{channel.name}</div>
-                      <div className="signals-stats-values math-channel-expression">
-                        <span>{channel.expression}</span>
-                      </div>
-                      <button
-                        type="button"
-                        className="small-button math-channel-remove"
-                        onClick={() => onRemoveMathChannel(channel.name)}
-                      >
-                        Supprimer
-                      </button>
+            </details>
+          </div>
+        ) : null}
+      </div>
+
+      <div className="import-submenu">
+        <button
+          type="button"
+          className="import-submenu-toggle"
+          onClick={() => setMathSectionOpen((prev) => !prev)}
+        >
+          <span>{mathSectionOpen ? "▾" : "▸"}</span>
+          <span>Math channel ({mathChannels.length})</span>
+        </button>
+        {mathSectionOpen ? (
+          <div className="import-submenu-content math-channel-content">
+            <input
+              type="text"
+              className="signals-filter-input"
+              value={mathName}
+              onChange={(event) => setMathName(event.target.value)}
+              placeholder="Nom du canal (ex: speed_gain)"
+            />
+            <input
+              type="text"
+              className="signals-filter-input"
+              value={mathExpression}
+              onChange={(event) => setMathExpression(event.target.value)}
+              placeholder="Expression (ex: gain(speed_kmh, 1.05) - 3)"
+            />
+            <button className="small-button" onClick={handleAddMathChannelClick}>
+              Ajouter math
+            </button>
+            {mathError ? <p className="panel-text">{mathError}</p> : null}
+            {mathChannels.length > 0 ? (
+              <div className="signals-stats-list math-channel-list">
+                {mathChannels.map((channel) => (
+                  <div key={channel.name} className="signals-stats-item">
+                    <div className="signals-stats-title">{channel.name}</div>
+                    <div className="signals-stats-values math-channel-expression">
+                      <span>{channel.expression}</span>
                     </div>
-                  ))}
-                </div>
-              ) : null}
-            </div>
-          ) : null}
-        </div>
+                    <button
+                      type="button"
+                      className="small-button math-channel-remove"
+                      onClick={() => onRemoveMathChannel(channel.name)}
+                    >
+                      Supprimer
+                    </button>
+                  </div>
+                ))}
+              </div>
+            ) : null}
+          </div>
+        ) : null}
+      </div>
 
-        <div className="import-submenu">
-          <button
-            type="button"
-            className="import-submenu-toggle"
-            onClick={() => setStatsSectionOpen((prev) => !prev)}
-          >
-            <span>{statsSectionOpen ? "▾" : "▸"}</span>
-            <span>Stats signaux</span>
-          </button>
-          {statsSectionOpen ? (
-            <div className="import-submenu-content">
-              {loadingStats ? (
-                <p className="panel-text loading-inline">
-                  <span className="loading-spinner" aria-hidden="true" />
-                  Calcul des statistiques...
-                </p>
-              ) : null}
-              {statsError ? <p className="panel-text">{statsError}</p> : null}
-              {!datasetMetadata || datasetMetadata.signal_names.length === 0 ? (
-                <p className="panel-text">Importez un dataset pour afficher les stats.</p>
-              ) : null}
-              {!loadingStats && !statsError && datasetMetadata && datasetMetadata.signal_names.length > 0 ? (
-                <div className="signals-stats-list">
-                  {filteredSignals.map((signal) => {
-                    const stat = signalStats[signal];
-                    return (
-                      <div key={`stat-${signal}`} className="signals-stats-item">
-                        <div className="signals-stats-title">{signal}</div>
-                        <div className="signals-stats-values">
-                          <span>moy: {stat ? formatStat(stat.mean) : "-"}</span>
-                          <span>std: {stat ? formatStat(stat.std) : "-"}</span>
-                          <span>min: {stat ? formatStat(stat.min) : "-"}</span>
-                          <span>max: {stat ? formatStat(stat.max) : "-"}</span>
-                        </div>
+      <div className="import-submenu">
+        <button
+          type="button"
+          className="import-submenu-toggle"
+          onClick={() => setStatsSectionOpen((prev) => !prev)}
+        >
+          <span>{statsSectionOpen ? "▾" : "▸"}</span>
+          <span>Stats signaux</span>
+        </button>
+        {statsSectionOpen ? (
+          <div className="import-submenu-content">
+            {loadingStats ? (
+              <p className="panel-text loading-inline">
+                <span className="loading-spinner" aria-hidden="true" />
+                Calcul des statistiques...
+              </p>
+            ) : null}
+            {statsError ? <p className="panel-text">{statsError}</p> : null}
+            {!datasetMetadata || datasetMetadata.signal_names.length === 0 ? (
+              <p className="panel-text">Importez un dataset pour afficher les stats.</p>
+            ) : null}
+            {!loadingStats && !statsError && datasetMetadata && datasetMetadata.signal_names.length > 0 ? (
+              <div className="signals-stats-list">
+                {filteredSignals.map((signal) => {
+                  const stat = signalStats[signal];
+                  return (
+                    <div key={`stat-${signal}`} className="signals-stats-item">
+                      <div className="signals-stats-title">{signal}</div>
+                      <div className="signals-stats-values">
+                        <span>moy: {stat ? formatStat(stat.mean) : "-"}</span>
+                        <span>std: {stat ? formatStat(stat.std) : "-"}</span>
+                        <span>min: {stat ? formatStat(stat.min) : "-"}</span>
+                        <span>max: {stat ? formatStat(stat.max) : "-"}</span>
                       </div>
-                    );
-                  })}
-                </div>
-              ) : null}
-            </div>
-          ) : null}
-        </div>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : null}
+          </div>
+        ) : null}
       </div>
     </section>
   );
