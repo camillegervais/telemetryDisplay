@@ -21,6 +21,7 @@
 body {
   margin: 0;
   font-family: "Space Grotesk", "Segoe UI", sans-serif;
+  position: relative;
   background:
     radial-gradient(circle at 12% 8%, rgba(255, 46, 79, 0.28), transparent 28%),
     radial-gradient(circle at 88% 0%, rgba(255, 111, 141, 0.18), transparent 33%),
@@ -30,7 +31,42 @@ body {
   overflow: hidden;
 }
 
+body::before,
+body::after {
+  content: "";
+  position: fixed;
+  inset: -18%;
+  pointer-events: none;
+  z-index: 0;
+}
+
+body::before {
+  background:
+    radial-gradient(38% 46% at 22% 18%, rgba(255, 79, 109, 0.2), transparent 72%),
+    radial-gradient(42% 52% at 82% 8%, rgba(255, 139, 163, 0.14), transparent 74%),
+    radial-gradient(44% 54% at 50% 82%, rgba(255, 70, 93, 0.12), transparent 76%);
+  transform-origin: 50% 50%;
+  animation: bg-aurora-float 34s ease-in-out infinite alternate;
+}
+
+body::after {
+  opacity: 0.32;
+  background:
+    linear-gradient(120deg, transparent 0%, rgba(255, 77, 108, 0.12) 50%, transparent 100%),
+    repeating-linear-gradient(
+      0deg,
+      rgba(255, 255, 255, 0.015) 0,
+      rgba(255, 255, 255, 0.015) 1px,
+      transparent 1px,
+      transparent 5px
+    );
+  mix-blend-mode: screen;
+  animation: bg-sheen-shift 22s linear infinite;
+}
+
 .app-shell {
+  position: relative;
+  z-index: 1;
   width: 100%;
   height: 100vh;
   padding: 0.35rem;
@@ -54,6 +90,7 @@ body {
   border: 1px solid var(--line);
   padding: 0.32rem 0.55rem;
   background: linear-gradient(180deg, rgba(31, 10, 14, 0.92), rgba(19, 7, 10, 0.9));
+  animation: surface-intro 380ms ease-out;
 }
 
 .topbar-brand {
@@ -99,6 +136,60 @@ body {
   justify-content: center;
   padding: 0.3rem 0.5rem;
   font-size: 0.95rem;
+}
+
+.small-button,
+.panel-button,
+.topbar-icon-button,
+.icon-button,
+.workspace-tab-name,
+.workspace-tab-action,
+.workspace-tab-add,
+.import-submenu-toggle,
+.sidebar-signal-chip,
+.inspector-widget-item,
+.mini-select,
+.topbar-user-input,
+.signals-filter-input,
+.focus-signal-filter {
+  transition:
+    transform 0.18s ease,
+    box-shadow 0.2s ease,
+    border-color 0.2s ease,
+    background-color 0.2s ease,
+    color 0.2s ease;
+}
+
+.small-button:hover:enabled,
+.panel-button:hover:enabled,
+.topbar-icon-button:hover:enabled,
+.icon-button:hover,
+.workspace-tab-add:hover,
+.workspace-tab-action:hover:not(:disabled),
+.workspace-tab-name:hover,
+.sidebar-signal-chip:hover,
+.import-submenu-toggle:hover,
+.inspector-widget-item:hover {
+  transform: translateY(-1px);
+}
+
+.topbar-icon-button:hover:enabled,
+.small-button:hover:enabled,
+.panel-button:hover:enabled,
+.icon-button:hover,
+.workspace-tab-add:hover,
+.workspace-tab-action:hover:not(:disabled),
+.workspace-tab-name:hover {
+  box-shadow: 0 6px 16px rgba(255, 70, 93, 0.22);
+}
+
+.topbar-user-input:focus,
+.signals-filter-input:focus,
+.focus-signal-filter:focus,
+.mini-select:focus {
+  outline: none;
+  border-color: rgba(255, 122, 145, 0.88);
+  box-shadow: 0 0 0 2px rgba(255, 70, 93, 0.24);
 }
 
 .topbar-user-input {
@@ -271,6 +362,12 @@ body {
   min-width: 130px;
   display: grid;
   gap: 0.2rem;
+  transition: box-shadow 0.2s ease, border-color 0.2s ease;
+}
+
+.status-box:hover {
+  border-color: rgba(255, 90, 116, 0.62);
+  box-shadow: 0 0 0 1px rgba(255, 70, 93, 0.18) inset;
 }
 
 .status-box span {
@@ -337,6 +434,7 @@ body {
   background: linear-gradient(180deg, rgba(20, 7, 10, 0.98), rgba(14, 6, 9, 0.96));
   box-shadow: 0 25px 60px rgba(0, 0, 0, 0.55);
   padding: 0.75rem 0.85rem 0.7rem;
+  animation: modal-fade-up 220ms ease-out;
 }
 
 .shortcuts-modal-header {
@@ -469,6 +567,7 @@ body {
 .dashboard-empty-logo .app-logo-core {
   font-size: 1.05rem;
   letter-spacing: 0.09em;
+  animation: logo-core-glow 2.8s ease-in-out infinite;
 }
 
 .dashboard-empty-state h2 {
@@ -744,6 +843,12 @@ body {
   background: linear-gradient(160deg, rgba(22, 8, 12, 0.95), rgba(15, 6, 9, 0.86));
   box-shadow: 0 10px 28px rgba(0, 0, 0, 0.32);
   padding: 0.45rem;
+  transition: box-shadow 0.24s ease, border-color 0.24s ease;
+}
+
+.panel:hover {
+  border-color: rgba(255, 87, 113, 0.58);
+  box-shadow: 0 14px 30px rgba(0, 0, 0, 0.34);
 }
 
 .graph-only-mode .panel {
@@ -1031,6 +1136,12 @@ body {
   background: linear-gradient(180deg, rgba(22, 8, 12, 0.9), rgba(15, 6, 9, 0.84));
   overflow: hidden;
   min-height: 0;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease;
+}
+
+.graph-tile:hover {
+  border-color: rgba(255, 94, 120, 0.72);
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.28);
 }
 
 .graph-tile-inspector-active {
@@ -1458,6 +1569,87 @@ body {
   place-items: center;
   color: #a6b4c8;
   font-size: 0.92rem;
+}
+
+@keyframes bg-aurora-float {
+  0% {
+    transform: translate3d(-1.5%, -1%, 0) scale(1) rotate(0deg);
+  }
+  100% {
+    transform: translate3d(1.5%, 1%, 0) scale(1.04) rotate(2deg);
+  }
+}
+
+@keyframes bg-sheen-shift {
+  0% {
+    transform: translateX(-4%);
+  }
+  100% {
+    transform: translateX(4%);
+  }
+}
+
+@keyframes surface-intro {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes modal-fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.99);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes logo-core-glow {
+  0%,
+  100% {
+    text-shadow: 0 0 0 rgba(255, 106, 132, 0);
+  }
+  50% {
+    text-shadow: 0 0 10px rgba(255, 106, 132, 0.35);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  body::before,
+  body::after,
+  .shortcuts-modal,
+  .topbar,
+  .dashboard-empty-logo .app-logo-core,
+  .loading-spinner {
+    animation: none !important;
+  }
+
+  .small-button,
+  .panel-button,
+  .topbar-icon-button,
+  .icon-button,
+  .workspace-tab-name,
+  .workspace-tab-action,
+  .workspace-tab-add,
+  .import-submenu-toggle,
+  .sidebar-signal-chip,
+  .inspector-widget-item,
+  .mini-select,
+  .topbar-user-input,
+  .signals-filter-input,
+  .focus-signal-filter,
+  .panel,
+  .graph-tile,
+  .status-box {
+    transition: none !important;
+  }
 }
 
 @media (max-width: 1000px) {
