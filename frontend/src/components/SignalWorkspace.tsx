@@ -30,6 +30,7 @@ export type InspectorWidgetSummary = {
   widthSpan: number;
   heightSpan: number;
   alignZero: boolean;
+  alignMode: "off" | "origin-scale" | "origin-only";
   menuOpen: boolean;
 };
 
@@ -43,17 +44,21 @@ export type InspectorSnapshot = {
 };
 
 export type InspectorCommand = {
-  type: "toggle-menu" | "set-align-zero" | "set-size" | "set-position";
+  type: "toggle-menu" | "set-align-zero" | "set-align-mode" | "set-size" | "set-position";
   widgetId: number;
   alignZero?: boolean;
+  alignMode?: "origin-scale" | "origin-only";
   widthSpan?: number;
   heightSpan?: number;
   row?: number;
   col?: number;
 };
 
+type YAxisMatchMode = "origin-scale" | "origin-only";
+
 type WidgetOptions = {
   alignZero?: boolean;
+  yAxisMatchMode?: YAxisMatchMode;
   [key: string]: unknown;
 };
 
@@ -167,9 +172,12 @@ function closeAllWidgetMenus(widgets: GraphWidget[]): GraphWidget[] {
 
 function normalizeWidget(widget: GraphWidget, forceCloseMenu: boolean): GraphWidget {
   const { alignZero: legacyAlignZero, options, ...rest } = widget;
+  const normalizedMatchMode: YAxisMatchMode =
+    options?.yAxisMatchMode === "origin-only" ? "origin-only" : "origin-scale";
   const normalizedOptions: WidgetOptions = {
     ...(options ?? {}),
     alignZero: options?.alignZero ?? legacyAlignZero ?? false,
+    yAxisMatchMode: normalizedMatchMode,
   };
 
   return {
@@ -181,6 +189,13 @@ function normalizeWidget(widget: GraphWidget, forceCloseMenu: boolean): GraphWid
 
 function getWidgetAlignZero(widget: GraphWidget): boolean {
   return widget.options?.alignZero ?? widget.alignZero ?? false;
+}
+
+function getWidgetYAxisMatchMode(widget: GraphWidget): "off" | YAxisMatchMode {
+  if (!getWidgetAlignZero(widget)) {
+    return "off";
+  }
+  return widget.options?.yAxisMatchMode === "origin-only" ? "origin-only" : "origin-scale";
 }
 
 function loadSavedWorkspaceConfigs(): SavedWorkspaceConfig[] {
@@ -432,6 +447,22 @@ function applyOffsetToDistance(lapDistance: number[], distance: number | null, o
   return wrapped;
 }
 
+function buildOriginAlignedRange(values: number[]): [number, number] | null {
+  const finiteValues = values.filter((value) => Number.isFinite(value));
+  if (finiteValues.length === 0) {
+    return null;
+  }
+
+  const min = Math.min(...finiteValues);
+  const max = Math.max(...finiteValues);
+
+  const negativeExtent = Math.max(0, -min);
+  const positiveExtent = Math.max(0, max);
+  const halfSpan = Math.max(negativeExtent, positiveExtent, 1e-9);
+
+  return [-halfSpan, halfSpan];
+}
+
 function buildChartConfig(
   title: string,
   series: SignalSeries | null,
@@ -440,7 +471,7 @@ function buildChartConfig(
   xRange: DistanceRange | null,
   graphOnlyMode: boolean,
   homeRevision: number,
-  alignZero: boolean,
+  yAxisMatchMode: "off" | YAxisMatchMode,
   xAxisMode: "distance" | "time"
 ) {
   if (!series || selectedSignals.length === 0) {
@@ -461,7 +492,14 @@ function buildChartConfig(
     useTimeAxis
       ? (series.lapTime as number[])
       : series.lapDistance;
-  const useSharedYAxis = alignZero && selectedSignals.length > 1;
+  const alignZero = yAxisMatchMode !== "off";
+  const useSharedYAxis = yAxisMatchMode === "origin-scale" && selectedSignals.length > 1;
+  const originOnlyRanges =
+    yAxisMatchMode === "origin-only"
+      ? Object.fromEntries(
+          selectedSignals.map((signal) => [signal, buildOriginAlignedRange(series.signals[signal] ?? [])])
+        )
+      : {};
 
   const data = selectedSignals.map((signal, index) => ({
     type: "scattergl" as const,
@@ -503,6 +541,12 @@ function buildChartConfig(
       zeroline: true,
       zerolinecolor: "rgba(255, 255, 255, 0.45)",
       ...(alignZero ? { rangemode: "tozero" } : {}),
+      ...(yAxisMatchMode === "origin-only" && originOnlyRanges[selectedSignals[0]]
+        ? {
+            range: originOnlyRanges[selectedSignals[0]],
+            autorange: false,
+          }
+        : {}),
     },
     hovermode: "x",
     uirevision: `telemetry-grid-${homeRevision}`,
@@ -526,6 +570,13 @@ function buildChartConfig(
         zeroline: true,
         zerolinecolor: "rgba(255, 255, 255, 0.45)",
         ...(alignZero ? { rangemode: "tozero" } : {}),
+        ...(yAxisMatchMode === "origin-only" && originOnlyRanges[signal]
+          ? {
+              range: originOnlyRanges[signal],
+              autorange: false,
+              tickmode: "sync",
+            }
+          : {}),
       };
     });
   }
@@ -788,6 +839,7 @@ export default function SignalWorkspace({
       widthSpan: widget.widthSpan,
       heightSpan: widget.heightSpan,
       alignZero: getWidgetAlignZero(widget),
+      alignMode: getWidgetYAxisMatchMode(widget),
       menuOpen: widget.menuOpen,
     }));
 
@@ -825,6 +877,26 @@ export default function SignalWorkspace({
                 options: {
                   ...(item.options ?? {}),
                   alignZero: checked,
+                  yAxisMatchMode: item.options?.yAxisMatchMode === "origin-only" ? "origin-only" : "origin-scale",
+                },
+              }
+            : item
+        )
+      );
+      return;
+    }
+
+    if (inspectorCommand.type === "set-align-mode") {
+      const mode = inspectorCommand.alignMode ?? "origin-scale";
+      setWidgets((prev) =>
+        prev.map((item) =>
+          item.id === inspectorCommand.widgetId && getWidgetKind(item) === "timeseries"
+            ? {
+                ...item,
+                options: {
+                  ...(item.options ?? {}),
+                  alignZero: true,
+                  yAxisMatchMode: mode,
                 },
               }
             : item
@@ -2120,7 +2192,7 @@ export default function SignalWorkspace({
                   xRange,
                   graphOnlyMode,
                   homeRevision,
-                  getWidgetAlignZero(widget),
+                  getWidgetYAxisMatchMode(widget),
                   xAxisMode
                 );
 
@@ -2289,31 +2361,68 @@ export default function SignalWorkspace({
                   </div>
 
                   {widgetKind === "timeseries" ? (
-                    <label className="signal-checkbox" style={{ marginTop: "0.4rem" }}>
-                      <input
-                        type="checkbox"
-                        checked={getWidgetAlignZero(widget)}
-                        onChange={(event) => {
-                          const checked = event.target.checked;
-                          setWidgets((prev) =>
-                            prev.map((item) =>
-                              item.id === widget.id
-                                ? {
-                                    ...item,
-                                    options: {
-                                      ...(item.options ?? {}),
-                                      alignZero: checked,
-                                    },
-                                  }
-                                : item
-                            )
-                          );
-                        }}
-                      />
-                      <span className="signal-badge" style={{ borderColor: "#e5e7eb" }}>
-                        Origine commune (0)
-                      </span>
-                    </label>
+                    <>
+                      <label className="signal-checkbox" style={{ marginTop: "0.4rem" }}>
+                        <input
+                          type="checkbox"
+                          checked={getWidgetAlignZero(widget)}
+                          onChange={(event) => {
+                            const checked = event.target.checked;
+                            setWidgets((prev) =>
+                              prev.map((item) =>
+                                item.id === widget.id
+                                  ? {
+                                      ...item,
+                                      options: {
+                                        ...(item.options ?? {}),
+                                        alignZero: checked,
+                                        yAxisMatchMode:
+                                          item.options?.yAxisMatchMode === "origin-only"
+                                            ? "origin-only"
+                                            : "origin-scale",
+                                      },
+                                    }
+                                  : item
+                              )
+                            );
+                          }}
+                        />
+                        <span className="signal-badge" style={{ borderColor: "#e5e7eb" }}>
+                          Match axes Y
+                        </span>
+                      </label>
+
+                      {getWidgetAlignZero(widget) ? (
+                        <div className="size-selector" style={{ marginTop: "0.35rem" }}>
+                          <label>Mode Y</label>
+                          <select
+                            className="mini-select"
+                            value={getWidgetYAxisMatchMode(widget) === "origin-only" ? "origin-only" : "origin-scale"}
+                            onChange={(event) => {
+                              const mode: YAxisMatchMode =
+                                event.target.value === "origin-only" ? "origin-only" : "origin-scale";
+                              setWidgets((prev) =>
+                                prev.map((item) =>
+                                  item.id === widget.id
+                                    ? {
+                                        ...item,
+                                        options: {
+                                          ...(item.options ?? {}),
+                                          alignZero: true,
+                                          yAxisMatchMode: mode,
+                                        },
+                                      }
+                                    : item
+                                )
+                              );
+                            }}
+                          >
+                            <option value="origin-scale">Origine + echelle</option>
+                            <option value="origin-only">Origine seulement</option>
+                          </select>
+                        </div>
+                      ) : null}
+                    </>
                   ) : null}
 
                   <p className="menu-help">Taille du graphe</p>

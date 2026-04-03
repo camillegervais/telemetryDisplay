@@ -167,6 +167,13 @@ export default function App() {
     setInspectorCommand({ ...command });
   }
 
+  const activeInspectorAlignModeLabel =
+    activeInspectorWidget?.alignMode === "origin-only"
+      ? "Origine seulement"
+      : activeInspectorWidget?.alignMode === "origin-scale"
+      ? "Origine + echelle"
+      : "Desactive";
+
   const inspectorPanel = (
     <section className="panel import-panel inspector-panel">
       <div className="panel-header">
@@ -228,8 +235,8 @@ export default function App() {
                     </div>
                   ) : (
                     <div className="meta-item">
-                      <span>Align zero</span>
-                      <strong>{activeInspectorWidget.alignZero ? "Oui" : "Non"}</strong>
+                      <span>Match axes Y</span>
+                      <strong>{activeInspectorAlignModeLabel}</strong>
                     </div>
                   )}
                   <div className="meta-item">
@@ -254,18 +261,36 @@ export default function App() {
                         Menu
                       </button>
                       {activeInspectorWidget.kind === "timeseries" ? (
-                        <button
-                          className="small-button"
-                          onClick={() =>
-                            pushInspectorCommand({
-                              type: "set-align-zero",
-                              widgetId: activeInspectorWidget.id,
-                              alignZero: !activeInspectorWidget.alignZero,
-                            })
-                          }
-                        >
-                          Align 0
-                        </button>
+                        <>
+                          <button
+                            className="small-button"
+                            onClick={() =>
+                              pushInspectorCommand({
+                                type: "set-align-zero",
+                                widgetId: activeInspectorWidget.id,
+                                alignZero: !activeInspectorWidget.alignZero,
+                              })
+                            }
+                          >
+                            Match Y
+                          </button>
+                          {activeInspectorWidget.alignZero ? (
+                            <select
+                              className="mini-select"
+                              value={activeInspectorWidget.alignMode === "origin-only" ? "origin-only" : "origin-scale"}
+                              onChange={(event) =>
+                                pushInspectorCommand({
+                                  type: "set-align-mode",
+                                  widgetId: activeInspectorWidget.id,
+                                  alignMode: event.target.value === "origin-only" ? "origin-only" : "origin-scale",
+                                })
+                              }
+                            >
+                              <option value="origin-scale">Origine + echelle</option>
+                              <option value="origin-only">Origine seulement</option>
+                            </select>
+                          ) : null}
+                        </>
                       ) : null}
                     </div>
                   </div>
