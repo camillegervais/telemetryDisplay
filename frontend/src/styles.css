@@ -35,7 +35,7 @@ body {
   height: 100vh;
   padding: 0.35rem;
   display: grid;
-  grid-template-rows: auto 1fr;
+  grid-template-rows: auto auto 1fr;
   gap: 0.35rem;
 }
 
@@ -277,6 +277,7 @@ body {
   border: 1px solid #a1293d;
   border-radius: 0;
   padding: 0.65rem 0.8rem;
+  height: fit-content;
 }
 
 .graph-only-mode .error-banner {
@@ -307,6 +308,7 @@ body {
 }
 
 .dashboard-grid {
+  grid-row: 3;
   display: grid;
   grid-template-columns: 300px 1fr;
   grid-template-rows: 1fr;
@@ -325,6 +327,7 @@ body {
 }
 
 .graph-only-mode .dashboard-grid {
+  grid-row: 1;
   grid-template-columns: 1fr;
   gap: 0;
   margin-top: 3rem;
