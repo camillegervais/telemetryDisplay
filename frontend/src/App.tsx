@@ -42,6 +42,7 @@ export default function App() {
   const [inspectorSnapshot, setInspectorSnapshot] = useState<InspectorSnapshot | null>(null);
   const [inspectorSelectedWidgetId, setInspectorSelectedWidgetId] = useState<number | null>(null);
   const [inspectorCommand, setInspectorCommand] = useState<InspectorCommand | null>(null);
+  const [shortcutsModalOpen, setShortcutsModalOpen] = useState(false);
 
   const { setXRange, setCursorDistance, triggerHomeReset } = useTelemetryStore();
 
@@ -86,6 +87,14 @@ export default function App() {
         return;
       }
 
+      if (shortcutsModalOpen) {
+        if (event.code === "Escape") {
+          event.preventDefault();
+          setShortcutsModalOpen(false);
+        }
+        return;
+      }
+
       if (event.ctrlKey || event.metaKey || event.altKey) {
         return;
       }
@@ -118,7 +127,7 @@ export default function App() {
     return () => {
       window.removeEventListener("keydown", onGlobalKeyDown);
     };
-  }, []);
+  }, [shortcutsModalOpen]);
 
   async function handleImport(file: File) {
     setImporting(true);
@@ -447,6 +456,42 @@ export default function App() {
     </section>
   );
 
+  const shortcutGroups: Array<{ title: string; items: Array<{ keys: string; action: string }> }> = [
+    {
+      title: "Global",
+      items: [
+        { keys: "H", action: "Reset Home (zoom/axes)" },
+        { keys: "G", action: "Basculer mode Graphes/UI" },
+        { keys: "I", action: "Basculer Data Hub/Inspecteur" },
+        { keys: "P", action: "Basculer panneau gauche/droite" },
+      ],
+    },
+    {
+      title: "Dashboard",
+      items: [
+        { keys: "A", action: "Ajouter un graphe" },
+        { keys: "X", action: "Ajouter un graphe XY" },
+        { keys: "T", action: "Ajouter un onglet" },
+        { keys: "Ctrl+S", action: "Sauver configuration" },
+        { keys: "Ctrl+O", action: "Charger configuration selectionnee" },
+        { keys: "Ctrl+Tab", action: "Onglet suivant" },
+        { keys: "Ctrl+Shift+Tab", action: "Onglet precedent" },
+        { keys: "1..9", action: "Aller a l'onglet N" },
+      ],
+    },
+    {
+      title: "Widget",
+      items: [
+        { keys: "Delete", action: "Supprimer widget selectionne" },
+        { keys: "Enter", action: "Ouvrir/fermer menu widget" },
+        { keys: "F", action: "Agrandir/reduire widget" },
+        { keys: "Flèches", action: "Deplacer widget selectionne" },
+        { keys: "Shift+Flèches", action: "Redimensionner widget selectionne" },
+        { keys: "Esc", action: "Fermer menus/expand/deselection" },
+      ],
+    },
+  ];
+
   return (
     <div className={`app-shell ${graphOnlyMode ? "graph-only-mode" : ""}`}>
       <header className="topbar">
@@ -465,7 +510,9 @@ export default function App() {
         </div>
         <div className="topbar-actions">
           <details className="topbar-user-menu">
-            <summary className="small-button">Profil</summary>
+            <summary className="small-button topbar-icon-button" title="Profil" aria-label="Profil">
+              <span aria-hidden="true">◉</span>
+            </summary>
             <div className="topbar-user-menu-content">
               <label className="field-label" htmlFor="topbar-user-input">
                 Prenom
@@ -481,17 +528,40 @@ export default function App() {
               />
             </div>
           </details>
-          <button className="small-button" onClick={resetAllGraphsToHome}>
-            Maison
+          <button className="small-button topbar-icon-button" onClick={resetAllGraphsToHome} title="Home (H)" aria-label="Home">
+            <span aria-hidden="true">⌂</span>
           </button>
           <button
-            className="small-button"
+            className="small-button topbar-icon-button"
             onClick={() => setPanelSide((prev) => (prev === "left" ? "right" : "left"))}
+            title={`Changer cote panneau (P) - ${panelSide === "left" ? "Gauche" : "Droite"}`}
+            aria-label="Changer cote panneau"
           >
-            Panneau: {panelSide === "left" ? "Gauche" : "Droite"}
+            <span aria-hidden="true">⇆</span>
           </button>
-          <button className="small-button" onClick={() => setGraphOnlyMode((prev) => !prev)}>
-            {graphOnlyMode ? "UI" : "Graphes"}
+          <button
+            className="small-button topbar-icon-button"
+            onClick={() => setGraphOnlyMode((prev) => !prev)}
+            title={graphOnlyMode ? "Mode UI (G)" : "Mode Graphes (G)"}
+            aria-label="Basculer mode Graphes"
+          >
+            <span aria-hidden="true">▣</span>
+          </button>
+          <button
+            className="small-button topbar-icon-button"
+            onClick={() => setPanelMode((prev) => (prev === "data" ? "inspector" : "data"))}
+            title={panelMode === "data" ? "Ouvrir Inspecteur (I)" : "Ouvrir Data Hub (I)"}
+            aria-label="Basculer Data Hub Inspecteur"
+          >
+            <span aria-hidden="true">⌘</span>
+          </button>
+          <button
+            className="small-button topbar-icon-button"
+            onClick={() => setShortcutsModalOpen(true)}
+            title="Aide raccourcis clavier"
+            aria-label="Aide raccourcis clavier"
+          >
+            <span aria-hidden="true">?</span>
           </button>
           <div className="status-box">
             <span>Backend</span>
@@ -508,6 +578,46 @@ export default function App() {
             <span className="loading-spinner" aria-hidden="true" />
             <span>Import en cours</span>
           </div>
+        </div>
+      ) : null}
+
+      {shortcutsModalOpen ? (
+        <div className="shortcuts-modal-overlay" onClick={() => setShortcutsModalOpen(false)}>
+          <section
+            className="shortcuts-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-label="Aide raccourcis clavier"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="shortcuts-modal-header">
+              <h2>Raccourcis clavier</h2>
+              <button
+                className="icon-button"
+                onClick={() => setShortcutsModalOpen(false)}
+                aria-label="Fermer"
+                title="Fermer"
+              >
+                ×
+              </button>
+            </div>
+            <div className="shortcuts-modal-body">
+              {shortcutGroups.map((group) => (
+                <section className="shortcuts-group" key={group.title}>
+                  <h3>{group.title}</h3>
+                  <ul className="shortcuts-list">
+                    {group.items.map((item) => (
+                      <li key={`${group.title}-${item.keys}`}>
+                        <kbd>{item.keys}</kbd>
+                        <span>{item.action}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </section>
+              ))}
+            </div>
+            <p className="shortcuts-modal-footnote">Les raccourcis sont ignores quand vous ecrivez dans un champ.</p>
+          </section>
         </div>
       ) : null}
 
@@ -576,10 +686,10 @@ export default function App() {
       {graphOnlyMode ? (
         <div className="graph-only-overlay-controls">
           <button className="small-button" onClick={resetAllGraphsToHome}>
-            Maison
+            <span aria-hidden="true">⌂</span>
           </button>
           <button className="small-button" onClick={() => setGraphOnlyMode(false)}>
-            UI
+            <span aria-hidden="true">▣</span>
           </button>
         </div>
       ) : null}

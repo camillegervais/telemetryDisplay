@@ -91,6 +91,16 @@ body {
   gap: 0.45rem;
 }
 
+.topbar-icon-button {
+  min-width: 32px;
+  height: 30px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.3rem 0.5rem;
+  font-size: 0.95rem;
+}
+
 .topbar-user-input {
   width: 160px;
   border: 1px solid rgba(255, 70, 93, 0.42);
@@ -306,6 +316,99 @@ body {
   font-family: "Rajdhani", sans-serif;
   letter-spacing: 0.04em;
   text-transform: uppercase;
+}
+
+.shortcuts-modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 70;
+  display: grid;
+  place-items: center;
+  background: rgba(8, 3, 5, 0.72);
+  backdrop-filter: blur(3px);
+  padding: 0.8rem;
+}
+
+.shortcuts-modal {
+  width: min(760px, 96vw);
+  max-height: min(88vh, 900px);
+  overflow: auto;
+  border: 1px solid rgba(255, 70, 93, 0.62);
+  background: linear-gradient(180deg, rgba(20, 7, 10, 0.98), rgba(14, 6, 9, 0.96));
+  box-shadow: 0 25px 60px rgba(0, 0, 0, 0.55);
+  padding: 0.75rem 0.85rem 0.7rem;
+}
+
+.shortcuts-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.7rem;
+  margin-bottom: 0.6rem;
+}
+
+.shortcuts-modal-header h2 {
+  margin: 0;
+  font-family: "Rajdhani", sans-serif;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  font-size: 1.02rem;
+}
+
+.shortcuts-modal-body {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.55rem;
+}
+
+.shortcuts-group {
+  border: 1px solid rgba(73, 23, 33, 0.78);
+  background: rgba(18, 7, 10, 0.82);
+  padding: 0.5rem;
+}
+
+.shortcuts-group h3 {
+  margin: 0 0 0.45rem;
+  color: #ffb9c5;
+  font-size: 0.76rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  font-family: "Rajdhani", sans-serif;
+}
+
+.shortcuts-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.32rem;
+}
+
+.shortcuts-list li {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  align-items: center;
+  gap: 0.42rem;
+  font-size: 0.72rem;
+  color: #ffe6eb;
+}
+
+.shortcuts-list kbd {
+  min-width: 70px;
+  text-align: center;
+  padding: 0.14rem 0.3rem;
+  border: 1px solid rgba(255, 70, 93, 0.55);
+  background: rgba(255, 70, 93, 0.15);
+  color: #ffd6de;
+  font-family: "Rajdhani", sans-serif;
+  font-size: 0.7rem;
+  letter-spacing: 0.04em;
+}
+
+.shortcuts-modal-footnote {
+  margin: 0.65rem 0 0;
+  font-size: 0.7rem;
+  color: #9bb0c8;
 }
 
 .dashboard-grid {
@@ -1325,6 +1428,10 @@ body {
   }
 
   .signal-config-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .shortcuts-modal-body {
     grid-template-columns: 1fr;
   }
 }
