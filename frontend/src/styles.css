@@ -277,6 +277,7 @@ body {
   border: 1px solid #a1293d;
   border-radius: 0;
   padding: 0.65rem 0.8rem;
+  height: fit-content;
 }
 
 .graph-only-mode .error-banner {
