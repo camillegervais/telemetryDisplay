@@ -436,12 +436,6 @@ export default function App() {
           </button>
           <button
             className="small-button"
-            onClick={() => setPanelMode((prev) => (prev === "data" ? "inspector" : "data"))}
-          >
-            {panelMode === "data" ? "Inspecteur" : "Data Hub"}
-          </button>
-          <button
-            className="small-button"
             onClick={() => setPanelSide((prev) => (prev === "left" ? "right" : "left"))}
           >
             Panneau: {panelSide === "left" ? "Gauche" : "Droite"}
@@ -470,6 +464,12 @@ export default function App() {
       <main className={`dashboard-grid ${panelSide === "right" ? "dashboard-grid-panel-right" : ""}`}>
         {!graphOnlyMode && panelSide === "left" ? (
           <div className="global-side-panel">
+            <button
+            className="panel-button"
+            onClick={() => setPanelMode((prev) => (prev === "data" ? "inspector" : "data"))}
+          >
+            {panelMode === "data" ? "Inspecteur" : "Data Hub"}
+          </button>
             {panelMode === "data" ? (
               <ImportPanel
                 appInfo={appInfo}

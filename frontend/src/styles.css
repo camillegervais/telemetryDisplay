@@ -753,6 +753,26 @@ body {
   cursor: not-allowed;
 }
 
+.panel-button {
+  border: 1px solid rgba(255, 70, 93, 0.55);
+  background: rgba(255, 70, 93, 0.18);
+  color: var(--fg-1);
+  border-radius: 0;
+  padding: 0.3rem 0.55rem;
+  cursor: pointer;
+  font-family: "Rajdhani", sans-serif;
+  font-weight: 700;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  width: 100%;
+  margin-bottom: 0.5rem;
+}
+
+.panel-button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
 .workspace-tabs {
   display: flex;
   align-items: center;
