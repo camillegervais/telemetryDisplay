@@ -17,7 +17,7 @@ Define a stable MAT input convention for racing telemetry indexed by lap progres
 - `lap_distance` length >= 2
 - all signal arrays have same length as `lap_distance`
 - source spatial step > 0
-- no NaN in `lap_distance`
+- NaN allowed at the end of signals to accept data from simulations that diverged. NaN in the middle of `lap_distance` signals are note allowed.
 
 ## Normalization rule (Parquet export)
 - All signals are resampled to app reference step `reference_distance_step_m`

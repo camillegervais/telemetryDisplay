@@ -73,16 +73,18 @@ class MatLoader:
 
         lap_distance_raw = np.asarray(mat_data[lap_key]).flatten()
         if len(lap_distance_raw) < 2:
-            raise MatValidationError("lap_distance must have at least 2 points")
+            raise MatValidationError("sLap must have at least 2 points")
 
-        if np.any(np.isnan(lap_distance_raw)):
-            raise MatValidationError("lap_distance contains NaN values")
+        nan_mask = np.isnan(lap_distance_raw)
+        if nan_mask[np.argmin(nan_mask):].all():  # If all values from the first NaN onward are NaN, we can trim them. Otherwise, it's a data integrity issue.
+            raise MatValidationError("sLap contains NaN values in the middle of the signal")
 
         source_points = len(lap_distance_raw)
 
         # Keep a single clean lap segment and enforce strictly increasing progression.
         segment_indices = self._select_clean_lap_indices(lap_distance_raw)
-        lap_distance = lap_distance_raw[segment_indices]
+        lap_distance = lap_distance_raw[segment_indices] # Apply segment selection first to focus on the most complete lap
+        lap_distance = lap_distance[self._trim_NAN_values_mask(lap_distance)] # Remove any NaN values that may be present
         monotonic_mask = self._strictly_increasing_mask(lap_distance)
         lap_distance = lap_distance[monotonic_mask]
 
@@ -116,7 +118,7 @@ class MatLoader:
                 )
 
             signal_segment = signal_data[segment_indices]
-            trimmed_signals[signal_name] = signal_segment[monotonic_mask]
+            trimmed_signals[signal_name] = signal_segment[monotonic_mask & self._trim_NAN_values_mask(signal_segment)]
 
         # Normalize all signals to reference spatial step
         df_normalized = self._resample_to_reference_step(lap_distance, trimmed_signals, source_time)
@@ -266,6 +268,12 @@ class MatLoader:
                 best_len = len(segment)
 
         return np.arange(best_start, best_end)
+
+    def _trim_NAN_values_mask(self, lap_distance: np.ndarray) -> np.ndarray:
+        """
+        Remove points where lap_distance is NaN (non-numeric noise).
+        """        
+        return ~np.isnan(lap_distance)
 
     def _strictly_increasing_mask(self, lap_distance: np.ndarray) -> np.ndarray:
         """
