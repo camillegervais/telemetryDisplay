@@ -305,6 +305,10 @@ body::after {
   padding-left: 0.15rem;
 }
 
+.focus-signal-list::-webkit-scrollbar {
+  display: none;
+}
+
 .focus-signal-filter {
   width: min(220px, 30vw);
   min-width: 130px;
