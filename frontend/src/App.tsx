@@ -232,6 +232,7 @@ export default function App() {
       : activeInspectorWidget?.alignMode === "origin-scale"
       ? "Origine + echelle"
       : "Desactive";
+  const hasImportedDataset = Boolean(datasetId && datasetMetadata);
 
   const inspectorPanel = (
     <section className="panel import-panel inspector-panel">
@@ -649,17 +650,28 @@ export default function App() {
             )}
           </div>
         ) : null}
-        <SignalWorkspace
-          datasetId={datasetId}
-          datasetMetadata={datasetMetadata}
-          trackMap={trackMap}
-          mathChannels={mathChannels}
-          graphOnlyMode={graphOnlyMode}
-          inspectorSelectedWidgetId={inspectorSelectedWidgetId}
-          onInspectorSelectedWidgetIdChange={setInspectorSelectedWidgetId}
-          onInspectorSnapshotChange={setInspectorSnapshot}
-          inspectorCommand={inspectorCommand}
-        />
+        {hasImportedDataset ? (
+          <SignalWorkspace
+            datasetId={datasetId}
+            datasetMetadata={datasetMetadata}
+            trackMap={trackMap}
+            mathChannels={mathChannels}
+            graphOnlyMode={graphOnlyMode}
+            inspectorSelectedWidgetId={inspectorSelectedWidgetId}
+            onInspectorSelectedWidgetIdChange={setInspectorSelectedWidgetId}
+            onInspectorSnapshotChange={setInspectorSnapshot}
+            inspectorCommand={inspectorCommand}
+          />
+        ) : (
+          <section className="panel dashboard-empty-state" role="status" aria-live="polite">
+            <div className="dashboard-empty-logo" aria-hidden="true">
+              <span className="app-logo-ring" />
+              <span className="app-logo-core">TD</span>
+            </div>
+            <h2>Aucun dataset importe</h2>
+            <p>Importez un fichier de telemetrie depuis le panneau Data Hub pour afficher les graphes.</p>
+          </section>
+        )}
         {!graphOnlyMode && panelSide === "right" ? (
           <div className="global-side-panel">
             {panelMode === "data" ? (

@@ -439,6 +439,54 @@ body {
   height: 94%;
 }
 
+.dashboard-empty-state {
+  min-height: 0;
+  height: 100%;
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  gap: 0.55rem;
+  text-align: center;
+  padding: 1.2rem;
+}
+
+.dashboard-empty-logo {
+  width: 64px;
+  height: 64px;
+  position: relative;
+  display: grid;
+  place-items: center;
+  margin-bottom: 0.35rem;
+}
+
+.dashboard-empty-logo .app-logo-ring {
+  border-color: rgba(255, 70, 93, 0.88);
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 70, 93, 0.38),
+    0 0 18px rgba(255, 70, 93, 0.26);
+}
+
+.dashboard-empty-logo .app-logo-core {
+  font-size: 1.05rem;
+  letter-spacing: 0.09em;
+}
+
+.dashboard-empty-state h2 {
+  margin: 0;
+  font-family: "Rajdhani", sans-serif;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-size: 1rem;
+}
+
+.dashboard-empty-state p {
+  margin: 0;
+  max-width: 440px;
+  color: var(--fg-2);
+  font-size: 0.78rem;
+  line-height: 1.45;
+}
+
 .import-panel {
   min-height: 0;
   max-height: 100%;
@@ -618,7 +666,6 @@ body {
 
 .inspector-grid-info {
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  max-height: 50%;
   overflow-y: auto;
   padding-right: 0.15rem;
   align-content: start;
