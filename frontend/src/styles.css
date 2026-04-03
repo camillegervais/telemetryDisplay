@@ -156,6 +156,7 @@ body {
   overflow-x: auto;
   overflow-y: hidden;
   min-height: 3rem;
+  height: fit-content;
 }
 
 .focus-mini-toolbar label {
@@ -324,6 +325,7 @@ body {
 .global-side-panel {
   min-height: 0;
   min-width: 0;
+  max-height: 94%;
 }
 
 .graph-only-mode .dashboard-grid {
@@ -336,7 +338,12 @@ body {
 
 .import-panel {
   min-height: 0;
-  overflow: auto;
+  max-height: 100%;
+  overflow-y: scroll;
+}
+
+.import-panel::-webkit-scrollbar {
+  display: none;
 }
 
 .inspector-panel {

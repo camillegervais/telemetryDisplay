@@ -15,6 +15,16 @@ import type { InspectorCommand, InspectorSnapshot } from "./components/SignalWor
 
 const USER_DISPLAY_NAME_KEY = "telemetry-display.user-display-name.v1";
 
+function isEditableElement(target: EventTarget | null): boolean {
+  if (!(target instanceof HTMLElement)) {
+    return false;
+  }
+  if (target.isContentEditable) {
+    return true;
+  }
+  return target.closest("input, textarea, select, [contenteditable='true']") !== null;
+}
+
 export default function App() {
   const [appInfo, setAppInfo] = useState<AppInfo | null>(null);
   const [loadingAppInfo, setLoadingAppInfo] = useState(true);
@@ -69,6 +79,46 @@ export default function App() {
   useEffect(() => {
     window.localStorage.setItem(USER_DISPLAY_NAME_KEY, userDisplayName.trim());
   }, [userDisplayName]);
+
+  useEffect(() => {
+    function onGlobalKeyDown(event: KeyboardEvent) {
+      if (isEditableElement(event.target)) {
+        return;
+      }
+
+      if (event.ctrlKey || event.metaKey || event.altKey) {
+        return;
+      }
+
+      if (event.code === "KeyH") {
+        event.preventDefault();
+        resetAllGraphsToHome();
+        return;
+      }
+
+      if (event.code === "KeyG") {
+        event.preventDefault();
+        setGraphOnlyMode((prev) => !prev);
+        return;
+      }
+
+      if (event.code === "KeyI") {
+        event.preventDefault();
+        setPanelMode((prev) => (prev === "data" ? "inspector" : "data"));
+        return;
+      }
+
+      if (event.code === "KeyP") {
+        event.preventDefault();
+        setPanelSide((prev) => (prev === "left" ? "right" : "left"));
+      }
+    }
+
+    window.addEventListener("keydown", onGlobalKeyDown);
+    return () => {
+      window.removeEventListener("keydown", onGlobalKeyDown);
+    };
+  }, []);
 
   async function handleImport(file: File) {
     setImporting(true);

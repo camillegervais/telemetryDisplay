@@ -125,6 +125,16 @@ const SIGNAL_DRAG_MIME = "application/x-telemetry-signal";
 const TRAJECTORY_TAB_ID = "tab-trajectory";
 const TRAJECTORY_SIGNALS = ["xCar", "yCar", "xRef", "yRef", "xTrack", "yTrack"] as const;
 
+function isEditableElement(target: EventTarget | null): boolean {
+  if (!(target instanceof HTMLElement)) {
+    return false;
+  }
+  if (target.isContentEditable) {
+    return true;
+  }
+  return target.closest("input, textarea, select, [contenteditable='true']") !== null;
+}
+
 function isAbortError(error: unknown): boolean {
   return error instanceof DOMException && error.name === "AbortError";
 }
@@ -1940,6 +1950,266 @@ export default function SignalWorkspace({
       startHeightSpan: widget.heightSpan,
     });
   }
+
+  function moveSelectedWidget(deltaRow: number, deltaCol: number): boolean {
+    if (selectedWidgetId === null) {
+      return false;
+    }
+
+    let moved = false;
+    setWidgets((prev) => {
+      const widget = prev.find((item) => item.id === selectedWidgetId);
+      if (!widget) {
+        return prev;
+      }
+
+      const nextRow = clamp(widget.row + deltaRow, 1, gridRows - widget.heightSpan + 1);
+      const nextCol = clamp(widget.col + deltaCol, 1, gridCols - widget.widthSpan + 1);
+      if (nextRow === widget.row && nextCol === widget.col) {
+        return prev;
+      }
+
+      const otherWidgets = prev.filter((item) => item.id !== widget.id);
+      if (!canPlaceWidget(widget, nextRow, nextCol, gridRows, gridCols, otherWidgets)) {
+        return prev;
+      }
+
+      moved = true;
+      return prev.map((item) =>
+        item.id === widget.id
+          ? {
+              ...item,
+              row: nextRow,
+              col: nextCol,
+            }
+          : item
+      );
+    });
+
+    return moved;
+  }
+
+  function resizeSelectedWidget(deltaWidth: number, deltaHeight: number): boolean {
+    if (selectedWidgetId === null) {
+      return false;
+    }
+
+    let resized = false;
+    setWidgets((prev) => {
+      const widget = prev.find((item) => item.id === selectedWidgetId);
+      if (!widget) {
+        return prev;
+      }
+
+      const maxWidth = gridCols - widget.col + 1;
+      const maxHeight = gridRows - widget.row + 1;
+      const nextWidth = clamp(widget.widthSpan + deltaWidth, 1, maxWidth);
+      const nextHeight = clamp(widget.heightSpan + deltaHeight, 1, maxHeight);
+      if (nextWidth === widget.widthSpan && nextHeight === widget.heightSpan) {
+        return prev;
+      }
+
+      const otherWidgets = prev.filter((item) => item.id !== widget.id);
+      if (!canPlaceWidget({ ...widget, widthSpan: nextWidth, heightSpan: nextHeight }, widget.row, widget.col, gridRows, gridCols, otherWidgets)) {
+        return prev;
+      }
+
+      resized = true;
+      return prev.map((item) =>
+        item.id === widget.id
+          ? {
+              ...item,
+              widthSpan: nextWidth,
+              heightSpan: nextHeight,
+            }
+          : item
+      );
+    });
+
+    return resized;
+  }
+
+  useEffect(() => {
+    function onWorkspaceKeyDown(event: KeyboardEvent) {
+      if (isEditableElement(event.target)) {
+        return;
+      }
+
+      const hasPrimaryModifier = event.ctrlKey || event.metaKey;
+      const hasOtherModifiers = event.altKey;
+      if (hasOtherModifiers) {
+        return;
+      }
+
+      if (hasPrimaryModifier && event.code === "KeyS") {
+        event.preventDefault();
+        saveCurrentConfiguration();
+        return;
+      }
+
+      if (hasPrimaryModifier && event.code === "KeyO") {
+        if (!selectedConfigId) {
+          return;
+        }
+        event.preventDefault();
+        loadConfiguration(selectedConfigId);
+        return;
+      }
+
+      if (hasPrimaryModifier && event.code === "Tab") {
+        event.preventDefault();
+        const sequence = [...tabs.map((tab) => tab.id), TRAJECTORY_TAB_ID];
+        const currentIndex = sequence.indexOf(activeTabId);
+        const direction = event.shiftKey ? -1 : 1;
+        const nextIndex =
+          currentIndex < 0
+            ? 0
+            : (currentIndex + direction + sequence.length) % sequence.length;
+        const nextTabId = sequence[nextIndex];
+        if (nextTabId === TRAJECTORY_TAB_ID) {
+          switchToTrajectoryTab();
+        } else {
+          switchToTab(nextTabId);
+        }
+        return;
+      }
+
+      if (hasPrimaryModifier) {
+        return;
+      }
+
+      if (event.code === "KeyA") {
+        event.preventDefault();
+        addWidget();
+        return;
+      }
+
+      if (event.code === "KeyX") {
+        event.preventDefault();
+        addXYWidget();
+        return;
+      }
+
+      if (event.code === "KeyT") {
+        event.preventDefault();
+        addTab();
+        return;
+      }
+
+      if (event.code.startsWith("Digit") && !event.shiftKey) {
+        const tabNumber = Number(event.code.replace("Digit", ""));
+        if (Number.isNaN(tabNumber) || tabNumber < 1 || tabNumber > 9) {
+          return;
+        }
+        const targetTab = tabs[tabNumber - 1];
+        if (targetTab) {
+          event.preventDefault();
+          switchToTab(targetTab.id);
+        }
+        return;
+      }
+
+      if (event.code === "Delete" || event.code === "Backspace") {
+        if (isTrajectoryActive || selectedWidgetId === null) {
+          return;
+        }
+        event.preventDefault();
+        removeWidget(selectedWidgetId);
+        return;
+      }
+
+      if (event.code === "Enter") {
+        if (isTrajectoryActive || selectedWidgetId === null) {
+          return;
+        }
+        event.preventDefault();
+        setWidgets((prev) =>
+          prev.map((item) =>
+            item.id === selectedWidgetId ? { ...item, menuOpen: !item.menuOpen } : item
+          )
+        );
+        return;
+      }
+
+      if (event.code === "KeyF") {
+        if (isTrajectoryActive || selectedWidgetId === null) {
+          return;
+        }
+        event.preventDefault();
+        setExpandedWidgetId((prev) => (prev === selectedWidgetId ? null : selectedWidgetId));
+        return;
+      }
+
+      if (event.code === "Escape") {
+        const hasOpenMenu = widgets.some((widget) => widget.menuOpen);
+        if (hasOpenMenu) {
+          event.preventDefault();
+          setWidgets((prev) => prev.map((widget) => ({ ...widget, menuOpen: false })));
+          return;
+        }
+        if (expandedWidgetId !== null) {
+          event.preventDefault();
+          setExpandedWidgetId(null);
+          return;
+        }
+        if (selectedWidgetId !== null) {
+          event.preventDefault();
+          updateSelectedWidgetId(null);
+        }
+        return;
+      }
+
+      if (isTrajectoryActive || selectedWidgetId === null) {
+        return;
+      }
+
+      if (event.code === "ArrowUp") {
+        const changed = event.shiftKey ? resizeSelectedWidget(0, -1) : moveSelectedWidget(-1, 0);
+        if (changed) {
+          event.preventDefault();
+        }
+        return;
+      }
+
+      if (event.code === "ArrowDown") {
+        const changed = event.shiftKey ? resizeSelectedWidget(0, 1) : moveSelectedWidget(1, 0);
+        if (changed) {
+          event.preventDefault();
+        }
+        return;
+      }
+
+      if (event.code === "ArrowLeft") {
+        const changed = event.shiftKey ? resizeSelectedWidget(-1, 0) : moveSelectedWidget(0, -1);
+        if (changed) {
+          event.preventDefault();
+        }
+        return;
+      }
+
+      if (event.code === "ArrowRight") {
+        const changed = event.shiftKey ? resizeSelectedWidget(1, 0) : moveSelectedWidget(0, 1);
+        if (changed) {
+          event.preventDefault();
+        }
+      }
+    }
+
+    window.addEventListener("keydown", onWorkspaceKeyDown);
+    return () => {
+      window.removeEventListener("keydown", onWorkspaceKeyDown);
+    };
+  }, [
+    activeTabId,
+    expandedWidgetId,
+    gridCols,
+    gridRows,
+    isTrajectoryActive,
+    selectedConfigId,
+    selectedWidgetId,
+    tabs,
+    widgets,
+  ]);
 
   return (
     <section className={`panel signal-workspace ${graphOnlyMode ? "signal-workspace-max" : ""}`}>
