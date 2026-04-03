@@ -6,7 +6,7 @@ import type {
   TrackMapResponse,
 } from "./types";
 
-const API_BASE_URL = "http://localhost:8001/api";
+const API_BASE_URL = "http://172.27.10.15:8001/api";
 
 export async function fetchAppInfo(): Promise<AppInfo> {
   const response = await fetch(`${API_BASE_URL}/app-info`);
