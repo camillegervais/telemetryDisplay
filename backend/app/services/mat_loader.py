@@ -76,20 +76,25 @@ class MatLoader:
             raise MatValidationError("sLap must have at least 2 points")
 
         nan_mask = np.isnan(lap_distance_raw)
-        if nan_mask[np.argmin(nan_mask):].all():  # If all values from the first NaN onward are NaN, we can trim them. Otherwise, it's a data integrity issue.
-            raise MatValidationError("sLap contains NaN values in the middle of the signal")
+        if nan_mask.any():
+            first_nan_index = int(np.flatnonzero(nan_mask)[0])
+            if not nan_mask[first_nan_index:].all():
+                raise MatValidationError("sLap contains NaN values in the middle of the signal")
 
         source_points = len(lap_distance_raw)
 
         # Keep a single clean lap segment and enforce strictly increasing progression.
         segment_indices = self._select_clean_lap_indices(lap_distance_raw)
         lap_distance = lap_distance_raw[segment_indices] # Apply segment selection first to focus on the most complete lap
-        lap_distance = lap_distance[self._trim_NAN_values_mask(lap_distance)] # Remove any NaN values that may be present
+        lap_distance_mask = self._trim_NAN_values_mask(lap_distance)
+        lap_distance = lap_distance[lap_distance_mask] # Remove any NaN values that may be present
         monotonic_mask = self._strictly_increasing_mask(lap_distance)
         lap_distance = lap_distance[monotonic_mask]
 
         if len(lap_distance) < 2:
             raise MatValidationError("Could not build a clean increasing lap from lap_distance/sLap")
+
+        clean_source_indices = segment_indices[lap_distance_mask][monotonic_mask]
 
         # Detect or compute spatial step
         source_step_m = self._detect_spatial_step(mat_data, lap_distance)
@@ -105,8 +110,9 @@ class MatLoader:
         source_time: Optional[np.ndarray] = None
         if sample_rate_hz is not None and sample_rate_hz > 0:
             source_time_raw = np.arange(source_points, dtype=float) / sample_rate_hz
-            source_time_segment = source_time_raw[segment_indices]
-            source_time = source_time_segment[monotonic_mask]
+            source_time = source_time_raw[clean_source_indices]
+
+        shared_length = len(lap_distance)
 
         # Validate all signals have same length as lap_distance
         for signal_name in signal_names:
@@ -117,8 +123,20 @@ class MatLoader:
                     f"expected {source_points}"
                 )
 
-            signal_segment = signal_data[segment_indices]
-            trimmed_signals[signal_name] = signal_segment[monotonic_mask & self._trim_NAN_values_mask(signal_segment)]
+            signal_segment = signal_data[clean_source_indices]
+            signal_valid_length = self._leading_valid_length(signal_segment, signal_name)
+            shared_length = min(shared_length, signal_valid_length)
+            trimmed_signals[signal_name] = signal_segment
+
+        if shared_length < 2:
+            raise MatValidationError("Could not build a clean increasing lap from lap_distance/sLap")
+
+        lap_distance = lap_distance[:shared_length]
+        if source_time is not None:
+            source_time = source_time[:shared_length]
+
+        for signal_name in list(trimmed_signals.keys()):
+            trimmed_signals[signal_name] = trimmed_signals[signal_name][:shared_length]
 
         # Normalize all signals to reference spatial step
         df_normalized = self._resample_to_reference_step(lap_distance, trimmed_signals, source_time)
@@ -274,6 +292,24 @@ class MatLoader:
         Remove points where lap_distance is NaN (non-numeric noise).
         """        
         return ~np.isnan(lap_distance)
+
+    def _leading_valid_length(self, signal: np.ndarray, signal_name: str) -> int:
+        """
+        Return the number of valid samples before trailing NaNs.
+
+        NaNs are allowed only as a suffix. Any NaN in the middle of the signal is rejected.
+        """
+        nan_mask = np.isnan(signal)
+        if not nan_mask.any():
+            return len(signal)
+
+        first_nan_index = int(np.flatnonzero(nan_mask)[0])
+        if not nan_mask[first_nan_index:].all():
+            raise MatValidationError(
+                f"Signal '{signal_name}' contains NaN values in the middle of the signal"
+            )
+
+        return first_nan_index
 
     def _strictly_increasing_mask(self, lap_distance: np.ndarray) -> np.ndarray:
         """
