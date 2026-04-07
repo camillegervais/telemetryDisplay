@@ -1,81 +1,92 @@
 # telemetryDisplay
 
-Scalable baseline for a racing telemetry web application.
+Application web de visualisation de télémétrie pour circuit, avec import de fichiers `.mat`, dashboard de graphes, track map et création de math channels.
 
-## Project structure
+## Structure du projet
 
-- `backend/`: FastAPI API
-- `frontend/`: React + Vite UI
-- `data/`: input and demo data
-- `docs/`: format and conventions
+- `backend/` : API FastAPI et logique d’import des données
+- `frontend/` : interface React + Vite
+- `data/` : jeux de données d’exemple et cartes de piste
+- `docs/` : conventions de format, dont le format MAT
 
-## Phase 1 & 2 status
+## Prérequis
 
-### Phase 1
-- Backend scaffold with:
-  - `GET /api/health`
-  - `GET /api/app-info` (includes reference spatial step)
-- Frontend telemetry-style dashboard scaffold:
-  - import panel with spatial step display
-  - signals workspace placeholders
-  - track map placeholder
-- Spatial sampling convention documented in `docs/MAT_FORMAT.md`
+- Python 3.10+ pour le backend
+- Node.js 18+ pour le frontend
+- Un navigateur moderne
 
-### Phase 2 (implemented)
-- **MAT loader service** (`backend/app/services/mat_loader.py`) with:
-  - .mat file validation (mandatory `lap_distance`, signals, spatial step)
-  - Source spatial step detection (from `distance_step_m` or median delta)
-  - Full normalization to reference step via **linear interpolation** (numpy.interp)
-  - Metadata tracking (source step, normalized step, enrichment factor, signal names)
+## Installation
 
-- **Dataset API endpoints**:
-  - `POST /api/datasets/import` — upload .mat, get dataset_id
-  - `GET /api/datasets/{dataset_id}/metadata` — signal list, distance range, steps, interpolation method
-  - `POST /api/datasets/{dataset_id}/query` — fetch signals with distance range and max_points decimation
-  - `GET /api/datasets/{dataset_id}/trackmap` — track coordinates
+### Backend
 
-- **Data generation utilities**:
-  - `backend/scripts/generate_losail_data.py` — generate Losail telemetry dataset (uses real FastF1 circuit data)
-  - `backend/scripts/generate_demo_data.py` — generic synthetic demo data
-  - `backend/app/utils/circuit.py` — reusable circuit fetcher (FastF1 + synthetic fallback)
+1. Ouvrir un terminal dans `backend/`.
+2. Créer l’environnement virtuel si besoin: `python -m venv .venv`
+3. Activer l’environnement virtuel.
+4. Installer les dépendances: `pip install -r requirements.txt`
 
-- **Demo data available**:
-  - `data/losail.mat` — 2000 samples, Losail circuit, 5400m lap, 2.7m spatial step (fetched via FastF1)
-  - `data/losail_track.csv` — real Losail track coordinates from FastF1
+### Frontend
 
-## Run backend
+1. Ouvrir un terminal dans `frontend/`.
+2. Installer les dépendances: `npm install`
 
-1. `cd backend`
-2. `python -m venv .venv`
-3. Activate virtual environment
-4. `pip install -r requirements.txt`
-5. **Generate demo data** (choose one):
-   - Losail with real circuit coordinates (requires FastF1): `python scripts/generate_losail_data.py`
-   - Generic demo data: `python scripts/generate_demo_data.py`
-6. `uvicorn app.main:app --reload --port 8001`
+## Démarrage
 
-Data files are saved to `data/` directory.
+### Lancer le backend
 
-## Run frontend
+1. Aller dans `backend/`.
+2. Activer `.venv`.
+3. Lancer l’API: `uvicorn app.main:app --reload --port 8001`
 
-1. `cd frontend`
-2. `npm install`
-3. `npm run dev`
+L’API est disponible sur `http://localhost:8001`.
 
-Frontend runs on `http://localhost:5173` and expects API on `http://localhost:8001`.
+### Lancer le frontend
 
-## Single-command dev startup (frontend + backend)
+1. Aller dans `frontend/`.
+2. Lancer l’interface: `npm run dev`
 
-From repository root:
+L’application est disponible sur `http://localhost:5173` et s’attend à trouver l’API sur `http://localhost:8001`.
 
-1. Ensure backend venv exists at `.venv/` (already used in project workflows).
-2. Install backend runtime dependencies in this venv: `.venv/Scripts/python.exe -m pip install -r backend/requirements-runtime.txt`
-3. Install root tooling once: `npm install`
-4. Start both services: `npm run dev`
+### Démarrage complet depuis la racine
 
-Optional for data-generation scripts using FastF1:
-- `.venv/Scripts/python.exe -m pip install -r backend/requirements.txt`
+Depuis la racine du dépôt, vous pouvez utiliser le script de dev configuré pour lancer frontend et backend ensemble. Ce mode suppose que les dépendances sont déjà installées.
 
-This starts:
-- Backend on `http://localhost:8001`
-- Frontend on `http://localhost:5173`
+## Utilisation basique
+
+1. Importer un fichier `.mat` depuis le panneau Data Hub.
+2. Ou importer un fichier depuis un chemin local si le backend y a accès.
+3. Consulter les signaux disponibles dans la liste de gauche.
+4. Ajouter des math channels depuis le même panneau pour créer des signaux dérivés.
+5. Ouvrir le dashboard pour afficher les graphes et la track map.
+
+Fonctions utiles de l’interface:
+
+- Le panneau Data Hub permet d’importer, filtrer et ajouter des math channels.
+- Les math channels sont conservés au rechargement de la page.
+- Le mode `Graph Only` masque les panneaux latéraux pour se concentrer sur les graphes.
+- Le panneau Inspecteur sert à modifier widgets, tailles et positions.
+- L’aide des raccourcis clavier est accessible depuis le bouton `?` en haut à droite.
+
+## Format des fichiers MAT
+
+Le format attendu est décrit dans [docs/MAT_FORMAT.md](docs/MAT_FORMAT.md).
+
+En résumé:
+
+- `sLap` est obligatoire et doit être monotone croissante.
+- Chaque signal doit avoir la même longueur que `sLap`.
+- `distance_step_m` est recommandé pour décrire l’échantillonnage spatial.
+- Les `NaN` en fin de signal sont acceptés, mais pas au milieu.
+
+## Données d’exemple
+
+- `data/losail.mat` : dataset de démonstration pour Losail
+- `data/losail_track.csv` : tracé de piste associé
+- Les scripts de génération se trouvent dans `backend/scripts/`
+
+## Utilisation avec MATLAB / Simulink
+
+Cette application vise à offrir un outil pratique pour analyser des données de télémétrie issues d’une simulation Simulink. Pour générer les données compatibles avec l’application, procédez ainsi:
+
+1. Copier le fichier `exportDataMATLAB.m` dans le dossier de votre projet Simulink.
+2. Le configurer comme callback `StopFcn` de la simulation.
+3. Ajouter des blocs `To Workspace` sur les signaux que vous voulez analyser dans l’application.
