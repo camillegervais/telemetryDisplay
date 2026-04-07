@@ -14,6 +14,55 @@ import type { AppInfo, DatasetMetadata, MathChannel, TrackMapResponse } from "./
 import type { InspectorCommand, InspectorSnapshot } from "./components/SignalWorkspace";
 
 const USER_DISPLAY_NAME_KEY = "telemetry-display.user-display-name.v1";
+const MATH_CHANNELS_KEY = "telemetry-display.math-channels.v1";
+
+function loadSavedMathChannels(): MathChannel[] {
+  if (typeof window === "undefined") {
+    return [];
+  }
+
+  try {
+    const raw = window.localStorage.getItem(MATH_CHANNELS_KEY);
+    if (!raw) {
+      return [];
+    }
+
+    const parsed = JSON.parse(raw) as unknown;
+    if (!Array.isArray(parsed)) {
+      return [];
+    }
+
+    return parsed
+      .filter((item): item is MathChannel => {
+        if (!item || typeof item !== "object") {
+          return false;
+        }
+
+        const candidate = item as MathChannel;
+        return (
+          typeof candidate.name === "string" &&
+          typeof candidate.expression === "string" &&
+          Array.isArray(candidate.dependencies) &&
+          candidate.dependencies.every((dependency) => typeof dependency === "string")
+        );
+      })
+      .map((channel) => ({
+        name: channel.name,
+        expression: channel.expression,
+        dependencies: [...channel.dependencies],
+      }));
+  } catch {
+    return [];
+  }
+}
+
+function storeSavedMathChannels(mathChannels: MathChannel[]): void {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  window.localStorage.setItem(MATH_CHANNELS_KEY, JSON.stringify(mathChannels));
+}
 
 function isEditableElement(target: EventTarget | null): boolean {
   if (!(target instanceof HTMLElement)) {
@@ -34,7 +83,7 @@ export default function App() {
   const [datasetId, setDatasetId] = useState<string | null>(null);
   const [datasetMetadata, setDatasetMetadata] = useState<DatasetMetadata | null>(null);
   const [trackMap, setTrackMap] = useState<TrackMapResponse | null>(null);
-  const [mathChannels, setMathChannels] = useState<MathChannel[]>([]);
+  const [mathChannels, setMathChannels] = useState<MathChannel[]>(() => loadSavedMathChannels());
   const [graphOnlyMode, setGraphOnlyMode] = useState(false);
   const [userDisplayName, setUserDisplayName] = useState("");
   const [panelSide, setPanelSide] = useState<"left" | "right">("left");
@@ -80,6 +129,10 @@ export default function App() {
   useEffect(() => {
     window.localStorage.setItem(USER_DISPLAY_NAME_KEY, userDisplayName.trim());
   }, [userDisplayName]);
+
+  useEffect(() => {
+    storeSavedMathChannels(mathChannels);
+  }, [mathChannels]);
 
   useEffect(() => {
     function onGlobalKeyDown(event: KeyboardEvent) {
@@ -168,7 +221,6 @@ export default function App() {
 
     setDatasetMetadata(metadata);
     setTrackMap(map);
-    setMathChannels([]);
     setXRange(null);
     setCursorDistance(null);
   }
