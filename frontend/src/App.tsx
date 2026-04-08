@@ -32,7 +32,7 @@ function loadSavedMathChannels(): MathChannel[] {
       return [];
     }
 
-    return parsed
+    const sanitized = parsed
       .filter((item): item is MathChannel => {
         if (!item || typeof item !== "object") {
           return false;
@@ -51,6 +51,16 @@ function loadSavedMathChannels(): MathChannel[] {
         expression: channel.expression,
         dependencies: [...channel.dependencies],
       }));
+
+    // Guard against stale localStorage entries that may contain duplicate channel names.
+    const seenNames = new Set<string>();
+    return sanitized.filter((channel) => {
+      if (seenNames.has(channel.name)) {
+        return false;
+      }
+      seenNames.add(channel.name);
+      return true;
+    });
   } catch {
     return [];
   }

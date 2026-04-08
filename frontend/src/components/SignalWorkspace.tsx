@@ -197,6 +197,41 @@ function normalizeWidget(widget: GraphWidget, forceCloseMenu: boolean): GraphWid
   };
 }
 
+function sanitizeTabWidgetIds(tab: WorkspaceTab): WorkspaceTab {
+  const usedIds = new Set<number>();
+  let nextCandidateId = 1;
+
+  const widgets = tab.widgets.map((widget) => {
+    let normalizedId = Number.isFinite(widget.id) ? Math.trunc(widget.id) : nextCandidateId;
+    if (normalizedId < 1) {
+      normalizedId = nextCandidateId;
+    }
+
+    while (usedIds.has(normalizedId)) {
+      normalizedId = nextCandidateId;
+      nextCandidateId += 1;
+    }
+
+    usedIds.add(normalizedId);
+    nextCandidateId = Math.max(nextCandidateId, normalizedId + 1);
+
+    return {
+      ...normalizeWidget(widget, true),
+      id: normalizedId,
+    };
+  });
+
+  const maxWidgetId = widgets.reduce((maxId, widget) => Math.max(maxId, widget.id), 0);
+  const fallbackNextId = Math.max(1, maxWidgetId + 1);
+  const tabNextId = Number.isFinite(tab.nextId) ? Math.trunc(tab.nextId) : fallbackNextId;
+
+  return {
+    ...tab,
+    widgets,
+    nextId: Math.max(tabNextId, fallbackNextId),
+  };
+}
+
 function getWidgetAlignZero(widget: GraphWidget): boolean {
   return widget.options?.alignZero ?? widget.alignZero ?? false;
 }
@@ -225,10 +260,7 @@ function loadSavedWorkspaceConfigs(): SavedWorkspaceConfig[] {
       .filter((cfg) => Array.isArray(cfg.tabs) && cfg.tabs.length > 0)
       .map((cfg) => ({
         ...cfg,
-        tabs: cfg.tabs.map((tab) => ({
-          ...tab,
-          widgets: tab.widgets.map((widget) => normalizeWidget(widget, true)),
-        })),
+        tabs: cfg.tabs.map((tab) => sanitizeTabWidgetIds(tab)),
       }));
   } catch {
     return [];
@@ -269,10 +301,13 @@ function storeWorkspaceSessionSnapshot(snapshot: WorkspaceSessionSnapshot): void
     return;
   }
 
-  const cleanTabs = snapshot.tabs.map((tab) => ({
-    ...tab,
-    widgets: sanitizeWidgetsForStorage(tab.widgets),
-  }));
+  const cleanTabs = snapshot.tabs.map((tab) => {
+    const sanitizedTab = sanitizeTabWidgetIds(tab);
+    return {
+      ...sanitizedTab,
+      widgets: sanitizeWidgetsForStorage(sanitizedTab.widgets),
+    };
+  });
 
   window.localStorage.setItem(
     WORKSPACE_SESSION_KEY,
@@ -512,7 +547,7 @@ function buildChartConfig(
       : {};
 
   const data = selectedSignals.map((signal, index) => ({
-    type: "scattergl" as const,
+    type: "scatter" as const,
     mode: "lines" as const,
     name: signal,
     x: xValues,
@@ -633,7 +668,7 @@ function buildXYChartConfig(
 
   const xValues = series.signals[xSignal] ?? [];
   const data = ySignals.map((signal, index) => ({
-    type: "scattergl" as const,
+    type: "scatter" as const,
     mode: "markers" as const,
     name: `${signal} vs ${xSignal}`,
     x: xValues,
@@ -1005,10 +1040,7 @@ export default function SignalWorkspace({
       return;
     }
 
-    const clonedTabs = snapshot.tabs.map((tab) => ({
-      ...tab,
-      widgets: tab.widgets.map((widget) => normalizeWidget(widget, true)),
-    }));
+    const clonedTabs = snapshot.tabs.map((tab) => sanitizeTabWidgetIds(tab));
     const restoredActiveId =
       snapshot.activeTabId === TRAJECTORY_TAB_ID
         ? TRAJECTORY_TAB_ID
@@ -1382,7 +1414,7 @@ export default function SignalWorkspace({
     const data: Array<Record<string, unknown>> = [];
     if (hasTrackFromSignals) {
       data.push({
-        type: "scattergl",
+        type: "scatter",
         mode: "lines",
         name: "Track",
         x: xTrack,
@@ -1391,7 +1423,7 @@ export default function SignalWorkspace({
       });
     } else if (hasTrackFromMap) {
       data.push({
-        type: "scattergl",
+        type: "scatter",
         mode: "lines",
         name: "Track",
         x: trackMap?.x_position ?? [],
@@ -1425,7 +1457,7 @@ export default function SignalWorkspace({
 
     if (hasRef) {
       data.push({
-        type: "scattergl",
+        type: "scatter",
         mode: "lines",
         name: "Reference",
         x: xRef,
@@ -1436,7 +1468,7 @@ export default function SignalWorkspace({
 
     if (hasCar) {
       data.push({
-        type: "scattergl",
+        type: "scatter",
         mode: "lines",
         name: "Car",
         x: xCar,
@@ -1700,10 +1732,7 @@ export default function SignalWorkspace({
       return;
     }
 
-    const clonedTabs = config.tabs.map((tab) => ({
-      ...tab,
-      widgets: tab.widgets.map((widget) => normalizeWidget(widget, true)),
-    }));
+    const clonedTabs = config.tabs.map((tab) => sanitizeTabWidgetIds(tab));
     const nextActiveId = clonedTabs.some((tab) => tab.id === config.activeTabId)
       ? config.activeTabId
       : clonedTabs[0].id;
@@ -2402,29 +2431,29 @@ export default function SignalWorkspace({
         <div className="graph-grid" style={{ gridTemplateColumns: "1fr", gridTemplateRows: "1fr" }}>
           <article className="graph-tile" style={{ gridColumn: "1 / span 1", gridRow: "1 / span 1" }}>
             {trajectoryLoading ? (
-              <div className="loading-plot">
+              <div className="loading-plot loading-plot-overlay">
                 <span className="loading-spinner" aria-hidden="true" />
                 Chargement...
               </div>
             ) : null}
             {trajectoryError ? <p className="panel-text">{trajectoryError}</p> : null}
-            {!trajectoryError && !trajectoryChart.hasCar ? (
+            {!trajectoryLoading && !trajectoryError && !trajectoryChart.hasCar ? (
               <div className="placeholder-graph" aria-label="Trajectoire indisponible">
                 <div className="placeholder-graph-mark">!</div>
                 <div className="placeholder-graph-text">Trajectoire indisponible</div>
                 <div className="placeholder-graph-help">Signaux requis: xCar et yCar</div>
               </div>
-            ) : (
+            ) : !trajectoryLoading && !trajectoryError ? (
               <div className="plot-fill">
                 <Plot
                   data={trajectoryChart.data}
                   layout={trajectoryChart.layout}
                   useResizeHandler
                   config={{ displaylogo: false, responsive: true }}
-                  style={{ width: "100%", height: "100%" }}
+                  style={{ width: "100%", height: "100%", backgroundColor: "transparent" }}
                 />
               </div>
-            )}
+            ) : null}
           </article>
         </div>
       ) : isTabSwitching ? (
@@ -2760,14 +2789,14 @@ export default function SignalWorkspace({
               ) : null}
 
               {loadingById[widget.id] ? (
-                <div className="loading-plot">
+                <div className="loading-plot loading-plot-overlay">
                   <span className="loading-spinner" aria-hidden="true" />
                   Chargement...
                 </div>
               ) : null}
 
-              {(widgetKind === "xy" && (!widget.xSignal || widget.signals.length === 0)) ||
-              (widgetKind === "timeseries" && widget.signals.length === 0) ? (
+              {loadingById[widget.id] ? null : ((widgetKind === "xy" && (!widget.xSignal || widget.signals.length === 0)) ||
+              (widgetKind === "timeseries" && widget.signals.length === 0)) ? (
                 <div className="placeholder-graph" aria-label="Aucun signal sélectionné">
                   <div className="placeholder-graph-mark">+</div>
                   <div className="placeholder-graph-text">
@@ -2782,7 +2811,7 @@ export default function SignalWorkspace({
                     layout={chart.layout}
                     useResizeHandler
                     config={{ displaylogo: false, responsive: true }}
-                    style={{ width: "100%", height: "100%" }}
+                    style={{ width: "100%", height: "100%", backgroundColor: "transparent" }}
                     onHover={(evt: HoverEvent) => {
                       if (widgetKind === "xy" || xAxisMode !== "distance") {
                         return;

@@ -77,6 +77,21 @@ function formatImportMessageLines(message: string): string[] {
   return lines.slice(0, 3);
 }
 
+function uniqueStrings(values: string[]): string[] {
+  const seen = new Set<string>();
+  const unique: string[] = [];
+
+  values.forEach((value) => {
+    if (seen.has(value)) {
+      return;
+    }
+    seen.add(value);
+    unique.push(value);
+  });
+
+  return unique;
+}
+
 export default function ImportPanel({
   appInfo,
   loadingAppInfo,
@@ -108,14 +123,21 @@ export default function ImportPanel({
 
   const canImport = useMemo(() => selectedFile !== null && !importing, [importing, selectedFile]);
   const canImportFromPath = useMemo(() => matPath.trim().length > 0 && !importing, [importing, matPath]);
+  const allSignals = useMemo(
+    () =>
+      uniqueStrings([
+        ...(datasetMetadata?.signal_names ?? []),
+        ...mathChannels.map((channel) => channel.name),
+      ]),
+    [datasetMetadata, mathChannels]
+  );
   const filteredSignals = useMemo(() => {
-    const allSignals = [...(datasetMetadata?.signal_names ?? []), ...mathChannels.map((channel) => channel.name)];
     const filter = signalFilter.trim().toLowerCase();
     if (!filter) {
       return allSignals;
     }
     return allSignals.filter((signal) => signal.toLowerCase().includes(filter));
-  }, [datasetMetadata, mathChannels, signalFilter]);
+  }, [allSignals, signalFilter]);
   const importMessageLines = useMemo(
     () => (importMessage ? formatImportMessageLines(importMessage) : []),
     [importMessage]
@@ -181,10 +203,10 @@ export default function ImportPanel({
         });
 
         const computed: Record<string, SignalStats> = {};
-        const statsSignals = [
+        const statsSignals = uniqueStrings([
           ...datasetMetadata.signal_names,
           ...mathChannels.map((channel) => channel.name),
-        ];
+        ]);
 
         statsSignals.forEach((signal) => {
           const values = signalsWithMath[signal] ?? [];

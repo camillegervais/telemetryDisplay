@@ -1194,6 +1194,7 @@ body::after {
 .plot-fill {
   width: 100%;
   height: 100%;
+  background: linear-gradient(180deg, rgba(27, 11, 11, 0.82), rgba(33, 14, 14, 0.75));
 }
 
 .plot-fill .js-plotly-plot,
@@ -1201,6 +1202,16 @@ body::after {
 .plot-fill .svg-container {
   width: 100% !important;
   height: 100% !important;
+}
+
+.plot-fill .js-plotly-plot,
+.plot-fill .plot-container,
+.plot-fill .svg-container,
+.plot-fill .main-svg,
+.plot-fill .plotly,
+.plot-fill .plotly .svg-container,
+.plot-fill .plotly .main-svg {
+  background: transparent !important;
 }
 
 .graph-corner-actions {
@@ -1469,6 +1480,18 @@ body::after {
   display: inline-flex;
   align-items: center;
   gap: 0.38rem;
+}
+
+.loading-plot-overlay {
+  inset: 0;
+  right: 0;
+  top: 0;
+  width: 100%;
+  height: 100%;
+  border-radius: 0;
+  justify-content: center;
+  background: linear-gradient(180deg, linear-gradient(180deg, rgba(27, 11, 11, 0.82), rgba(33, 14, 14, 0.75)));
+  z-index: 8;
 }
 
 .loading-inline {
