@@ -49,11 +49,20 @@ def _track_csv_path_from_metadata(source_path: str) -> Optional[Path]:
         return None
 
     candidates: list[tuple[int, Path]] = []
+    generic_tokens = {"data", "track", "pilote", "reference", "midline", "result", "import", "cache"}
+
     for csv_path in csv_files:
         csv_stem = csv_path.stem.lower()
-        tokens = [csv_stem]
+        tokens = {csv_stem}
+
         if csv_stem.endswith("_track"):
-            tokens.append(csv_stem[: -len("_track")])
+            tokens.add(csv_stem[: -len("_track")])
+        if csv_stem.endswith("_data"):
+            tokens.add(csv_stem[: -len("_data")])
+
+        for part in csv_stem.split("_"):
+            if len(part) >= 3 and part not in generic_tokens:
+                tokens.add(part)
 
         best_token_len = max((len(token) for token in tokens if token and token in source_stem), default=0)
         if best_token_len > 0:
