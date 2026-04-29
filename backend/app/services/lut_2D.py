@@ -1,10 +1,9 @@
 import scipy.io
 import numpy as np
 from scipy.interpolate import RegularGridInterpolator
-import matplotlib.pyplot as plt
-from dataclasses import dataclass
+import matplotlib.pyplot as plt 
+import pandas as pd
 
-@dataclass
 class LUT2D:
     """Class storing all th evalues defining a 2D LUT"""
     x_axis_label: str
@@ -12,35 +11,37 @@ class LUT2D:
     x_axis_values: np.ndarray
     y_axis_values: np.ndarray
     lut_values: np.ndarray
+    output_channel: str
 
-    def __init__(self, x_axis_label, y_axis_label, x_axis_values, y_axis_values, lut_values):
+    def __init__(self, x_axis_label, y_axis_label, x_axis_values, y_axis_values, lut_values, output_channel):
         assert x_axis_values.size == lut_values.shape[0], 'Incorrect size for x axis'
         assert y_axis_values.size == lut_values.shape[1], 'Incorrect size for y axis'
         self.x_axis_label = x_axis_label
         self.y_axis_label = y_axis_label
         self.x_axis_values = x_axis_values
         self.y_axis_values = y_axis_values
-        self.lut_values = lut_values 
+        self.lut_values = lut_values
+        self.output_channel = output_channel
 
-def apply2DLUT(dataset: dict, lut_data: LUT2D):
-    """ Apply a 2D LUT on dataset's channels with the 2DLUT defined in lut_data """
+    def apply2DLUT(self, dataset: dict):
+        """ Apply a 2D LUT on dataset's channels with the 2DLUT defined in lut_data """
 
-    # Creating the interpolator
-    lut_function = RegularGridInterpolator(
-        (lut_data.x_axis_values, lut_data.y_axis_values),
-        lut_data.lut_values,
-        method='linear',
-        bounds_error=False,
-        fill_value=None
-    )
+        # Creating the interpolator
+        lut_function = RegularGridInterpolator(
+            (self.x_axis_values, self.y_axis_values),
+            self.lut_values,
+            method='linear',
+            bounds_error=False,
+            fill_value=None
+        )
 
-    # Formating the input points from the dataset
-    input_points = np.column_stack((np.array(dataset[lut_data.x_axis_label]), np.array(dataset[lut_data.y_axis_label])))
+        # Formating the input points from the dataset
+        input_points = np.column_stack((np.array(dataset[self.x_axis_label]), np.array(dataset[self.y_axis_label])))
 
-    # Computing the result channel
-    output_channel = np.array(lut_function(input_points))
+        # Computing the result channel
+        output_channel = np.array(lut_function(input_points))
 
-    return output_channel
+        return output_channel
 
 if __name__ == "__main__":
 
@@ -57,9 +58,9 @@ if __name__ == "__main__":
     lut_values_rTorqueBal = lut_values_rTorqueBal.reshape(-1, lut_values_rTorqueBal.size).repeat(len(lut_x_values_rTorqueBal), 0)
 
     # Creating the 2DLUT object
-    lut_object_rTorqueBal = LUT2D('MBrakeR', 'vCarRef', lut_x_values_rTorqueBal, lut_y_values_rTorqueBal, lut_values_rTorqueBal)
+    lut_object_rTorqueBal = LUT2D('MBrakeR', 'vCarRef', lut_x_values_rTorqueBal, lut_y_values_rTorqueBal, lut_values_rTorqueBal, 'rTorqueBal')
 
-    output_rTorqueBal = apply2DLUT(data, lut_object_rTorqueBal)
+    output_rTorqueBal = lut_object_rTorqueBal.apply2DLUT(data)
 
     plt.plot(np.where(np.array(data['MBrakeR']).flatten() == 0, 0, output_rTorqueBal))
 
@@ -82,10 +83,11 @@ if __name__ == "__main__":
     [0.99,	0.99,	0.99,	0.85,	0.71,	0.56,	0.42,	0.28,	0.14,	0.00,	0.00,	0.00,	0.00,	0.00,	0.00],
     [1.00,	1.00,	1.00,	0.86,	0.71,	0.57,	0.43,	0.29,	0.14,	0.00,	0.00,	0.00,	0.00,	0.00,	0.00,]])
 
-    lut_object_EOB = LUT2D('vCarRef', 'gLat', lut_x_EOB, lut_y_EOB, lut_values_EOB)
+    lut_object_EOB = LUT2D('vCarRef', 'gLat', lut_x_EOB, lut_y_EOB, lut_values_EOB, 'EOB')
 
-    output_EOB = apply2DLUT(data, lut_object_EOB)
+    output_EOB = lut_object_EOB.apply2DLUT(data)
 
     plt.plot(np.where(np.array(data['MBrakeR']).flatten() == 0, 0, output_EOB))
+    plt.plot(np.where(np.array(data['MBrakeR']).flatten() == 0, 0, output_EOB) + np.where(np.array(data['MBrakeR']).flatten() == 0, 0, output_rTorqueBal))
     plt.show()
 

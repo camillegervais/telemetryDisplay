@@ -9,6 +9,8 @@ import pandas as pd
 from fastapi import APIRouter, HTTPException
 
 from app.config import config
+from app.services.lut_2D import LUT2D
+from app.services.mat_loader import MatLoader
 
 router = APIRouter(prefix="/api/map-tuning", tags=["map-tuning"])
 
@@ -37,59 +39,6 @@ class MapTuningRequest:
         self.gridData = np.array(gridData)
         self.rowHeaders = np.array(rowHeaders)
         self.colHeaders = np.array(colHeaders)
-
-
-def interpolate_map_value(
-    grid: np.ndarray,
-    row_headers: np.ndarray,
-    col_headers: np.ndarray,
-    x_val: float,
-    y_val: float,
-) -> float:
-    """
-    Bilinear interpolation on 2D lookup table.
-
-    Args:
-        grid: 2D array of map values
-        row_headers: Y-axis values
-        col_headers: X-axis values
-        x_val: X value to look up
-        y_val: Y value to look up
-
-    Returns:
-        Interpolated value
-    """
-    # Clamp to bounds
-    x_val = np.clip(x_val, col_headers.min(), col_headers.max())
-    y_val = np.clip(y_val, row_headers.min(), row_headers.max())
-
-    # Find bracketing indices
-    x_idx = np.searchsorted(col_headers, x_val)
-    y_idx = np.searchsorted(row_headers, y_val)
-
-    # Clamp to grid bounds
-    x_idx = np.clip(x_idx, 1, len(col_headers) - 1)
-    y_idx = np.clip(y_idx, 1, len(row_headers) - 1)
-
-    # Get the four surrounding points
-    x0, x1 = col_headers[x_idx - 1], col_headers[x_idx]
-    y0, y1 = row_headers[y_idx - 1], row_headers[y_idx]
-
-    f00 = grid[y_idx - 1, x_idx - 1]
-    f10 = grid[y_idx - 1, x_idx]
-    f01 = grid[y_idx, x_idx - 1]
-    f11 = grid[y_idx, x_idx]
-
-    # Bilinear interpolation
-    dx = (x_val - x0) / (x1 - x0) if x1 > x0 else 0
-    dy = (y_val - y0) / (y1 - y0) if y1 > y0 else 0
-
-    f0 = f00 * (1 - dx) + f10 * dx
-    f1 = f01 * (1 - dx) + f11 * dx
-    result = f0 * (1 - dy) + f1 * dy
-
-    return float(result)
-
 
 @router.post("/save")
 async def save_map(
@@ -188,26 +137,29 @@ async def calculate_map_output(
         # 3. For each row: output[i] = interpolate_map_value(grid, y_headers, x_headers, x_data[i], y_data[i])
         # 4. Add as new column to dataset or return as array
 
-        # Mock implementation: simulate interpolation
-        num_samples = 100  # Would be len(df) in real scenario
-        output_values = []
+        # Laod the source dataset
+        mat_loader = MatLoader()
+        dataset = mat_loader.get_dataset(datasetId)
 
-        for i in range(num_samples):
-            # Mock input values (would come from dataset)
-            x_val = req.colHeaders[0] + (req.colHeaders[-1] - req.colHeaders[0]) * (i / num_samples)
-            y_val = req.rowHeaders[0] + (req.rowHeaders[-1] - req.rowHeaders[0]) * (i / num_samples)
+        # Create the 2D LUT objecto to store the 2D LUT characteristics
+        lut_object = LUT2D(
+            inputChannelX,
+            inputChannelY,
+            rowHeaders,
+            colHeaders,
+            gridData,
+            outputChannelName
+        )
 
-            output_val = interpolate_map_value(
-                req.gridData, req.rowHeaders, req.colHeaders, x_val, y_val
-            )
-            output_values.append(output_val)
+        # Compute the output channel
+        output_values = lut_object(dataset)
 
         return {
             "success": True,
             "message": f"Map '{outputChannelName}' calculated successfully",
-            "samplesProcessed": num_samples,
+            "samplesProcessed": output_values.size,
             "outputChannelName": outputChannelName,
-            "outputValues": output_values[:10],  # Return first 10 values as preview
+            "outputValues": output_values,
             "outputStats": {
                 "min": float(np.min(output_values)),
                 "max": float(np.max(output_values)),

@@ -113,6 +113,7 @@ export async function fetchTrackMap(datasetId: string): Promise<TrackMapResponse
 }
 
 export async function saveMapTuning(request: MapTuningSaveRequest): Promise<MapTuningSaveResponse> {
+  console.log(request);
   const response = await fetch(`${API_BASE_URL}/map-tuning/save`, {
     method: "POST",
     headers: {
