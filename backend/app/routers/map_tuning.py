@@ -1,14 +1,10 @@
 """Map tuning and lookup table calculation endpoints."""
 
 from typing import Dict, Optional
-import json
-from pathlib import Path
-
 import numpy as np
-import pandas as pd
 from fastapi import APIRouter, HTTPException
 
-from app.config import config
+from app.schemas import MapTuningRequest, MapTuningSaveResponse, MapTuningCalculateResponse
 from app.services.lut_2D import LUT2D
 from app.services.mat_loader import MatLoader
 
@@ -19,37 +15,8 @@ router = APIRouter(prefix="/api/map-tuning", tags=["map-tuning"])
 map_configs: Dict[str, dict] = {}
 
 
-class MapTuningRequest:
-    """Represent a map tuning request"""
-
-    def __init__(
-        self,
-        datasetId: Optional[str],
-        inputChannelX: str,
-        inputChannelY: str,
-        outputChannelName: str,
-        gridData: list[list[float]],
-        rowHeaders: list[float],
-        colHeaders: list[float],
-    ):
-        self.datasetId = datasetId
-        self.inputChannelX = inputChannelX
-        self.inputChannelY = inputChannelY
-        self.outputChannelName = outputChannelName
-        self.gridData = np.array(gridData)
-        self.rowHeaders = np.array(rowHeaders)
-        self.colHeaders = np.array(colHeaders)
-
-@router.post("/save")
-async def save_map(
-    datasetId: Optional[str] = None,
-    inputChannelX: str = "",
-    inputChannelY: str = "",
-    outputChannelName: str = "",
-    gridData: list[list[float]] = [],
-    rowHeaders: list[float] = [],
-    colHeaders: list[float] = [],
-):
+@router.post("/save", response_model=MapTuningSaveResponse)
+async def save_map(payload: MapTuningRequest):
     """
     Save a map tuning configuration.
 
@@ -57,115 +24,83 @@ async def save_map(
     also persist it to a database or file.
     """
     try:
-        if not outputChannelName:
+        if not payload.outputChannelName:
             raise HTTPException(status_code=400, detail="outputChannelName is required")
 
-        if not gridData or not rowHeaders or not colHeaders:
+        if not payload.gridData or not payload.rowHeaders or not payload.colHeaders:
             raise HTTPException(status_code=400, detail="gridData, rowHeaders, and colHeaders are required")
 
-        config_key = f"{outputChannelName}_{datasetId or 'local'}"
+        config_key = f"{payload.outputChannelName}_{payload.datasetId or 'local'}"
 
         map_configs[config_key] = {
-            "inputChannelX": inputChannelX,
-            "inputChannelY": inputChannelY,
-            "outputChannelName": outputChannelName,
-            "gridData": gridData,
-            "rowHeaders": rowHeaders,
-            "colHeaders": colHeaders,
-            "datasetId": datasetId,
+            "inputChannelX": payload.inputChannelX,
+            "inputChannelY": payload.inputChannelY,
+            "outputChannelName": payload.outputChannelName,
+            "gridData": payload.gridData,
+            "rowHeaders": payload.rowHeaders,
+            "colHeaders": payload.colHeaders,
+            "datasetId": payload.datasetId,
         }
 
         return {
-            "success": True,
-            "message": f"Map '{outputChannelName}' saved successfully",
-            "configKey": config_key,
-            "samplesStored": len(gridData) * len(gridData[0]) if gridData else 0,
+            "message": f"Map '{payload.outputChannelName}' saved successfully",
+            "mapId": config_key
         }
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to save map: {str(e)}")
 
 
-@router.post("/calculate")
-async def calculate_map_output(
-    datasetId: Optional[str] = None,
-    inputChannelX: str = "",
-    inputChannelY: str = "",
-    outputChannelName: str = "",
-    gridData: list[list[float]] = [],
-    rowHeaders: list[float] = [],
-    colHeaders: list[float] = [],
-):
+@router.post("/calculate", response_model=MapTuningCalculateResponse)
+async def calculate_map_output(payload: MapTuningRequest):
     """
     Calculate output channel based on map tuning.
 
-    This endpoint takes the current map configuration and would apply it to
+    This endpoint takes the current map configuration and applies it to
     a dataset, creating a new computed output channel.
-
-    In a full implementation, this would:
-    1. Load the dataset by datasetId
-    2. Extract inputChannelX and inputChannelY columns
-    3. Interpolate through the lookup table for each row
-    4. Return the computed output values
     """
     try:
-        if not datasetId:
+        if not payload.datasetId:
             raise HTTPException(status_code=400, detail="datasetId is required")
 
-        if not gridData or not rowHeaders or not colHeaders:
+        if not payload.gridData or not payload.rowHeaders or not payload.colHeaders:
             raise HTTPException(status_code=400, detail="gridData, rowHeaders, and colHeaders are required")
 
-        if not inputChannelX or not inputChannelY:
+        if not payload.inputChannelX or not payload.inputChannelY:
             raise HTTPException(
                 status_code=400, detail="inputChannelX and inputChannelY are required"
             )
 
-        # Create map objects
-        req = MapTuningRequest(
-            datasetId=datasetId,
-            inputChannelX=inputChannelX,
-            inputChannelY=inputChannelY,
-            outputChannelName=outputChannelName,
-            gridData=gridData,
-            rowHeaders=rowHeaders,
-            colHeaders=colHeaders,
-        )
-
-        # TODO: In full implementation:
-        # 1. mat_loader.get_dataset(datasetId) -> (df, metadata)
-        # 2. Extract x_data = df[inputChannelX], y_data = df[inputChannelY]
-        # 3. For each row: output[i] = interpolate_map_value(grid, y_headers, x_headers, x_data[i], y_data[i])
-        # 4. Add as new column to dataset or return as array
-
-        # Laod the source dataset
+        # Load the source dataset
         mat_loader = MatLoader()
-        dataset = mat_loader.get_dataset(datasetId)
+        dataset_tuple = mat_loader.get_dataset(payload.datasetId)
+        
+        if not dataset_tuple:
+            raise HTTPException(status_code=404, detail="Dataset not found. Ensure it is loaded first.")
+            
+        df_normalized, metadata = dataset_tuple
 
-        # Create the 2D LUT objecto to store the 2D LUT characteristics
+        # Create the 2D LUT object to store the 2D LUT characteristics
         lut_object = LUT2D(
-            inputChannelX,
-            inputChannelY,
-            rowHeaders,
-            colHeaders,
-            gridData,
-            outputChannelName
+            payload.inputChannelX,
+            payload.inputChannelY,
+            payload.rowHeaders,
+            payload.colHeaders,
+            payload.gridData,
+            payload.outputChannelName
         )
 
-        # Compute the output channel
-        output_values = lut_object(dataset)
+        # Compute the output channel (assuming LUT2D is callable on the DataFrame directly)
+        output_values = lut_object(df_normalized)
+        
+        # Ensure output is a numpy array for processing
+        if not isinstance(output_values, np.ndarray):
+            output_values = np.array(output_values)
 
         return {
-            "success": True,
-            "message": f"Map '{outputChannelName}' calculated successfully",
+            "message": f"Map '{payload.outputChannelName}' calculated successfully",
             "samplesProcessed": output_values.size,
-            "outputChannelName": outputChannelName,
-            "outputValues": output_values,
-            "outputStats": {
-                "min": float(np.min(output_values)),
-                "max": float(np.max(output_values)),
-                "mean": float(np.mean(output_values)),
-                "std": float(np.std(output_values)),
-            },
+            "outputSignal": output_values.tolist() # Convert to list for JSON serialization
         }
 
     except Exception as e:

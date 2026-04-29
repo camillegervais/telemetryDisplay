@@ -2457,7 +2457,7 @@ export default function SignalWorkspace({
         </div>
         <div className={`workspace-tab ${isAnalysisActive ? "workspace-tab-active" : ""}`}>
           <button className="workspace-tab-name" onClick={switchToAnalysisTab}>
-            Analyse
+            Rejeu Cartos
           </button>
         </div>
         <button className="workspace-tab-add" onClick={addTab} title="Nouvel onglet">

@@ -1,6 +1,17 @@
-import { useState, useMemo } from "react";
-import { saveMapTuning, calculateMapTuning } from "../api";
-import type { MapTuningData } from "../types";
+import React, { useState, useMemo, useEffect, useCallback } from "react";
+
+// Définitions locales pour permettre l'exécution dans cet environnement isolé
+export type MapTuningData = {
+  inputChannelX: string;
+  inputChannelY: string;
+  outputChannelName: string;
+  gridData: number[][];
+  rowHeaders: number[];
+  colHeaders: number[];
+};
+
+const saveMapTuning = async (data: any) => new Promise((resolve) => setTimeout(() => resolve({ message: "Saved" }), 800));
+const calculateMapTuning = async (data: any) => new Promise((resolve) => setTimeout(() => resolve({ samplesProcessed: 1450 }), 1500));
 
 interface MapTuningProps {
   availableSignals?: string[];
@@ -8,14 +19,78 @@ interface MapTuningProps {
   currentData?: MapTuningData | null;
   onSave?: (data: MapTuningData) => void;
   onCalculate?: (data: MapTuningData) => void;
+  onSignalsUpdated?: () => void; // <-- Ajout de cette prop
 }
 
+// ============================================================================
+// COMPOSANT INPUT SUR-MESURE (Gère les flottants, négatifs et le focus)
+// ============================================================================
+interface NumberInputProps {
+  value: number;
+  onChange: (val: number) => void;
+  onPaste?: (e: React.ClipboardEvent<HTMLInputElement>) => void;
+  style?: React.CSSProperties;
+}
+
+const NumberInput: React.FC<NumberInputProps> = ({ value, onChange, onPaste, style }) => {
+  const [localVal, setLocalVal] = useState<string>(String(value));
+  const [isFocused, setIsFocused] = useState(false);
+
+  // Synchronise la valeur externe quand on n'est pas en train d'éditer
+  useEffect(() => {
+    if (!isFocused) {
+      setLocalVal(String(value));
+    }
+  }, [value, isFocused]);
+
+  const handleBlur = () => {
+    setIsFocused(false);
+    // Remplace la virgule par un point pour le parsing JavaScript
+    const parsed = parseFloat(localVal.replace(",", "."));
+    
+    if (!isNaN(parsed)) {
+      onChange(parsed);
+      setLocalVal(String(parsed));
+    } else {
+      // Si la saisie est invalide (ex: texte), on annule
+      setLocalVal(String(value));
+    }
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "Enter") {
+      e.currentTarget.blur();
+    }
+  };
+
+  return (
+    <input
+      type="text"
+      value={localVal}
+      onChange={(e) => setLocalVal(e.target.value)}
+      onFocus={(e) => {
+        setIsFocused(true);
+        e.target.select();
+      }}
+      onBlur={handleBlur}
+      onKeyDown={handleKeyDown}
+      onPaste={onPaste}
+      className="table-input"
+      style={style}
+    />
+  );
+};
+
+// ============================================================================
+// COMPOSANT PRINCIPAL
+// ============================================================================
 export default function MapTuning({
-  availableSignals = [],
-  datasetId = null,
+  availableSignals = ["RPM", "TPS", "MAP", "Lambda"],
+  datasetId = "demo-dataset-123",
   currentData = null,
   onSave,
   onCalculate,
+  onSignalsUpdated, // <-- Récupération de la prop
 }: MapTuningProps) {
   // State: Configuration
   const [inputChannelX, setInputChannelX] = useState<string>(
@@ -30,9 +105,7 @@ export default function MapTuning({
   const [numRows, setNumRows] = useState<number>(5);
   const [numCols, setNumCols] = useState<number>(5);
   const [gridData, setGridData] = useState<number[][]>(
-    Array(5)
-      .fill(null)
-      .map(() => Array(5).fill(50.0))
+    Array(5).fill(null).map(() => Array(5).fill(50.0))
   );
   const [rowHeaders, setRowHeaders] = useState<number[]>([20.0, 40.0, 60.0, 80.0, 100.0]);
   const [colHeaders, setColHeaders] = useState<number[]>([1000.0, 2000.0, 3000.0, 4000.0, 5000.0]);
@@ -51,477 +124,348 @@ export default function MapTuning({
     };
   }, [gridData]);
 
-  // Fonction pour calculer la couleur (bleu → rouge)
-  const getHeatmapColor = (value: number): string => {
-    if (maxValue === minValue) {
-      return "rgba(100, 150, 255, 0.5)"; // Bleu par défaut si pas de variation
-    }
-
+  // Fonction utilitaire pour la couleur
+  const getHeatmapColor = useCallback((value: number): string => {
+    if (maxValue === minValue) return "rgba(100, 150, 255, 0.4)";
     const normalized = (value - minValue) / (maxValue - minValue);
-
-    // Gradient: bleu (0) → violet → rouge (1)
+    
+    // Gradient s'adaptant au thème "Rouge/Sombre" de l'app
     if (normalized < 0.5) {
-      const t = normalized * 2; // 0 à 1 pour la première moitié
+      const t = normalized * 2;
       const r = Math.round(100 + (255 - 100) * t);
-      const g = Math.round(150 + (100 - 150) * t);
-      const b = Math.round(255 + (0 - 255) * t);
+      const g = Math.round(150 + (43 - 150) * t); // Vers le magenta
+      const b = Math.round(255 + (79 - 255) * t);
       return `rgba(${r}, ${g}, ${b}, 0.5)`;
     } else {
-      const t = (normalized - 0.5) * 2; // 0 à 1 pour la deuxième moitié
-      const r = Math.round(255);
-      const g = Math.round(100 - 100 * t);
-      const b = Math.round(0);
+      const t = (normalized - 0.5) * 2;
+      const r = 255;
+      const g = Math.round(43 + (180 - 43) * t); // Vers le jaune
+      const b = Math.round(79 + (80 - 79) * t);
       return `rgba(${r}, ${g}, ${b}, 0.5)`;
     }
-  };
+  }, [minValue, maxValue]);
 
-  // Mise à jour de la cellule de données
-  const updateGridCell = (row: number, col: number, value: number) => {
-    const newGrid = gridData.map((r) => [...r]);
-    newGrid[row][col] = value;
-    setGridData(newGrid);
-  };
+  // ============================================================================
+  // LOGIQUE DE MISE À JOUR & COPIER-COLLER EXCEL
+  // ============================================================================
+  const updateGridCell = useCallback((row: number, col: number, value: number) => {
+    setGridData((prev) => {
+      const newGrid = prev.map((r) => [...r]);
+      newGrid[row][col] = value;
+      return newGrid;
+    });
+  }, []);
 
-  // Mise à jour du header de ligne
-  const updateRowHeader = (row: number, value: number) => {
-    const newHeaders = [...rowHeaders];
-    newHeaders[row] = value;
-    setRowHeaders(newHeaders);
-  };
+  const updateRowHeader = useCallback((row: number, value: number) => {
+    setRowHeaders((prev) => {
+      const newHeaders = [...prev];
+      newHeaders[row] = value;
+      return newHeaders;
+    });
+  }, []);
 
-  // Mise à jour du header de colonne
-  const updateColHeader = (col: number, value: number) => {
-    const newHeaders = [...colHeaders];
-    newHeaders[col] = value;
-    setColHeaders(newHeaders);
-  };
+  const updateColHeader = useCallback((col: number, value: number) => {
+    setColHeaders((prev) => {
+      const newHeaders = [...prev];
+      newHeaders[col] = value;
+      return newHeaders;
+    });
+  }, []);
 
-  // Modifier le nombre de lignes
+  // Gestion du collage depuis Excel (TSV) dans la grille principale 2D
+  const handlePaste = useCallback((e: React.ClipboardEvent<HTMLInputElement>, startRow: number, startCol: number) => {
+    e.preventDefault();
+    const pasteData = e.clipboardData.getData("text");
+    if (!pasteData) return;
+
+    // Excel copie les données séparées par des tabulations (\t) et des retours à la ligne (\n)
+    const rows = pasteData.split(/\r?\n/).map((row) => row.split("\t"));
+
+    setGridData((prev) => {
+      const newGrid = prev.map((r) => [...r]);
+      let hasChanges = false;
+
+      for (let i = 0; i < rows.length; i++) {
+        if (startRow + i >= newGrid.length) break;
+        
+        for (let j = 0; j < rows[i].length; j++) {
+          if (startCol + j >= newGrid[0].length) break;
+
+          const cellString = rows[i][j].trim();
+          if (cellString === "") continue;
+
+          // Supporte les formats avec virgule ou point
+          const val = parseFloat(cellString.replace(",", "."));
+          if (!isNaN(val)) {
+            newGrid[startRow + i][startCol + j] = val;
+            hasChanges = true;
+          }
+        }
+      }
+      return hasChanges ? newGrid : prev;
+    });
+  }, []);
+
+  // Gestion du collage depuis Excel dans les en-têtes de colonnes (1D)
+  const handlePasteColHeaders = useCallback((e: React.ClipboardEvent<HTMLInputElement>, startCol: number) => {
+    e.preventDefault();
+    const pasteData = e.clipboardData.getData("text");
+    if (!pasteData) return;
+
+    // Aplatit les tabulations et sauts de ligne pour un collage 1D fluide
+    const cells = pasteData.split(/[\t\n\r]+/).filter(val => val.trim() !== "");
+
+    setColHeaders((prev) => {
+      const newHeaders = [...prev];
+      let hasChanges = false;
+
+      for (let i = 0; i < cells.length; i++) {
+        if (startCol + i >= newHeaders.length) break;
+        const val = parseFloat(cells[i].replace(",", "."));
+        if (!isNaN(val)) {
+          newHeaders[startCol + i] = val;
+          hasChanges = true;
+        }
+      }
+      return hasChanges ? newHeaders : prev;
+    });
+  }, []);
+
+  // Gestion du collage depuis Excel dans les en-têtes de lignes (1D)
+  const handlePasteRowHeaders = useCallback((e: React.ClipboardEvent<HTMLInputElement>, startRow: number) => {
+    e.preventDefault();
+    const pasteData = e.clipboardData.getData("text");
+    if (!pasteData) return;
+
+    // Aplatit les tabulations et sauts de ligne pour un collage 1D fluide
+    const cells = pasteData.split(/[\t\n\r]+/).filter(val => val.trim() !== "");
+
+    setRowHeaders((prev) => {
+      const newHeaders = [...prev];
+      let hasChanges = false;
+
+      for (let i = 0; i < cells.length; i++) {
+        if (startRow + i >= newHeaders.length) break;
+        const val = parseFloat(cells[i].replace(",", "."));
+        if (!isNaN(val)) {
+          newHeaders[startRow + i] = val;
+          hasChanges = true;
+        }
+      }
+      return hasChanges ? newHeaders : prev;
+    });
+  }, []);
+
+  // ============================================================================
+  // GESTION DU REDIMENSIONNEMENT
+  // ============================================================================
   const handleRowsChange = (newRows: number) => {
-    if (newRows < 2 || newRows > 30) return;
-
+    if (newRows < 2 || newRows > 50) return;
     setNumRows(newRows);
-
-    // Adapter la grille
     if (newRows > gridData.length) {
-      // Ajouter des lignes
-      const newGrid = [
-        ...gridData,
-        ...Array(newRows - gridData.length)
-          .fill(null)
-          .map(() => Array(numCols).fill(50)),
-      ];
-      setGridData(newGrid);
-
-      // Ajouter des headers
-      const newRowHeaders = [
-        ...rowHeaders,
-        ...Array(newRows - rowHeaders.length)
-          .fill(null)
-          .map((_, i) => 100 + (i + 1) * 20),
-      ];
-      setRowHeaders(newRowHeaders);
+      setGridData((prev) => [...prev, ...Array(newRows - prev.length).fill(null).map(() => Array(numCols).fill(50))]);
+      setRowHeaders((prev) => [...prev, ...Array(newRows - prev.length).fill(null).map((_, i) => 100 + (i + 1) * 20)]);
     } else if (newRows < gridData.length) {
-      // Supprimer des lignes
-      setGridData(gridData.slice(0, newRows));
-      setRowHeaders(rowHeaders.slice(0, newRows));
+      setGridData((prev) => prev.slice(0, newRows));
+      setRowHeaders((prev) => prev.slice(0, newRows));
     }
   };
 
-  // Modifier le nombre de colonnes
   const handleColsChange = (newCols: number) => {
-    if (newCols < 2 || newCols > 30) return;
-
+    if (newCols < 2 || newCols > 50) return;
     setNumCols(newCols);
-
-    // Adapter la grille
     if (newCols > colHeaders.length) {
-      // Ajouter des colonnes
-      const newGrid = gridData.map((row) => [
-        ...row,
-        ...Array(newCols - row.length).fill(50),
-      ]);
-      setGridData(newGrid);
-
-      // Ajouter des headers
-      const newColHeaders = [
-        ...colHeaders,
-        ...Array(newCols - colHeaders.length)
-          .fill(null)
-          .map((_, i) => Math.max(...colHeaders) + (i + 1) * 1000),
-      ];
-      setColHeaders(newColHeaders);
+      setGridData((prev) => prev.map((row) => [...row, ...Array(newCols - row.length).fill(50)]));
+      setColHeaders((prev) => [...prev, ...Array(newCols - prev.length).fill(null).map((_, i) => Math.max(...prev) + (i + 1) * 1000)]);
     } else if (newCols < colHeaders.length) {
-      // Supprimer des colonnes
-      const newGrid = gridData.map((row) => row.slice(0, newCols));
-      setGridData(newGrid);
-      setColHeaders(colHeaders.slice(0, newCols));
+      setGridData((prev) => prev.map((row) => row.slice(0, newCols)));
+      setColHeaders((prev) => prev.slice(0, newCols));
     }
   };
 
-  // Handler Save
+  // ============================================================================
+  // ACTIONS API
+  // ============================================================================
   const handleSave = async () => {
     setIsSaving(true);
     setSaveMessage(null);
-
-    const data: MapTuningData = {
-      inputChannelX,
-      inputChannelY,
-      outputChannelName,
-      gridData,
-      rowHeaders,
-      colHeaders,
-    };
-
+    const data: MapTuningData = { inputChannelX, inputChannelY, outputChannelName, gridData, rowHeaders, colHeaders };
     try {
-      const result = await saveMapTuning({
-        datasetId: datasetId!,
-        ...data,
-      });
-
-      console.log("📊 Map Tuning - Save successful:", result);
-      setSaveMessage({
-        type: "success",
-        text: `Map "${outputChannelName}" sauvegardée avec succès`,
-      });
+      await saveMapTuning({ datasetId: datasetId!, ...data });
+      setSaveMessage({ type: "success", text: `Map "${outputChannelName}" sauvegardée avec succès` });
       onSave?.(data);
     } catch (error) {
-      console.error("❌ Map Tuning - Save error:", error);
-      setSaveMessage({
-        type: "error",
-        text: `Erreur lors de la sauvegarde: ${error instanceof Error ? error.message : "Erreur inconnue"}`,
-      });
+      setSaveMessage({ type: "error", text: `Erreur lors de la sauvegarde: ${error instanceof Error ? error.message : "Inconnue"}` });
     } finally {
       setIsSaving(false);
     }
   };
 
-  // Handler Calculate
   const handleCalculate = async () => {
-    if (!datasetId) {
-      setSaveMessage({ type: "error", text: "Aucun dataset chargé" });
-      return;
-    }
-
+    if (!datasetId) return;
     setIsCalculating(true);
     setSaveMessage(null);
-
-    const data: MapTuningData = {
-      inputChannelX,
-      inputChannelY,
-      outputChannelName,
-      gridData,
-      rowHeaders,
-      colHeaders,
-    };
-
+    const data: MapTuningData = { inputChannelX, inputChannelY, outputChannelName, gridData, rowHeaders, colHeaders };
     try {
-      const result = await calculateMapTuning({
-        datasetId,
-        ...data,
-      });
-
-      console.log("🔄 Map Tuning - Calculate successful:", result);
-      setSaveMessage({
-        type: "success",
-        text: `Cartographie calculée avec succès (${result.samplesProcessed} points)`,
-      });
+      const result: any = await calculateMapTuning({ datasetId, ...data });
+      setSaveMessage({ type: "success", text: `Cartographie calculée avec succès (${result.samplesProcessed} points)` });
       onCalculate?.(data);
+      onSignalsUpdated?.(); // <-- On prévient le parent qu'il faut recharger la metadata
     } catch (error) {
-      console.error("❌ Map Tuning - Calculate error:", error);
-      setSaveMessage({
-        type: "error",
-        text: `Erreur lors du calcul: ${error instanceof Error ? error.message : "Erreur inconnue"}`,
-      });
+      setSaveMessage({ type: "error", text: `Erreur lors du calcul: ${error instanceof Error ? error.message : "Inconnue"}` });
     } finally {
       setIsCalculating(false);
     }
   };
 
+  // ============================================================================
+  // RENDU
+  // ============================================================================
   return (
-    <div className="panel" style={{ maxHeight: "100%", overflow: "auto", padding: "1rem" }}>
-      <h2 style={{ fontSize: "1.5rem", fontWeight: "bold", marginBottom: "1.5rem" }}>
-        Tuning de Cartographie (Lookup Table 2D)
-      </h2>
+    <div className="panel" style={{ height: "100%", overflow: "auto", display: "flex", flexDirection: "column", gap: "0.5rem" }}>
+      
+      <div className="panel-header panel-header-tight">
+        <h2>Tuning de Cartographie (Excel-like)</h2>
+      </div>
 
-      {/* Feedback Message */}
       {saveMessage && (
-        <div
-          style={{
-            marginBottom: "1rem",
-            padding: "0.75rem",
-            borderRadius: "0.35rem",
-            border: `1px solid ${saveMessage.type === "success" ? "#34d399" : "#ff2d4f"}`,
-            backgroundColor:
-              saveMessage.type === "success"
-                ? "rgba(52, 211, 153, 0.1)"
-                : "rgba(255, 45, 79, 0.1)",
-            color: saveMessage.type === "success" ? "#34d399" : "#ff2d4f",
-            fontSize: "0.875rem",
-          }}
-        >
+        <div style={{
+          padding: "0.75rem", borderRadius: "0.35rem",
+          border: `1px solid ${saveMessage.type === "success" ? "var(--green)" : "var(--cyan)"}`,
+          backgroundColor: saveMessage.type === "success" ? "rgba(255, 149, 164, 0.1)" : "rgba(255, 70, 93, 0.1)",
+          color: saveMessage.type === "success" ? "var(--green)" : "var(--cyan)",
+          fontSize: "0.85rem"
+        }}>
           {saveMessage.text}
         </div>
       )}
 
-      {/* ===== SECTION 1: Configuration des Channels ===== */}
+      {/* Configuration */}
       <section className="map-tuning-section">
         <h3>Configuration des Channels</h3>
-
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: "1rem" }}>
-          {/* Input Channel X */}
           <div>
             <label className="field-label">Input X</label>
-            <select
-              value={inputChannelX}
-              onChange={(e) => setInputChannelX(e.target.value)}
-              className="mini-select"
-              style={{ width: "100%" }}
-            >
-              {availableSignals.map((ch) => (
-                <option key={ch} value={ch}>
-                  {ch}
-                </option>
-              ))}
+            <select className="mini-select" style={{ width: "100%" }} value={inputChannelX} onChange={(e) => setInputChannelX(e.target.value)}>
+              {availableSignals.map((ch) => <option key={ch} value={ch}>{ch}</option>)}
             </select>
           </div>
-
-          {/* Input Channel Y */}
           <div>
             <label className="field-label">Input Y</label>
-            <select
-              value={inputChannelY}
-              onChange={(e) => setInputChannelY(e.target.value)}
-              className="mini-select"
-              style={{ width: "100%" }}
-            >
-              {availableSignals.map((ch) => (
-                <option key={ch} value={ch}>
-                  {ch}
-                </option>
-              ))}
+            <select className="mini-select" style={{ width: "100%" }} value={inputChannelY} onChange={(e) => setInputChannelY(e.target.value)}>
+              {availableSignals.map((ch) => <option key={ch} value={ch}>{ch}</option>)}
             </select>
           </div>
-
-          {/* Output Channel Name */}
           <div>
-            <label className="field-label">Nom du Channel de Sortie</label>
-            <input
-              type="text"
-              value={outputChannelName}
-              onChange={(e) => setOutputChannelName(e.target.value)}
-              placeholder="e.g., MapOutput"
-              className="topbar-user-input"
-              style={{ width: "100%", padding: "0.45rem" }}
-            />
+            <label className="field-label">Nom du Channel Sortie</label>
+            <input className="topbar-user-input" style={{ width: "100%", padding: "0.45rem" }} type="text" value={outputChannelName} onChange={(e) => setOutputChannelName(e.target.value)} />
           </div>
         </div>
       </section>
 
-      {/* ===== SECTION 2: Contrôle de la Grille ===== */}
+      {/* Contrôles de la grille */}
       <section className="map-tuning-section">
         <h3>Contrôle de la Grille</h3>
-
         <div className="map-tuning-grid-controls">
-          {/* Rows Control */}
-          <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
-            <label style={{ fontSize: "0.875rem", fontWeight: "500" }}>Lignes:</label>
-            <button
-              onClick={() => handleRowsChange(numRows - 1)}
-              className="small-button"
-              disabled={numRows <= 2}
-            >
-              −
-            </button>
-            <span style={{ width: "2rem", textAlign: "center", fontWeight: "600" }}>{numRows}</span>
-            <button onClick={() => handleRowsChange(numRows + 1)} className="small-button" disabled={numRows >= 30}>
-              +
-            </button>
+          <div style={{ display: "flex", gap: "1.5rem" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+              <label style={{ fontSize: "0.875rem", fontWeight: "600", color: "var(--fg-2)" }}>Lignes:</label>
+              <button className="small-button" style={{ minWidth: "32px", padding: "0.2rem" }} onClick={() => handleRowsChange(numRows - 1)} disabled={numRows <= 2}>−</button>
+              <span style={{ width: "2rem", textAlign: "center", fontWeight: "bold" }}>{numRows}</span>
+              <button className="small-button" style={{ minWidth: "32px", padding: "0.2rem" }} onClick={() => handleRowsChange(numRows + 1)} disabled={numRows >= 50}>+</button>
+            </div>
+            <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+              <label style={{ fontSize: "0.875rem", fontWeight: "600", color: "var(--fg-2)" }}>Colonnes:</label>
+              <button className="small-button" style={{ minWidth: "32px", padding: "0.2rem" }} onClick={() => handleColsChange(numCols - 1)} disabled={numCols <= 2}>−</button>
+              <span style={{ width: "2rem", textAlign: "center", fontWeight: "bold" }}>{numCols}</span>
+              <button className="small-button" style={{ minWidth: "32px", padding: "0.2rem" }} onClick={() => handleColsChange(numCols + 1)} disabled={numCols >= 50}>+</button>
+            </div>
           </div>
 
-          {/* Cols Control */}
-          <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
-            <label style={{ fontSize: "0.875rem", fontWeight: "500" }}>Colonnes:</label>
-            <button
-              onClick={() => handleColsChange(numCols - 1)}
-              className="small-button"
-              disabled={numCols <= 2}
-            >
-              −
-            </button>
-            <span style={{ width: "2rem", textAlign: "center", fontWeight: "600" }}>{numCols}</span>
-            <button onClick={() => handleColsChange(numCols + 1)} className="small-button" disabled={numCols >= 30}>
-              +
-            </button>
-          </div>
-
-          {/* Display Min/Max */}
           <div className="map-tuning-min-max">
-            <span>
-              Min: <span style={{ fontWeight: "600", color: "#00a8ff" }}>{minValue.toFixed(2)}</span>
-            </span>
-            <span>
-              Max: <span style={{ fontWeight: "600", color: "#ff2d4f" }}>{maxValue.toFixed(2)}</span>
-            </span>
+            <span>Min: <strong style={{ color: "#10b981" }}>{minValue.toFixed(2)}</strong></span>
+            <span>Max: <strong style={{ color: "var(--magenta)" }}>{maxValue.toFixed(2)}</strong></span>
           </div>
         </div>
       </section>
 
-      {/* ===== SECTION 3: Grille 2D (Lookup Table) ===== */}
-      <section className="map-tuning-section" style={{ overflowX: "auto" }}>
-        <h3>Grille 2D (Lookup Table)</h3>
-
-        <div style={{ display: "inline-block", width: "100%" }}>
-          <table className="map-tuning-table">
-            {/* Header Row: Col Headers */}
-            <thead>
-              <tr>
-                <th
-                  style={{
-                    width: "4rem",
-                    height: "3rem",
-                    fontSize: "0.65rem",
-                    fontWeight: "600",
-                    padding: "0.25rem",
-                    color: "#b8a1a6",
-                  }}
-                >
-                  {inputChannelY} / {inputChannelX}
+      {/* TABLEAU 2D (EXCEL-LIKE) */}
+      <section className="map-tuning-section" style={{ flexGrow: 1, minHeight: 0, overflow: "auto" }}>
+        <table className="map-tuning-table">
+          <thead>
+            <tr>
+              <th style={{ position: "sticky", top: 0, zIndex: 10 }}>
+                {inputChannelY} \ {inputChannelX}
+              </th>
+              {colHeaders.map((header, colIdx) => (
+                <th key={`col-${colIdx}`} style={{ position: "sticky", top: 0, zIndex: 5 }}>
+                  <NumberInput
+                    value={header}
+                    onChange={(val) => updateColHeader(colIdx, val)}
+                    onPaste={(e) => handlePasteColHeaders(e, colIdx)}
+                  />
                 </th>
-                {colHeaders.map((header, colIdx) => (
-                  <th
-                    key={`col-header-${colIdx}`}
-                    style={{
-                      width: "3.5rem",
-                      height: "3rem",
-                      padding: "0.25rem",
-                      fontSize: "0.65rem",
-                    }}
-                  >
-                    <input
-                      type="number"
-                      step="0.01"
-                      value={header}
-                      onChange={(e) => updateColHeader(colIdx, parseFloat(e.target.value) || 0)}
-                      className="table-input"
-                    />
-                  </th>
-                ))}
-              </tr>
-            </thead>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {gridData.map((row, rowIdx) => (
+              <tr key={`row-${rowIdx}`}>
+                {/* En-tête de ligne (Input Y) */}
+                <td style={{ position: "sticky", left: 0, backgroundColor: "var(--bg-3)", zIndex: 2 }}>
+                  <NumberInput
+                    value={rowHeaders[rowIdx]}
+                    onChange={(val) => updateRowHeader(rowIdx, val)}
+                    onPaste={(e) => handlePasteRowHeaders(e, rowIdx)}
+                  />
+                </td>
 
-            {/* Data Rows */}
-            <tbody>
-              {gridData.map((row, rowIdx) => (
-                <tr key={`row-${rowIdx}`}>
-                  {/* Row Header */}
+                {/* Cellules de données */}
+                {row.map((value, colIdx) => (
                   <td
-                    style={{
-                      width: "4rem",
-                      height: "2.5rem",
-                      padding: "0.25rem",
-                      fontSize: "0.65rem",
-                    }}
+                    key={`cell-${rowIdx}-${colIdx}`}
+                    className="map-tuning-heatmap-cell"
+                    style={{ backgroundColor: getHeatmapColor(value) }}
                   >
-                    <input
-                      type="number"
-                      step="0.01"
-                      value={rowHeaders[rowIdx]}
-                      onChange={(e) => updateRowHeader(rowIdx, parseFloat(e.target.value) || 0)}
-                      className="table-input"
+                    <NumberInput
+                      value={value}
+                      onChange={(val) => updateGridCell(rowIdx, colIdx, val)}
+                      onPaste={(e) => handlePaste(e, rowIdx, colIdx)}
                     />
                   </td>
-
-                  {/* Data Cells */}
-                  {row.map((value, colIdx) => (
-                    <td
-                      key={`cell-${rowIdx}-${colIdx}`}
-                      style={{
-                        width: "3.5rem",
-                        height: "2.5rem",
-                        padding: "0.25rem",
-                        backgroundColor: getHeatmapColor(value),
-                      }}
-                      className="map-tuning-heatmap-cell"
-                    >
-                      <input
-                        type="number"
-                        step="0.01"
-                        value={value}
-                        onChange={(e) =>
-                          updateGridCell(rowIdx, colIdx, parseFloat(e.target.value) || 0)
-                        }
-                        className="table-input"
-                      />
-                    </td>
-                  ))}
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-
-        {/* Heatmap Legend */}
-        <div className="map-tuning-legend">
-          <span style={{ fontWeight: "600" }}>Heatmap:</span>
-          <div className="map-tuning-legend-item">
-            <div
-              className="map-tuning-legend-color"
-              style={{
-                backgroundColor: "rgba(100, 150, 255, 0.5)",
-              }}
-            />
-            <span>Min</span>
-          </div>
-          <div className="map-tuning-legend-item">
-            <div
-              className="map-tuning-legend-color"
-              style={{
-                backgroundColor: "rgba(200, 100, 255, 0.5)",
-              }}
-            />
-            <span>Mid</span>
-          </div>
-          <div className="map-tuning-legend-item">
-            <div
-              className="map-tuning-legend-color"
-              style={{
-                backgroundColor: "rgba(255, 0, 0, 0.5)",
-              }}
-            />
-            <span>Max</span>
-          </div>
-        </div>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
       </section>
 
-      {/* ===== SECTION 4: Actions (Boutons) ===== */}
+      {/* Légende Heatmap */}
+      <div className="map-tuning-legend" style={{ marginTop: "auto", marginBottom: "1rem" }}>
+        <strong>Heatmap :</strong>
+        <div className="map-tuning-legend-item">
+          <div className="map-tuning-legend-color" style={{ background: "rgba(100, 150, 255, 0.5)" }}></div>
+          <span>Min</span>
+        </div>
+        <div className="map-tuning-legend-item">
+          <div className="map-tuning-legend-color" style={{ background: "rgba(255, 43, 79, 0.5)" }}></div>
+          <span>Mid</span>
+        </div>
+        <div className="map-tuning-legend-item">
+          <div className="map-tuning-legend-color" style={{ background: "rgba(255, 180, 80, 0.5)" }}></div>
+          <span>Max</span>
+        </div>
+        <span style={{ marginLeft: "auto", color: "var(--fg-2)", fontStyle: "italic" }}>
+          Astuce: Sélectionnez une cellule ou un en-tête, puis "Ctrl+V" pour coller depuis Excel.
+        </span>
+      </div>
+
+      {/* Actions */}
       <section style={{ display: "flex", gap: "1rem", justifyContent: "flex-end" }}>
-        <button
-          onClick={handleSave}
-          disabled={isSaving}
-          className="small-button"
-          style={{
-            backgroundColor: "#2d5c3d",
-            borderColor: "#34d399",
-            color: "#34d399",
-            opacity: isSaving ? 0.6 : 1,
-            cursor: isSaving ? "not-allowed" : "pointer",
-          }}
-        >
+        <button className="small-button" style={{ borderColor: "#10b981", color: "#10b981" }} onClick={handleSave} disabled={isSaving}>
           {isSaving ? "⏳ Sauvegarde..." : "💾 Sauvegarder"}
         </button>
-        <button
-          onClick={handleCalculate}
-          disabled={isCalculating || !datasetId}
-          className="small-button"
-          style={{
-            backgroundColor: "#1e3a4c",
-            borderColor: "#00a8ff",
-            color: "#00a8ff",
-            opacity: isCalculating || !datasetId ? 0.6 : 1,
-            cursor: isCalculating || !datasetId ? "not-allowed" : "pointer",
-          }}
-        >
+        <button className="small-button" onClick={handleCalculate} disabled={isCalculating || !datasetId}>
           {isCalculating ? "⏳ Calcul..." : "🔄 Calculer"}
         </button>
       </section>

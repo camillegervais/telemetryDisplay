@@ -1,4 +1,4 @@
-from typing import Literal, Optional
+from typing import Literal, Optional, List, Dict
 
 from pydantic import BaseModel, Field
 
@@ -38,7 +38,7 @@ class DatasetQueryRequest(BaseModel):
     start_distance: float = Field(
         default=0.0, description="Start distance in meters"
     )
-    end_distance: float = Field(
+    end_distance: Optional[float] = Field(
         default=None, description="End distance in meters (optional, uses max if None)"
     )
     max_points: int = Field(
@@ -68,3 +68,25 @@ class DatasetImportResponse(BaseModel):
 
 class DatasetImportFromPathRequest(BaseModel):
     mat_path: str = Field(..., min_length=1, description="Absolute or server-local path to a .mat file")
+
+
+# === Map Tuning ===
+class MapTuningRequest(BaseModel):
+    datasetId: str
+    inputChannelX: str
+    inputChannelY: str
+    outputChannelName: str
+    gridData: List[List[float]]
+    rowHeaders: List[float]
+    colHeaders: List[float]
+
+
+class MapTuningSaveResponse(BaseModel):
+    message: str
+    mapId: str
+
+
+class MapTuningCalculateResponse(BaseModel):
+    message: str
+    samplesProcessed: int
+    outputSignal: List[float]
