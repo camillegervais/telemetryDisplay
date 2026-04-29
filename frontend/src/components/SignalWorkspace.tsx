@@ -123,6 +123,7 @@ const WORKSPACE_CONFIGS_KEY = "telemetry-display.workspace-configs.v1";
 const WORKSPACE_SESSION_KEY = "telemetry-display.workspace-session.v1";
 const SIGNAL_DRAG_MIME = "application/x-telemetry-signal";
 const TRAJECTORY_TAB_ID = "tab-trajectory";
+const ANALYSIS_TAB_ID = "tab-analysis";
 const TRAJECTORY_SIGNALS = ["xCar", "yCar", "xRef", "yRef", "xTrack", "yTrack"] as const;
 
 function isEditableElement(target: EventTarget | null): boolean {
@@ -832,6 +833,7 @@ export default function SignalWorkspace({
   }, [availableSignals, focusSignalFilter]);
   const canQuery = datasetId !== null && datasetMetadata !== null;
   const isTrajectoryActive = activeTabId === TRAJECTORY_TAB_ID;
+  const isAnalysisActive = activeTabId === ANALYSIS_TAB_ID;
   const selectedWidgetId = inspectorSelectedWidgetId ?? localSelectedWidgetId;
 
   function updateSelectedWidgetId(next: number | null) {
@@ -1651,6 +1653,29 @@ export default function SignalWorkspace({
     setSignalDropCell(null);
   }
 
+  function switchToAnalysisTab() {
+    if (isAnalysisActive) {
+      return;
+    }
+
+    setTabs((prev) =>
+      prev.map((tab) =>
+        tab.id === activeTabId
+          ? {
+              ...tab,
+              widgets: closeAllWidgetMenus(tab.widgets),
+            }
+          : tab
+      )
+    );
+    setWidgets((prev) => closeAllWidgetMenus(prev));
+    setActiveTabId(ANALYSIS_TAB_ID);
+    setExpandedWidgetId(null);
+    updateSelectedWidgetId(null);
+    setDragFromId(null);
+    setSignalDropCell(null);
+  }
+
   function addTab() {
     const newTab = createEmptyTab(`Onglet ${tabs.length + 1}`);
     setTabs((prev) => [...prev, newTab]);
@@ -2422,6 +2447,11 @@ export default function SignalWorkspace({
             Trajectoire
           </button>
         </div>
+        <div className={`workspace-tab ${isAnalysisActive ? "workspace-tab-active" : ""}`}>
+          <button className="workspace-tab-name" onClick={switchToAnalysisTab}>
+            Analyse
+          </button>
+        </div>
         <button className="workspace-tab-add" onClick={addTab} title="Nouvel onglet">
           + Onglet
         </button>
@@ -2454,6 +2484,15 @@ export default function SignalWorkspace({
                 />
               </div>
             ) : null}
+          </article>
+        </div>
+      ) : isAnalysisActive ? (
+        <div className="graph-grid" style={{ gridTemplateColumns: "1fr", gridTemplateRows: "1fr" }}>
+          <article className="graph-tile" style={{ gridColumn: "1 / span 1", gridRow: "1 / span 1" }}>
+            <div className="placeholder-graph" aria-label="Onglet Analyse">
+              <div className="placeholder-graph-text">Onglet Analyse</div>
+              <div className="placeholder-graph-help">À remplir</div>
+            </div>
           </article>
         </div>
       ) : isTabSwitching ? (
