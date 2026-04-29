@@ -6,6 +6,7 @@ import { queryDataset } from "../api";
 import { evaluateMathChannel } from "../mathChannels";
 import { useTelemetryStore } from "../store/telemetryStore";
 import type { DatasetMetadata, DistanceRange, MathChannel, SignalSeries, TrackMapResponse } from "../types";
+import MapTuning from "./MapTuning";
 
 type SignalWorkspaceProps = {
   datasetId: string | null;
@@ -2112,7 +2113,7 @@ export default function SignalWorkspace({
 
       if (hasPrimaryModifier && event.code === "Tab") {
         event.preventDefault();
-        const sequence = [...tabs.map((tab) => tab.id), TRAJECTORY_TAB_ID];
+        const sequence = [...tabs.map((tab) => tab.id), TRAJECTORY_TAB_ID, ANALYSIS_TAB_ID];
         const currentIndex = sequence.indexOf(activeTabId);
         const direction = event.shiftKey ? -1 : 1;
         const nextIndex =
@@ -2122,6 +2123,8 @@ export default function SignalWorkspace({
         const nextTabId = sequence[nextIndex];
         if (nextTabId === TRAJECTORY_TAB_ID) {
           switchToTrajectoryTab();
+        } else if (nextTabId === ANALYSIS_TAB_ID) {
+          switchToAnalysisTab();
         } else {
           switchToTab(nextTabId);
         }
@@ -2259,6 +2262,7 @@ export default function SignalWorkspace({
     gridCols,
     gridRows,
     isTrajectoryActive,
+    isAnalysisActive,
     selectedConfigId,
     selectedWidgetId,
     tabs,
@@ -2487,13 +2491,13 @@ export default function SignalWorkspace({
           </article>
         </div>
       ) : isAnalysisActive ? (
-        <div className="graph-grid" style={{ gridTemplateColumns: "1fr", gridTemplateRows: "1fr" }}>
-          <article className="graph-tile" style={{ gridColumn: "1 / span 1", gridRow: "1 / span 1" }}>
-            <div className="placeholder-graph" aria-label="Onglet Analyse">
-              <div className="placeholder-graph-text">Onglet Analyse</div>
-              <div className="placeholder-graph-help">À remplir</div>
-            </div>
-          </article>
+        <div className="w-full h-full overflow-auto">
+          <MapTuning
+            availableSignals={availableSignals}
+            datasetId={datasetId}
+            onSave={(data) => console.log("Map saved:", data)}
+            onCalculate={(data) => console.log("Map calculated:", data)}
+          />
         </div>
       ) : isTabSwitching ? (
         <div className="graph-grid" style={gridStyle}>
