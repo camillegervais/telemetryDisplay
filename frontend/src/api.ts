@@ -4,6 +4,10 @@ import type {
   DatasetMetadata,
   DatasetQueryResponse,
   TrackMapResponse,
+  MapTuningSaveRequest,
+  MapTuningSaveResponse,
+  MapTuningCalculateRequest,
+  MapTuningCalculateResponse,
 } from "./types";
 
 const API_BASE_URL = "http://localhost:8001/api";
@@ -106,4 +110,38 @@ export async function fetchTrackMap(datasetId: string): Promise<TrackMapResponse
   }
 
   return (await response.json()) as TrackMapResponse;
+}
+
+export async function saveMapTuning(request: MapTuningSaveRequest): Promise<MapTuningSaveResponse> {
+  const response = await fetch(`${API_BASE_URL}/map-tuning/save`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(request),
+  });
+
+  if (!response.ok) {
+    const payload = await response.json().catch(() => ({ detail: "Save failed" }));
+    throw new Error(payload.detail ?? "Save failed");
+  }
+
+  return (await response.json()) as MapTuningSaveResponse;
+}
+
+export async function calculateMapTuning(request: MapTuningCalculateRequest): Promise<MapTuningCalculateResponse> {
+  const response = await fetch(`${API_BASE_URL}/map-tuning/calculate`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(request),
+  });
+
+  if (!response.ok) {
+    const payload = await response.json().catch(() => ({ detail: "Calculate failed" }));
+    throw new Error(payload.detail ?? "Calculate failed");
+  }
+
+  return (await response.json()) as MapTuningCalculateResponse;
 }

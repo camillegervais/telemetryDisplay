@@ -1701,3 +1701,97 @@ body::after {
     grid-template-columns: 1fr;
   }
 }
+
+/* MapTuning Component Styles */
+.map-tuning-table {
+  border-collapse: collapse;
+  border: 1px solid var(--line);
+  background: linear-gradient(160deg, rgba(22, 8, 12, 0.95), rgba(15, 6, 9, 0.86));
+  width: 100%;
+}
+
+.map-tuning-table th,
+.map-tuning-table td {
+  border: 1px solid var(--line);
+  padding: 0.25rem;
+  font-size: 0.65rem;
+}
+
+.map-tuning-table th {
+  background-color: rgba(20, 6, 7, 0.8);
+  font-weight: 600;
+  color: var(--fg-2);
+}
+
+.map-tuning-table .table-input {
+  width: 100%;
+  height: 2rem;
+  background-color: rgba(77, 27, 36, 0.6);
+  border: 1px solid var(--line);
+  border-radius: 0.2rem;
+  color: var(--fg-1);
+  text-align: center;
+  font-size: 0.65rem;
+  padding: 0.2rem;
+  transition: border-color 0.2s ease;
+}
+
+.map-tuning-table .table-input:focus {
+  outline: none;
+  border-color: rgba(255, 122, 145, 0.88);
+  box-shadow: 0 0 0 1px rgba(255, 70, 93, 0.24);
+}
+
+.map-tuning-heatmap-cell {
+  background-color: rgba(30, 10, 14, 0.7);
+  transition: background-color 0.2s ease;
+}
+
+.map-tuning-section {
+  margin-bottom: 1.5rem;
+}
+
+.map-tuning-section h3 {
+  font-size: 1rem;
+  font-weight: 600;
+  margin-bottom: 1rem;
+  color: var(--fg-1);
+}
+
+.map-tuning-grid-controls {
+  display: flex;
+  gap: 2rem;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.map-tuning-min-max {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  font-size: 0.875rem;
+  color: var(--fg-2);
+}
+
+.map-tuning-legend {
+  margin-top: 1rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.75rem;
+  color: var(--fg-2);
+}
+
+.map-tuning-legend-item {
+  display: flex;
+  gap: 0.25rem;
+  align-items: center;
+}
+
+.map-tuning-legend-color {
+  width: 1.5rem;
+  height: 1rem;
+  border-radius: 0.2rem;
+  border: 1px solid var(--line);
+}

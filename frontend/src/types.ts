@@ -54,3 +54,31 @@ export type MathChannel = {
   expression: string;
   dependencies: string[];
 };
+
+export type MapTuningData = {
+  inputChannelX: string;
+  inputChannelY: string;
+  outputChannelName: string;
+  gridData: number[][];
+  rowHeaders: number[];
+  colHeaders: number[];
+};
+
+export type MapTuningSaveRequest = {
+  datasetId: string;
+} & MapTuningData;
+
+export type MapTuningSaveResponse = {
+  message: string;
+  mapId: string;
+};
+
+export type MapTuningCalculateRequest = {
+  datasetId: string;
+} & MapTuningData;
+
+export type MapTuningCalculateResponse = {
+  message: string;
+  samplesProcessed: number;
+  outputSignal: number[];
+};

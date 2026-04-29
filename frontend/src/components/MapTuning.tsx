@@ -1,29 +1,19 @@
 import { useState, useMemo } from "react";
+import { saveMapTuning, calculateMapTuning } from "../api";
+import type { MapTuningData } from "../types";
 
 interface MapTuningProps {
   availableSignals?: string[];
   datasetId?: string | null;
-  onSave?: (data: {
-    inputChannelX: string;
-    inputChannelY: string;
-    outputChannelName: string;
-    gridData: number[][];
-    rowHeaders: number[];
-    colHeaders: number[];
-  }) => void;
-  onCalculate?: (data: {
-    inputChannelX: string;
-    inputChannelY: string;
-    outputChannelName: string;
-    gridData: number[][];
-    rowHeaders: number[];
-    colHeaders: number[];
-  }) => void;
+  currentData?: MapTuningData | null;
+  onSave?: (data: MapTuningData) => void;
+  onCalculate?: (data: MapTuningData) => void;
 }
 
 export default function MapTuning({
   availableSignals = [],
   datasetId = null,
+  currentData = null,
   onSave,
   onCalculate,
 }: MapTuningProps) {
@@ -108,7 +98,7 @@ export default function MapTuning({
 
   // Modifier le nombre de lignes
   const handleRowsChange = (newRows: number) => {
-    if (newRows < 2 || newRows > 10) return;
+    if (newRows < 2 || newRows > 30) return;
 
     setNumRows(newRows);
 
@@ -140,7 +130,7 @@ export default function MapTuning({
 
   // Modifier le nombre de colonnes
   const handleColsChange = (newCols: number) => {
-    if (newCols < 2 || newCols > 10) return;
+    if (newCols < 2 || newCols > 30) return;
 
     setNumCols(newCols);
 
@@ -174,7 +164,7 @@ export default function MapTuning({
     setIsSaving(true);
     setSaveMessage(null);
 
-    const data = {
+    const data: MapTuningData = {
       inputChannelX,
       inputChannelY,
       outputChannelName,
@@ -184,23 +174,11 @@ export default function MapTuning({
     };
 
     try {
-      // Appel API pour sauvegarder la cartographie
-      const response = await fetch("/api/map-tuning/save", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          datasetId,
-          ...data,
-        }),
+      const result = await saveMapTuning({
+        datasetId: datasetId!,
+        ...data,
       });
 
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}`);
-      }
-
-      const result = await response.json();
       console.log("📊 Map Tuning - Save successful:", result);
       setSaveMessage({
         type: "success",
@@ -228,7 +206,7 @@ export default function MapTuning({
     setIsCalculating(true);
     setSaveMessage(null);
 
-    const data = {
+    const data: MapTuningData = {
       inputChannelX,
       inputChannelY,
       outputChannelName,
@@ -238,27 +216,15 @@ export default function MapTuning({
     };
 
     try {
-      // Appel API pour calculer la sortie
-      const response = await fetch("/api/map-tuning/calculate", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          datasetId,
-          ...data,
-        }),
+      const result = await calculateMapTuning({
+        datasetId,
+        ...data,
       });
 
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}`);
-      }
-
-      const result = await response.json();
       console.log("🔄 Map Tuning - Calculate successful:", result);
       setSaveMessage({
         type: "success",
-        text: `Cartographie calculée avec succès (${result.samplesProcessed || 0} points)`,
+        text: `Cartographie calculée avec succès (${result.samplesProcessed} points)`,
       });
       onCalculate?.(data);
     } catch (error) {
@@ -299,10 +265,8 @@ export default function MapTuning({
       )}
 
       {/* ===== SECTION 1: Configuration des Channels ===== */}
-      <section className="meta-grid" style={{ marginBottom: "1.5rem" }}>
-        <h3 style={{ fontSize: "1rem", fontWeight: "600", marginBottom: "1rem" }}>
-          Configuration des Channels
-        </h3>
+      <section className="map-tuning-section">
+        <h3>Configuration des Channels</h3>
 
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: "1rem" }}>
           {/* Input Channel X */}
@@ -355,10 +319,10 @@ export default function MapTuning({
       </section>
 
       {/* ===== SECTION 2: Contrôle de la Grille ===== */}
-      <section style={{ marginBottom: "1.5rem" }}>
-        <h3 style={{ fontSize: "1rem", fontWeight: "600", marginBottom: "1rem" }}>Contrôle de la Grille</h3>
+      <section className="map-tuning-section">
+        <h3>Contrôle de la Grille</h3>
 
-        <div style={{ display: "flex", gap: "2rem", flexWrap: "wrap", alignItems: "center" }}>
+        <div className="map-tuning-grid-controls">
           {/* Rows Control */}
           <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
             <label style={{ fontSize: "0.875rem", fontWeight: "500" }}>Lignes:</label>
@@ -370,7 +334,7 @@ export default function MapTuning({
               −
             </button>
             <span style={{ width: "2rem", textAlign: "center", fontWeight: "600" }}>{numRows}</span>
-            <button onClick={() => handleRowsChange(numRows + 1)} className="small-button" disabled={numRows >= 10}>
+            <button onClick={() => handleRowsChange(numRows + 1)} className="small-button" disabled={numRows >= 30}>
               +
             </button>
           </div>
@@ -386,13 +350,13 @@ export default function MapTuning({
               −
             </button>
             <span style={{ width: "2rem", textAlign: "center", fontWeight: "600" }}>{numCols}</span>
-            <button onClick={() => handleColsChange(numCols + 1)} className="small-button" disabled={numCols >= 10}>
+            <button onClick={() => handleColsChange(numCols + 1)} className="small-button" disabled={numCols >= 30}>
               +
             </button>
           </div>
 
           {/* Display Min/Max */}
-          <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: "1rem", fontSize: "0.875rem" }}>
+          <div className="map-tuning-min-max">
             <span>
               Min: <span style={{ fontWeight: "600", color: "#00a8ff" }}>{minValue.toFixed(2)}</span>
             </span>
@@ -404,17 +368,11 @@ export default function MapTuning({
       </section>
 
       {/* ===== SECTION 3: Grille 2D (Lookup Table) ===== */}
-      <section style={{ marginBottom: "1.5rem", overflowX: "auto" }}>
-        <h3 style={{ fontSize: "1rem", fontWeight: "600", marginBottom: "1rem" }}>Grille 2D (Lookup Table)</h3>
+      <section className="map-tuning-section" style={{ overflowX: "auto" }}>
+        <h3>Grille 2D (Lookup Table)</h3>
 
-        <div style={{ display: "inline-block" }}>
-          <table
-            style={{
-              borderCollapse: "collapse",
-              border: "1px solid #4d1b24",
-              backgroundColor: "rgba(20, 6, 7, 0.5)",
-            }}
-          >
+        <div style={{ display: "inline-block", width: "100%" }}>
+          <table className="map-tuning-table">
             {/* Header Row: Col Headers */}
             <thead>
               <tr>
@@ -422,8 +380,6 @@ export default function MapTuning({
                   style={{
                     width: "4rem",
                     height: "3rem",
-                    border: "1px solid #4d1b24",
-                    backgroundColor: "rgba(20, 6, 7, 0.8)",
                     fontSize: "0.65rem",
                     fontWeight: "600",
                     padding: "0.25rem",
@@ -438,8 +394,6 @@ export default function MapTuning({
                     style={{
                       width: "3.5rem",
                       height: "3rem",
-                      border: "1px solid #4d1b24",
-                      backgroundColor: "rgba(20, 6, 7, 0.8)",
                       padding: "0.25rem",
                       fontSize: "0.65rem",
                     }}
@@ -449,17 +403,7 @@ export default function MapTuning({
                       step="0.01"
                       value={header}
                       onChange={(e) => updateColHeader(colIdx, parseFloat(e.target.value) || 0)}
-                      style={{
-                        width: "100%",
-                        height: "2rem",
-                        backgroundColor: "rgba(77, 27, 36, 0.6)",
-                        border: "1px solid #4d1b24",
-                        borderRadius: "0.2rem",
-                        color: "#f4e8ea",
-                        textAlign: "center",
-                        fontSize: "0.65rem",
-                        padding: "0.2rem",
-                      }}
+                      className="table-input"
                     />
                   </th>
                 ))}
@@ -475,8 +419,6 @@ export default function MapTuning({
                     style={{
                       width: "4rem",
                       height: "2.5rem",
-                      border: "1px solid #4d1b24",
-                      backgroundColor: "rgba(20, 6, 7, 0.8)",
                       padding: "0.25rem",
                       fontSize: "0.65rem",
                     }}
@@ -486,17 +428,7 @@ export default function MapTuning({
                       step="0.01"
                       value={rowHeaders[rowIdx]}
                       onChange={(e) => updateRowHeader(rowIdx, parseFloat(e.target.value) || 0)}
-                      style={{
-                        width: "100%",
-                        height: "2rem",
-                        backgroundColor: "rgba(77, 27, 36, 0.6)",
-                        border: "1px solid #4d1b24",
-                        borderRadius: "0.2rem",
-                        color: "#f4e8ea",
-                        textAlign: "center",
-                        fontSize: "0.65rem",
-                        padding: "0.2rem",
-                      }}
+                      className="table-input"
                     />
                   </td>
 
@@ -507,10 +439,10 @@ export default function MapTuning({
                       style={{
                         width: "3.5rem",
                         height: "2.5rem",
-                        border: "1px solid #4d1b24",
                         padding: "0.25rem",
                         backgroundColor: getHeatmapColor(value),
                       }}
+                      className="map-tuning-heatmap-cell"
                     >
                       <input
                         type="number"
@@ -519,17 +451,7 @@ export default function MapTuning({
                         onChange={(e) =>
                           updateGridCell(rowIdx, colIdx, parseFloat(e.target.value) || 0)
                         }
-                        style={{
-                          width: "100%",
-                          height: "2rem",
-                          backgroundColor: "rgba(30, 10, 14, 0.7)",
-                          border: "1px solid #4d1b24",
-                          borderRadius: "0.2rem",
-                          color: "#f4e8ea",
-                          textAlign: "center",
-                          fontSize: "0.65rem",
-                          padding: "0.2rem",
-                        }}
+                        className="table-input"
                       />
                     </td>
                   ))}
@@ -540,39 +462,30 @@ export default function MapTuning({
         </div>
 
         {/* Heatmap Legend */}
-        <div style={{ marginTop: "1rem", display: "flex", alignItems: "center", gap: "0.5rem", fontSize: "0.75rem" }}>
+        <div className="map-tuning-legend">
           <span style={{ fontWeight: "600" }}>Heatmap:</span>
-          <div style={{ display: "flex", gap: "0.25rem", alignItems: "center" }}>
+          <div className="map-tuning-legend-item">
             <div
+              className="map-tuning-legend-color"
               style={{
-                width: "1.5rem",
-                height: "1rem",
-                borderRadius: "0.2rem",
-                border: "1px solid #4d1b24",
                 backgroundColor: "rgba(100, 150, 255, 0.5)",
               }}
             />
             <span>Min</span>
           </div>
-          <div style={{ display: "flex", gap: "0.25rem", alignItems: "center" }}>
+          <div className="map-tuning-legend-item">
             <div
+              className="map-tuning-legend-color"
               style={{
-                width: "1.5rem",
-                height: "1rem",
-                borderRadius: "0.2rem",
-                border: "1px solid #4d1b24",
                 backgroundColor: "rgba(200, 100, 255, 0.5)",
               }}
             />
             <span>Mid</span>
           </div>
-          <div style={{ display: "flex", gap: "0.25rem", alignItems: "center" }}>
+          <div className="map-tuning-legend-item">
             <div
+              className="map-tuning-legend-color"
               style={{
-                width: "1.5rem",
-                height: "1rem",
-                borderRadius: "0.2rem",
-                border: "1px solid #4d1b24",
                 backgroundColor: "rgba(255, 0, 0, 0.5)",
               }}
             />

@@ -5,7 +5,7 @@ import Plot from "react-plotly.js";
 import { queryDataset } from "../api";
 import { evaluateMathChannel } from "../mathChannels";
 import { useTelemetryStore } from "../store/telemetryStore";
-import type { DatasetMetadata, DistanceRange, MathChannel, SignalSeries, TrackMapResponse } from "../types";
+import type { DatasetMetadata, DistanceRange, MathChannel, SignalSeries, TrackMapResponse, MapTuningData } from "../types";
 import MapTuning from "./MapTuning";
 
 type SignalWorkspaceProps = {
@@ -93,6 +93,7 @@ type SavedWorkspaceConfig = {
   name: string;
   tabs: WorkspaceTab[];
   activeTabId: string;
+  mapTuning: MapTuningData;
 };
 
 type WorkspaceSessionSnapshot = {
@@ -813,6 +814,7 @@ export default function SignalWorkspace({
   const [focusTargetWidgetId, setFocusTargetWidgetId] = useState<string>("auto");
   const [focusSignalFilter, setFocusSignalFilter] = useState("");
   const [localSelectedWidgetId, setLocalSelectedWidgetId] = useState<number | null>(null);
+  const [mapTuningData, setMapTuningData] = useState<MapTuningData | null>(null);
   const gridRef = useRef<HTMLDivElement | null>(null);
   const queryGenerationRef = useRef(0);
   const tabSwitchGenerationRef = useRef(0);
@@ -1740,6 +1742,7 @@ export default function SignalWorkspace({
       name: nextName.trim() || defaultName,
       tabs: normalizedTabs,
       activeTabId,
+      mapTuning: mapTuningData,
     };
 
     setCurrentConfigId(newId);
@@ -1775,6 +1778,7 @@ export default function SignalWorkspace({
     setSeriesById({});
     setLoadingById({});
     setDragFromId(null);
+    setMapTuningData(config.mapTuning ?? null);
   }
 
   function deleteConfiguration(configId: string) {
@@ -2495,7 +2499,8 @@ export default function SignalWorkspace({
           <MapTuning
             availableSignals={availableSignals}
             datasetId={datasetId}
-            onSave={(data) => console.log("Map saved:", data)}
+            currentData={mapTuningData}
+            onSave={(data) => setMapTuningData(data)}
             onCalculate={(data) => console.log("Map calculated:", data)}
           />
         </div>
