@@ -79,6 +79,7 @@ class MapTuningRequest(BaseModel):
     gridData: List[List[float]]
     rowHeaders: List[float]
     colHeaders: List[float]
+    braking_signal: bool
 
 
 class MapTuningSaveResponse(BaseModel):

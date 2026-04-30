@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useEffect, useCallback } from "react";
+import { calculateMapTuning } from "../api";
 
 // ============================================================================
 // TYPES ET PERSISTENCE LOCALSTORAGE
@@ -10,6 +11,7 @@ export type MapTuningData = {
   gridData: number[][];
   rowHeaders: number[];
   colHeaders: number[];
+  braking_signal: boolean;
 };
 
 const STORAGE_KEY = "map_tuning_local_configs";
@@ -112,6 +114,7 @@ export default function MapTuning({
   const [inputChannelX, setInputChannelX] = useState<string>(availableSignals[0] || "");
   const [inputChannelY, setInputChannelY] = useState<string>(availableSignals[1] || availableSignals[0] || "");
   const [outputChannelName, setOutputChannelName] = useState<string>("Ma_Nouvelle_Map");
+  const [braking_signal, setBraking_signal] = useState<boolean>(false);
 
   // State: Grid
   const [numRows, setNumRows] = useState<number>(5);
@@ -124,6 +127,7 @@ export default function MapTuning({
 
   // State: UI feedback
   const [isSaving, setIsSaving] = useState(false);
+  const [isCalculating, setIsCalculating] = useState(false);
   const [saveMessage, setSaveMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
   const [savedConfigs, setSavedConfigs] = useState<string[]>([]);
   const [showConfigMenu, setShowConfigMenu] = useState(false);
@@ -143,20 +147,20 @@ export default function MapTuning({
     setSavedConfigs(Object.keys(configs));
   }, []);
 
+  // Dégradé Vert -> Orange -> Rouge
   const getHeatmapColor = useCallback((value: number): string => {
     if (maxValue === minValue) return "rgba(34, 197, 94, 0.2)";
     const normalized = (value - minValue) / (maxValue - minValue);
     
-    // Dégradé Vert -> Orange -> Rouge
     if (normalized < 0.5) {
-      // Transition Vert (34, 197, 94) vers Orange (249, 115, 22)
+      // Vert vers Orange
       const t = normalized * 2;
       const r = Math.round(34 + (249 - 34) * t);
       const g = Math.round(197 + (115 - 197) * t);
       const b = Math.round(94 + (22 - 94) * t);
       return `rgba(${r}, ${g}, ${b}, 0.5)`;
     } else {
-      // Transition Orange (249, 115, 22) vers Rouge (239, 68, 68)
+      // Orange vers Rouge
       const t = (normalized - 0.5) * 2;
       const r = Math.round(249 + (239 - 249) * t);
       const g = Math.round(115 + (68 - 115) * t);
@@ -173,7 +177,11 @@ export default function MapTuning({
     });
   };
 
-  const handlePaste = (e: React.ClipboardEvent, startRow: number, startCol: number) => {
+  // ============================================================================
+  // LOGIQUE DE COPIER-COLLER EXCEL
+  // ============================================================================
+
+  const handlePaste = useCallback((e: React.ClipboardEvent, startRow: number, startCol: number) => {
     e.preventDefault();
     const pasteData = e.clipboardData.getData("text");
     if (!pasteData) return;
@@ -192,7 +200,47 @@ export default function MapTuning({
       });
       return newGrid;
     });
-  };
+  }, []);
+
+  const handlePasteColHeaders = useCallback((e: React.ClipboardEvent, startCol: number) => {
+    e.preventDefault();
+    const pasteData = e.clipboardData.getData("text");
+    if (!pasteData) return;
+    const cells = pasteData.split(/[\t\n\r]+/).filter(val => val.trim() !== "");
+
+    setColHeaders((prev) => {
+      const newHeaders = [...prev];
+      cells.forEach((cell, i) => {
+        if (startCol + i < newHeaders.length) {
+          const val = parseFloat(cell.replace(",", "."));
+          if (!isNaN(val)) newHeaders[startCol + i] = val;
+        }
+      });
+      return newHeaders;
+    });
+  }, []);
+
+  const handlePasteRowHeaders = useCallback((e: React.ClipboardEvent, startRow: number) => {
+    e.preventDefault();
+    const pasteData = e.clipboardData.getData("text");
+    if (!pasteData) return;
+    const cells = pasteData.split(/[\t\n\r]+/).filter(val => val.trim() !== "");
+
+    setRowHeaders((prev) => {
+      const newHeaders = [...prev];
+      cells.forEach((cell, i) => {
+        if (startRow + i < newHeaders.length) {
+          const val = parseFloat(cell.replace(",", "."));
+          if (!isNaN(val)) newHeaders[startRow + i] = val;
+        }
+      });
+      return newHeaders;
+    });
+  }, []);
+
+  // ============================================================================
+  // GESTION DU REDIMENSIONNEMENT
+  // ============================================================================
 
   const handleRowsChange = (newRows: number) => {
     if (newRows < 2 || newRows > 50) return;
@@ -218,10 +266,21 @@ export default function MapTuning({
     }
   };
 
-  // ACTIONS LOCALSTORAGE
+  // ============================================================================
+  // ACTIONS (API & LOCALSTORAGE)
+  // ============================================================================
+  
   const handleSave = () => {
     setIsSaving(true);
-    const data: MapTuningData = { inputChannelX, inputChannelY, outputChannelName, gridData, rowHeaders, colHeaders };
+    const data: MapTuningData = { 
+      inputChannelX, 
+      inputChannelY, 
+      outputChannelName, 
+      gridData, 
+      rowHeaders, 
+      colHeaders,
+      braking_signal 
+    };
     try {
       saveLocalConfig(outputChannelName, data);
       setSavedConfigs(Object.keys(getLocalConfigs()));
@@ -231,6 +290,37 @@ export default function MapTuning({
       setSaveMessage({ type: "error", text: "Erreur lors de la sauvegarde locale." });
     } finally {
       setIsSaving(false);
+    }
+  };
+
+  const handleCalculate = async () => {
+    if (!datasetId) return;
+    setIsCalculating(true);
+    setSaveMessage(null);
+    const data: MapTuningData = { 
+      inputChannelX, 
+      inputChannelY, 
+      outputChannelName, 
+      gridData, 
+      rowHeaders, 
+      colHeaders,
+      braking_signal 
+    };
+    try {
+      const result: any = await calculateMapTuning({ datasetId, ...data });
+      setSaveMessage({ 
+        type: "success", 
+        text: `Calcul terminé avec succès (${result.samplesProcessed} points).` 
+      });
+      onCalculate?.(data);
+      onSignalsUpdated?.();
+    } catch (error) {
+      setSaveMessage({ 
+        type: "error", 
+        text: `Erreur lors du calcul: ${error instanceof Error ? error.message : "Inconnue"}` 
+      });
+    } finally {
+      setIsCalculating(false);
     }
   };
 
@@ -246,6 +336,7 @@ export default function MapTuning({
       setColHeaders(config.colHeaders);
       setNumRows(config.rowHeaders.length);
       setNumCols(config.colHeaders.length);
+      setBraking_signal(config.braking_signal || false);
       setShowConfigMenu(false);
       setSaveMessage({ type: "success", text: `Configuration "${name}" chargée.` });
     }
@@ -293,16 +384,30 @@ export default function MapTuning({
               {availableSignals.map((ch) => <option key={ch} value={ch}>{ch}</option>)}
             </select>
           </div>
-          <div>
-            <label className="field-label">Nom de Sortie</label>
-            <input className="topbar-user-input" style={{ width: "100%" }} type="text" value={outputChannelName} onChange={(e) => setOutputChannelName(e.target.value)} />
+          <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
+            <div>
+              <label className="field-label">Nom de Sortie</label>
+              <input className="topbar-user-input" style={{ width: "100%" }} type="text" value={outputChannelName} onChange={(e) => setOutputChannelName(e.target.value)} />
+            </div>
+            <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+              <input 
+                type="checkbox" 
+                id="isBrakeSignal" 
+                checked={braking_signal} 
+                onChange={(e) => setBraking_signal(e.target.checked)} 
+                style={{ cursor: "pointer", accentColor: "var(--cyan)" }}
+              />
+              <label htmlFor="isBrakeSignal" className="field-label" style={{ margin: 0, cursor: "pointer" }}>
+                Signal lié au frein ?
+              </label>
+            </div>
           </div>
         </div>
       </section>
 
       {/* Bibliothèque Locale */}
       <section className="map-tuning-section" style={{ position: "relative" }}>
-        <h3>Bibliothèque de Sauvegardes</h3>
+        <h3>Bibliothèque de Sauvegardes (LocalStorage)</h3>
         <button 
           className="small-button" 
           style={{ width: "100%" }} 
@@ -384,9 +489,13 @@ export default function MapTuning({
               <th style={{ position: "sticky", top: 0, left: 0, zIndex: 10 }}>{inputChannelY} \ {inputChannelX}</th>
               {colHeaders.map((h, i) => (
                 <th key={i} style={{ position: "sticky", top: 0, zIndex: 5 }}>
-                  <NumberInput value={h} onChange={val => {
-                    const newH = [...colHeaders]; newH[i] = val; setColHeaders(newH);
-                  }} />
+                  <NumberInput 
+                    value={h} 
+                    onChange={val => {
+                      const newH = [...colHeaders]; newH[i] = val; setColHeaders(newH);
+                    }} 
+                    onPaste={(e) => handlePasteColHeaders(e, i)}
+                  />
                 </th>
               ))}
             </tr>
@@ -395,13 +504,21 @@ export default function MapTuning({
             {gridData.map((row, rIdx) => (
               <tr key={rIdx}>
                 <td style={{ position: "sticky", left: 0, background: "var(--bg-3)", zIndex: 2 }}>
-                  <NumberInput value={rowHeaders[rIdx]} onChange={val => {
-                    const newH = [...rowHeaders]; newH[rIdx] = val; setRowHeaders(newH);
-                  }} />
+                  <NumberInput 
+                    value={rowHeaders[rIdx]} 
+                    onChange={val => {
+                      const newH = [...rowHeaders]; newH[rIdx] = val; setRowHeaders(newH);
+                    }} 
+                    onPaste={(e) => handlePasteRowHeaders(e, rIdx)}
+                  />
                 </td>
                 {row.map((val, cIdx) => (
                   <td key={cIdx} className="map-tuning-heatmap-cell" style={{ backgroundColor: getHeatmapColor(val) }}>
-                    <NumberInput value={val} onChange={v => updateGridCell(rIdx, cIdx, v)} onPaste={e => handlePaste(e, rIdx, cIdx)} />
+                    <NumberInput 
+                      value={val} 
+                      onChange={v => updateGridCell(rIdx, cIdx, v)} 
+                      onPaste={e => handlePaste(e, rIdx, cIdx)} 
+                    />
                   </td>
                 ))}
               </tr>
@@ -426,15 +543,20 @@ export default function MapTuning({
             <div className="map-tuning-legend-color" style={{ background: "rgba(239, 68, 68, 0.5)" }}></div>
             <span>Max</span>
           </div>
-          <span style={{ marginLeft: "auto", fontStyle: "italic", fontSize: "0.7rem" }}>Ctrl+V pour coller depuis Excel</span>
+          <span style={{ marginLeft: "auto", fontStyle: "italic", fontSize: "0.7rem" }}>Astuce: Ctrl+V pour coller depuis Excel sur une cellule ou un en-tête.</span>
         </div>
 
         <div style={{ display: "flex", gap: "1rem", justifyContent: "flex-end" }}>
-          <button className="small-button" onClick={handleSave} disabled={isSaving}>
-            {isSaving ? "⏳ En cours..." : "💾 Sauvegarder Localement"}
+          <button className="small-button" onClick={handleSave} disabled={isSaving || isCalculating}>
+            {isSaving ? "⏳ En cours..." : "💾 Sauvegarder"}
           </button>
-          <button className="small-button" style={{ borderColor: "var(--cyan)", background: "rgba(255, 70, 93, 0.3)" }} onClick={() => onCalculate?.({ inputChannelX, inputChannelY, outputChannelName, gridData, rowHeaders, colHeaders })}>
-            🔄 Calculer
+          <button 
+            className="small-button" 
+            style={{ borderColor: "var(--cyan)", background: "rgba(255, 70, 93, 0.3)" }} 
+            onClick={handleCalculate} 
+            disabled={isCalculating || !datasetId}
+          >
+            {isCalculating ? "⏳ Calcul..." : "🔄 Calculer"}
           </button>
         </div>
       </footer>

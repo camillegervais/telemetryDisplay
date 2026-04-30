@@ -326,7 +326,8 @@ async def calculate_map_output(payload: MapTuningRequest):
             np.array(payload.rowHeaders),
             np.array(payload.colHeaders),
             np.array(payload.gridData),
-            payload.outputChannelName
+            payload.outputChannelName,
+            payload.braking_signal
         )
 
         # Compute the output channel (assuming LUT2D is callable on the DataFrame directly)

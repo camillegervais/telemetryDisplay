@@ -12,8 +12,9 @@ class LUT2D:
     y_axis_values: np.ndarray
     lut_values: np.ndarray
     output_channel: str
+    braking_signal: bool
 
-    def __init__(self, x_axis_label, y_axis_label, x_axis_values, y_axis_values, lut_values, output_channel):
+    def __init__(self, x_axis_label, y_axis_label, x_axis_values, y_axis_values, lut_values, output_channel, braking_signal):
         assert x_axis_values.size == lut_values.shape[0], 'Incorrect size for x axis'
         assert y_axis_values.size == lut_values.shape[1], 'Incorrect size for y axis'
         self.x_axis_label = x_axis_label
@@ -22,6 +23,7 @@ class LUT2D:
         self.y_axis_values = y_axis_values
         self.lut_values = lut_values
         self.output_channel = output_channel
+        self.braking_signal = braking_signal
 
     def apply2DLUT(self, dataset: dict):
         """ Apply a 2D LUT on dataset's channels with the 2DLUT defined in lut_data """
@@ -41,6 +43,9 @@ class LUT2D:
         # Computing the result channel
         output_channel = np.array(lut_function(input_points))
 
+        if self.braking_signal:
+            output_channel = np.where(np.array(dataset['MBrakeR']).flatten() == 0, 0, output_channel)
+
         return output_channel
 
 if __name__ == "__main__":
@@ -58,11 +63,11 @@ if __name__ == "__main__":
     lut_values_rTorqueBal = lut_values_rTorqueBal.reshape(-1, lut_values_rTorqueBal.size).repeat(len(lut_x_values_rTorqueBal), 0)
 
     # Creating the 2DLUT object
-    lut_object_rTorqueBal = LUT2D('MBrakeR', 'vCarRef', lut_x_values_rTorqueBal, lut_y_values_rTorqueBal, lut_values_rTorqueBal, 'rTorqueBal')
+    lut_object_rTorqueBal = LUT2D('MBrakeR', 'vCarRef', lut_x_values_rTorqueBal, lut_y_values_rTorqueBal, lut_values_rTorqueBal, 'rTorqueBal', True)
 
     output_rTorqueBal = lut_object_rTorqueBal.apply2DLUT(data)
 
-    plt.plot(np.where(np.array(data['MBrakeR']).flatten() == 0, 0, output_rTorqueBal))
+    # plt.plot(output_rTorqueBal)
 
     lut_y_EOB = np.arange(-3.5, 4.0, 0.5)
     lut_x_EOB = np.array([0,2,50,75,100,125,150,175,200,225,250,275,300,325,350])
@@ -83,11 +88,11 @@ if __name__ == "__main__":
     [0.99,	0.99,	0.99,	0.85,	0.71,	0.56,	0.42,	0.28,	0.14,	0.00,	0.00,	0.00,	0.00,	0.00,	0.00],
     [1.00,	1.00,	1.00,	0.86,	0.71,	0.57,	0.43,	0.29,	0.14,	0.00,	0.00,	0.00,	0.00,	0.00,	0.00,]])
 
-    lut_object_EOB = LUT2D('vCarRef', 'gLat', lut_x_EOB, lut_y_EOB, lut_values_EOB, 'EOB')
+    lut_object_EOB = LUT2D('vCarRef', 'gLat', lut_x_EOB, lut_y_EOB, lut_values_EOB, 'EOB', True)
 
     output_EOB = lut_object_EOB.apply2DLUT(data)
 
-    plt.plot(np.where(np.array(data['MBrakeR']).flatten() == 0, 0, output_EOB))
-    plt.plot(np.where(np.array(data['MBrakeR']).flatten() == 0, 0, output_EOB) + np.where(np.array(data['MBrakeR']).flatten() == 0, 0, output_rTorqueBal))
+    plt.plot(output_EOB)
+    # plt.plot(output_EOB + output_rTorqueBal)
     plt.show()
 

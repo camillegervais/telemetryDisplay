@@ -62,6 +62,7 @@ export type MapTuningData = {
   gridData: number[][];
   rowHeaders: number[];
   colHeaders: number[];
+  braking_signal: boolean;
 };
 
 export type MapTuningSaveRequest = {
