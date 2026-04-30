@@ -341,6 +341,7 @@ export default function MapTuning({
         text: `Calcul terminé avec succès (${result.samplesProcessed} points).` 
       });
       onCalculate?.(data);
+      // Recalculer tous les maths channels une fois le channel de cartographie calculé
       onSignalsUpdated?.();
     } catch (error) {
       setSaveMessage({ 
