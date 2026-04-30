@@ -380,7 +380,7 @@ export default function MapTuning({
           </div>
           <div>
             <label className="field-label">Entrée Y (Lignes)</label>
-            <select className="mini-select" style={{ width: "100%" }} value={inputChannelY} onChange={(e) => setInputChannelY(e.target.value)}>
+            <select className="mini-select" style={{ width: "100%" }} value={inputChannelY} onChange={(e) => setInputChannelX(e.target.value)}>
               {availableSignals.map((ch) => <option key={ch} value={ch}>{ch}</option>)}
             </select>
           </div>
@@ -486,7 +486,7 @@ export default function MapTuning({
         <table className="map-tuning-table">
           <thead>
             <tr>
-              <th style={{ position: "sticky", top: 0, left: 0, zIndex: 10 }}>{inputChannelY} \ {inputChannelX}</th>
+              <th style={{ position: "sticky", top: 0, left: 0, zIndex: 10 }}>{inputChannelX} \ {inputChannelY}</th>
               {colHeaders.map((h, i) => (
                 <th key={i} style={{ position: "sticky", top: 0, zIndex: 5 }}>
                   <NumberInput 
