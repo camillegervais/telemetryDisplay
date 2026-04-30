@@ -43,8 +43,10 @@ class LUT2D:
         # Computing the result channel
         output_channel = np.array(lut_function(input_points))
 
+        MBrakeR = np.array(dataset['MBrakeR']).flatten()
+
         if self.braking_signal:
-            output_channel = np.where(np.array(dataset['MBrakeR']).flatten() == 0, 0, output_channel)
+            output_channel = np.where(MBrakeR > np.min(MBrakeR) * 0.1, np.nan, output_channel)
 
         return output_channel
 
