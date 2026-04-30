@@ -15,6 +15,7 @@ export type MapTuningData = {
 };
 
 const STORAGE_KEY = "map_tuning_local_configs";
+const STORAGE_CURRENT_KEY = "current_config";
 
 const getLocalConfigs = (): Record<string, MapTuningData> => {
   try {
@@ -24,6 +25,21 @@ const getLocalConfigs = (): Record<string, MapTuningData> => {
     return {};
   }
 };
+
+const getCurrentConfig = (): string | null => {
+  try {
+    const data = localStorage.getItem(STORAGE_CURRENT_KEY);
+    return data;
+  } catch (e) {
+    return null;
+  }
+}
+
+const saveCurrentConfig = (name: string): void => {
+  if(name != null){
+    localStorage.setItem(STORAGE_CURRENT_KEY, name);
+  }
+}
 
 const saveLocalConfig = (name: string, data: MapTuningData) => {
   const configs = getLocalConfigs();
@@ -145,7 +161,11 @@ export default function MapTuning({
   useEffect(() => {
     const configs = getLocalConfigs();
     setSavedConfigs(Object.keys(configs));
+    // Charger la dernière config chargée au montage
+    const lastConfig = getCurrentConfig();
+    handleLoadConfig(lastConfig ? lastConfig : "");
   }, []);
+
 
   // Dégradé Vert -> Orange -> Rouge
   const getHeatmapColor = useCallback((value: number): string => {
@@ -326,6 +346,7 @@ export default function MapTuning({
 
   const handleLoadConfig = (name: string) => {
     const configs = getLocalConfigs();
+    saveCurrentConfig(name);
     const config = configs[name];
     if (config) {
       setInputChannelX(config.inputChannelX);
