@@ -144,21 +144,23 @@ export default function MapTuning({
   }, []);
 
   const getHeatmapColor = useCallback((value: number): string => {
-    if (maxValue === minValue) return "rgba(255, 70, 93, 0.2)";
+    if (maxValue === minValue) return "rgba(34, 197, 94, 0.2)";
     const normalized = (value - minValue) / (maxValue - minValue);
     
-    // Dégradé Cyan -> Magenta -> Jaune basé sur les variables du CSS
+    // Dégradé Vert -> Orange -> Rouge
     if (normalized < 0.5) {
+      // Transition Vert (34, 197, 94) vers Orange (249, 115, 22)
       const t = normalized * 2;
-      const r = Math.round(255);
-      const g = Math.round(70 + (43 - 70) * t);
-      const b = Math.round(93 + (79 - 93) * t);
+      const r = Math.round(34 + (249 - 34) * t);
+      const g = Math.round(197 + (115 - 197) * t);
+      const b = Math.round(94 + (22 - 94) * t);
       return `rgba(${r}, ${g}, ${b}, 0.5)`;
     } else {
+      // Transition Orange (249, 115, 22) vers Rouge (239, 68, 68)
       const t = (normalized - 0.5) * 2;
-      const r = 255;
-      const g = Math.round(43 + (123 - 43) * t);
-      const b = Math.round(79 + (143 - 79) * t);
+      const r = Math.round(249 + (239 - 249) * t);
+      const g = Math.round(115 + (68 - 115) * t);
+      const b = Math.round(22 + (68 - 22) * t);
       return `rgba(${r}, ${g}, ${b}, 0.5)`;
     }
   }, [minValue, maxValue]);
@@ -368,8 +370,8 @@ export default function MapTuning({
             <button className="small-button" onClick={() => handleColsChange(numCols + 1)}>+</button>
           </div>
           <div className="map-tuning-min-max">
-            <span>Min: <strong style={{ color: "var(--cyan)" }}>{minValue.toFixed(2)}</strong></span>
-            <span>Max: <strong style={{ color: "var(--magenta)" }}>{maxValue.toFixed(2)}</strong></span>
+            <span>Min: <strong style={{ color: "#22c55e" }}>{minValue.toFixed(2)}</strong></span>
+            <span>Max: <strong style={{ color: "#ef4444" }}>{maxValue.toFixed(2)}</strong></span>
           </div>
         </div>
       </section>
@@ -413,15 +415,15 @@ export default function MapTuning({
         <div className="map-tuning-legend">
           <span>Légende Heatmap :</span>
           <div className="map-tuning-legend-item">
-            <div className="map-tuning-legend-color" style={{ background: "rgba(255, 70, 93, 0.2)" }}></div>
+            <div className="map-tuning-legend-color" style={{ background: "rgba(34, 197, 94, 0.5)" }}></div>
             <span>Min</span>
           </div>
           <div className="map-tuning-legend-item">
-            <div className="map-tuning-legend-color" style={{ background: "rgba(255, 43, 79, 0.5)" }}></div>
+            <div className="map-tuning-legend-color" style={{ background: "rgba(249, 115, 22, 0.5)" }}></div>
             <span>Mid</span>
           </div>
           <div className="map-tuning-legend-item">
-            <div className="map-tuning-legend-color" style={{ background: "rgba(255, 123, 143, 0.5)" }}></div>
+            <div className="map-tuning-legend-color" style={{ background: "rgba(239, 68, 68, 0.5)" }}></div>
             <span>Max</span>
           </div>
           <span style={{ marginLeft: "auto", fontStyle: "italic", fontSize: "0.7rem" }}>Ctrl+V pour coller depuis Excel</span>
