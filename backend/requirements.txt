@@ -7,3 +7,4 @@ h5py
 pydantic
 python-multipart
 fastf1
+matplotlib
