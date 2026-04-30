@@ -18,6 +18,7 @@ type SignalWorkspaceProps = {
   onInspectorSelectedWidgetIdChange?: (widgetId: number | null) => void;
   onInspectorSnapshotChange?: (snapshot: InspectorSnapshot) => void;
   inspectorCommand?: InspectorCommand | null;
+  onRefreshDatasetMetadata?: () => Promise<void>;
 };
 
 export type InspectorWidgetSummary = {
@@ -778,6 +779,7 @@ export default function SignalWorkspace({
   onInspectorSelectedWidgetIdChange,
   onInspectorSnapshotChange,
   inspectorCommand,
+  onRefreshDatasetMetadata,
 }: SignalWorkspaceProps) {
   const {
     cursorDistance,
@@ -2502,6 +2504,7 @@ export default function SignalWorkspace({
             currentData={mapTuningData}
             onSave={(data) => setMapTuningData(data)}
             onCalculate={(data) => console.log("Map calculated:", data)}
+            onSignalsUpdated={onRefreshDatasetMetadata}
           />
         </div>
       ) : isTabSwitching ? (

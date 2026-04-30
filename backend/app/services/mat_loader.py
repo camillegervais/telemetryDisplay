@@ -9,7 +9,7 @@ from typing import Dict, Optional, Tuple, Union
 
 import numpy as np
 import pandas as pd
-from scipy.io import loadmat
+from scipy.io import loadmat, savemat
 
 from app.config import config
 
@@ -162,6 +162,40 @@ class MatLoader:
         self.loaded_datasets[metadata.dataset_id] = (df_normalized, metadata)
 
         return df_normalized, metadata
+
+    def add_new_channel(
+            self,
+            channel_name: str,
+            channel_data: np.ndarray,
+            dataset_id: Optional[str] = None,
+        ) -> str:
+        if not self.loaded_datasets:
+            raise MatValidationError("Aucun jeu de données chargé pour ajouter un canal.")
+
+        if dataset_id is None:
+            dataset_id, (df, metadata) = next(reversed(self.loaded_datasets.items()))
+        else:
+            dataset = self.loaded_datasets.get(dataset_id)
+            if dataset is None:
+                raise MatValidationError(f"Dataset '{dataset_id}' introuvable.")
+            df, metadata = dataset
+
+        channel_array = np.asarray(channel_data).flatten()
+        if len(channel_array) != len(df):
+            raise MatValidationError(
+                f"Le canal '{channel_name}' doit avoir la même longueur que le dataset "
+                f"({len(df)} points), reçu {len(channel_array)}."
+            )
+
+        if not channel_name in df.columns:
+            metadata.signal_names.append(channel_name)
+
+        df[channel_name] = channel_array
+        
+
+        self.loaded_datasets[dataset_id] = (df, metadata)
+
+        return metadata.source_path
 
     def _detect_spatial_step(self, mat_data: dict, lap_distance: np.ndarray) -> float:
         """

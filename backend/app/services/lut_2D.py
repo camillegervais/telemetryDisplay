@@ -36,7 +36,7 @@ class LUT2D:
         )
 
         # Formating the input points from the dataset
-        input_points = np.column_stack((np.array(dataset[self.x_axis_label]), np.array(dataset[self.y_axis_label])))
+        input_points = np.column_stack((np.array(dataset[self.x_axis_label]).flatten(), np.array(dataset[self.y_axis_label]).flatten()))
 
         # Computing the result channel
         output_channel = np.array(lut_function(input_points))

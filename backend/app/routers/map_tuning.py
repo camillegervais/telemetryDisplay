@@ -7,6 +7,7 @@ from fastapi import APIRouter, HTTPException
 from app.schemas import MapTuningRequest, MapTuningSaveResponse, MapTuningCalculateResponse
 from app.services.lut_2D import LUT2D
 from app.services.mat_loader import MatLoader
+from app.routers.datasets import mat_loader
 
 router = APIRouter(prefix="/api/map-tuning", tags=["map-tuning"])
 
@@ -36,9 +37,9 @@ async def save_map(payload: MapTuningRequest):
             "inputChannelX": payload.inputChannelX,
             "inputChannelY": payload.inputChannelY,
             "outputChannelName": payload.outputChannelName,
-            "gridData": payload.gridData,
-            "rowHeaders": payload.rowHeaders,
-            "colHeaders": payload.colHeaders,
+            "gridData": np.array(payload.gridData),
+            "rowHeaders": np.array(payload.rowHeaders),
+            "colHeaders": np.array(payload.colHeaders),
             "datasetId": payload.datasetId,
         }
 
@@ -51,62 +52,64 @@ async def save_map(payload: MapTuningRequest):
         raise HTTPException(status_code=500, detail=f"Failed to save map: {str(e)}")
 
 
-@router.post("/calculate", response_model=MapTuningCalculateResponse)
-async def calculate_map_output(payload: MapTuningRequest):
-    """
-    Calculate output channel based on map tuning.
+# @router.post("/calculate", response_model=MapTuningCalculateResponse)
+# async def calculate_map_output(payload: MapTuningRequest):
+#     """
+#     Calculate output channel based on map tuning.
 
-    This endpoint takes the current map configuration and applies it to
-    a dataset, creating a new computed output channel.
-    """
-    try:
-        if not payload.datasetId:
-            raise HTTPException(status_code=400, detail="datasetId is required")
+#     This endpoint takes the current map configuration and applies it to
+#     a dataset, creating a new computed output channel.
+#     """
+#     try:
+#         if not payload.datasetId:
+#             raise HTTPException(status_code=400, detail="datasetId is required")
 
-        if not payload.gridData or not payload.rowHeaders or not payload.colHeaders:
-            raise HTTPException(status_code=400, detail="gridData, rowHeaders, and colHeaders are required")
+#         if not payload.gridData or not payload.rowHeaders or not payload.colHeaders:
+#             raise HTTPException(status_code=400, detail="gridData, rowHeaders, and colHeaders are required")
 
-        if not payload.inputChannelX or not payload.inputChannelY:
-            raise HTTPException(
-                status_code=400, detail="inputChannelX and inputChannelY are required"
-            )
+#         if not payload.inputChannelX or not payload.inputChannelY:
+#             raise HTTPException(
+#                 status_code=400, detail="inputChannelX and inputChannelY are required"
+#             )
 
-        # Load the source dataset
-        mat_loader = MatLoader()
-        dataset_tuple = mat_loader.get_dataset(payload.datasetId)
+#         # Load the source dataset
+#         dataset_tuple, available_id = mat_loader.get_dataset(payload.datasetId)
         
-        if not dataset_tuple:
-            raise HTTPException(status_code=404, detail="Dataset not found. Ensure it is loaded first.")
+#         if not dataset_tuple:
+#             raise HTTPException(status_code=404, detail=f"Dataset not found. Ensure it is loaded first.{payload.datasetId}, {available_id}")
             
-        df_normalized, metadata = dataset_tuple
+#         df_normalized, metadata = dataset_tuple
 
-        # Create the 2D LUT object to store the 2D LUT characteristics
-        lut_object = LUT2D(
-            payload.inputChannelX,
-            payload.inputChannelY,
-            payload.rowHeaders,
-            payload.colHeaders,
-            payload.gridData,
-            payload.outputChannelName
-        )
+#         # Create the 2D LUT object to store the 2D LUT characteristics
+#         lut_object = LUT2D(
+#             payload.inputChannelX,
+#             payload.inputChannelY,
+#             payload.rowHeaders,
+#             payload.colHeaders,
+#             payload.gridData,
+#             payload.outputChannelName
+#         )
 
-        # Compute the output channel (assuming LUT2D is callable on the DataFrame directly)
-        output_values = lut_object(df_normalized)
+#         # Compute the output channel (assuming LUT2D is callable on the DataFrame directly)
+#         output_values = lut_object(df_normalized)
         
-        # Ensure output is a numpy array for processing
-        if not isinstance(output_values, np.ndarray):
-            output_values = np.array(output_values)
+#         # Ensure output is a numpy array for processing
+#         if not isinstance(output_values, np.ndarray):
+#             output_values = np.array(output_values)
 
-        return {
-            "message": f"Map '{payload.outputChannelName}' calculated successfully",
-            "samplesProcessed": output_values.size,
-            "outputSignal": output_values.tolist() # Convert to list for JSON serialization
-        }
+#         # We add the new channel to the dataset for future display
+#         mat_loader.add_new_channel(payload.outputChannelName, output_values)
 
-    except Exception as e:
-        raise HTTPException(
-            status_code=500, detail=f"Failed to calculate map output: {str(e)}"
-        )
+#         return {
+#             "message": f"Map '{payload.outputChannelName}' calculated successfully",
+#             "samplesProcessed": output_values.size,
+#             "outputSignal": output_values.tolist() # Convert to list for JSON serialization
+#         }
+
+#     except Exception as e:
+#         raise HTTPException(
+#             status_code=500, detail=f"Failed to calculate map output: {str(e)}"
+#         )
 
 
 @router.get("/configs")

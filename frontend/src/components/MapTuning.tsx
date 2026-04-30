@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useEffect, useCallback } from "react";
+import { calculateMapTuning, saveMapTuning, getSavedMapConfigs, loadMapConfig } from "../api";
 
 // Définitions locales pour permettre l'exécution dans cet environnement isolé
 export type MapTuningData = {
@@ -9,9 +10,6 @@ export type MapTuningData = {
   rowHeaders: number[];
   colHeaders: number[];
 };
-
-const saveMapTuning = async (data: any) => new Promise((resolve) => setTimeout(() => resolve({ message: "Saved" }), 800));
-const calculateMapTuning = async (data: any) => new Promise((resolve) => setTimeout(() => resolve({ samplesProcessed: 1450 }), 1500));
 
 interface MapTuningProps {
   availableSignals?: string[];
@@ -114,6 +112,9 @@ export default function MapTuning({
   const [isSaving, setIsSaving] = useState(false);
   const [isCalculating, setIsCalculating] = useState(false);
   const [saveMessage, setSaveMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
+  const [savedConfigs, setSavedConfigs] = useState<string[]>([]);
+  const [isLoadingConfigs, setIsLoadingConfigs] = useState(false);
+  const [showConfigMenu, setShowConfigMenu] = useState(false);
 
   // Calcul min/max pour la heatmap
   const { minValue, maxValue } = useMemo(() => {
@@ -123,6 +124,22 @@ export default function MapTuning({
       maxValue: Math.max(...flat),
     };
   }, [gridData]);
+
+  // Charger la liste des configurations sauvegardées au montage
+  useEffect(() => {
+    const loadConfigs = async () => {
+      setIsLoadingConfigs(true);
+      try {
+        const result = await getSavedMapConfigs();
+        setSavedConfigs(result.configs);
+      } catch (err) {
+        console.error("Failed to load configurations:", err);
+      } finally {
+        setIsLoadingConfigs(false);
+      }
+    };
+    loadConfigs();
+  }, []);
 
   // Fonction utilitaire pour la couleur
   const getHeatmapColor = useCallback((value: number): string => {
@@ -294,6 +311,9 @@ export default function MapTuning({
       await saveMapTuning({ datasetId: datasetId!, ...data });
       setSaveMessage({ type: "success", text: `Map "${outputChannelName}" sauvegardée avec succès` });
       onSave?.(data);
+      // Recharger la liste des configurations
+      const result = await getSavedMapConfigs();
+      setSavedConfigs(result.configs);
     } catch (error) {
       setSaveMessage({ type: "error", text: `Erreur lors de la sauvegarde: ${error instanceof Error ? error.message : "Inconnue"}` });
     } finally {
@@ -308,13 +328,32 @@ export default function MapTuning({
     const data: MapTuningData = { inputChannelX, inputChannelY, outputChannelName, gridData, rowHeaders, colHeaders };
     try {
       const result: any = await calculateMapTuning({ datasetId, ...data });
-      setSaveMessage({ type: "success", text: `Cartographie calculée avec succès (${result.samplesProcessed} points)` });
+      setSaveMessage({ type: "success", text: `Cartographie calculée avec succès (${result.samplesProcessed} points), saved in ${result.sourcePath}` });
       onCalculate?.(data);
       onSignalsUpdated?.(); // <-- On prévient le parent qu'il faut recharger la metadata
     } catch (error) {
       setSaveMessage({ type: "error", text: `Erreur lors du calcul: ${error instanceof Error ? error.message : "Inconnue"}` });
     } finally {
       setIsCalculating(false);
+    }
+  };
+
+  const handleLoadConfig = async (configKey: string) => {
+    setSaveMessage(null);
+    try {
+      const config = await loadMapConfig(configKey);
+      setInputChannelX(config.inputChannelX);
+      setInputChannelY(config.inputChannelY);
+      setOutputChannelName(config.outputChannelName);
+      setGridData(config.gridData);
+      setRowHeaders(config.rowHeaders);
+      setColHeaders(config.colHeaders);
+      setNumRows(config.rowHeaders.length);
+      setNumCols(config.colHeaders.length);
+      setShowConfigMenu(false);
+      setSaveMessage({ type: "success", text: `Configuration "${configKey}" chargée avec succès` });
+    } catch (error) {
+      setSaveMessage({ type: "error", text: `Erreur lors du chargement: ${error instanceof Error ? error.message : "Inconnue"}` });
     }
   };
 
@@ -361,6 +400,58 @@ export default function MapTuning({
             <input className="topbar-user-input" style={{ width: "100%", padding: "0.45rem" }} type="text" value={outputChannelName} onChange={(e) => setOutputChannelName(e.target.value)} />
           </div>
         </div>
+      </section>
+
+      {/* Chargement des configurations sauvegardées */}
+      <section className="map-tuning-section" style={{ position: "relative" }}>
+        <h3>Configurations Sauvegardées</h3>
+        <div style={{ display: "flex", gap: "0.5rem", alignItems: "center" }}>
+          <button
+            className="small-button"
+            onClick={() => setShowConfigMenu(!showConfigMenu)}
+            disabled={isLoadingConfigs || savedConfigs.length === 0}
+            style={{ flex: 1 }}
+          >
+            {isLoadingConfigs ? "⏳ Chargement..." : `📁 ${savedConfigs.length} config(s)`}
+          </button>
+        </div>
+        {showConfigMenu && savedConfigs.length > 0 && (
+          <div style={{
+            position: "absolute",
+            top: "100%",
+            left: 0,
+            right: 0,
+            backgroundColor: "var(--bg-2)",
+            border: "1px solid var(--fg-3)",
+            borderRadius: "0.35rem",
+            maxHeight: "200px",
+            overflowY: "auto",
+            zIndex: 100,
+            marginTop: "0.25rem"
+          }}>
+            {savedConfigs.map((configKey) => (
+              <button
+                key={configKey}
+                onClick={() => handleLoadConfig(configKey)}
+                style={{
+                  display: "block",
+                  width: "100%",
+                  padding: "0.5rem",
+                  textAlign: "left",
+                  border: "none",
+                  backgroundColor: "transparent",
+                  color: "var(--fg-1)",
+                  cursor: "pointer",
+                  fontSize: "0.85rem",
+                }}
+                onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "var(--bg-3)")}
+                onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "transparent")}
+              >
+                {configKey}
+              </button>
+            ))}
+          </div>
+        )}
       </section>
 
       {/* Contrôles de la grille */}

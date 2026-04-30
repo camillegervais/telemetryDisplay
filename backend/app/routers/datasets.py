@@ -16,8 +16,12 @@ from app.schemas import (
     DatasetQueryRequest,
     DatasetQueryResponse,
     TrackMapResponse,
+    MapTuningRequest,
+    MapTuningSaveResponse,
+    MapTuningCalculateResponse
 )
 from app.services.mat_loader import MatLoader, MatValidationError
+from app.services.lut_2D import LUT2D
 
 router = APIRouter(prefix="/api/datasets", tags=["datasets"])
 
@@ -288,3 +292,66 @@ def get_trackmap(dataset_id: str) -> TrackMapResponse:
         x_position=x.tolist(),
         y_position=y.tolist(),
     )
+
+@router.post("/calculate", response_model=MapTuningCalculateResponse)
+async def calculate_map_output(payload: MapTuningRequest):
+    """
+    Calculate output channel based on map tuning.
+
+    This endpoint takes the current map configuration and applies it to
+    a dataset, creating a new computed output channel.
+    """
+    try:
+        if not payload.datasetId:
+            raise HTTPException(status_code=400, detail="datasetId is required")
+
+        if not payload.gridData or not payload.rowHeaders or not payload.colHeaders:
+            raise HTTPException(status_code=400, detail="gridData, rowHeaders, and colHeaders are required")
+
+        if not payload.inputChannelX or not payload.inputChannelY:
+            raise HTTPException(
+                status_code=400, detail="inputChannelX and inputChannelY are required"
+            )
+
+        dataset = mat_loader.get_dataset(payload.datasetId)
+        if dataset is None:
+            raise HTTPException(status_code=404, detail="Dataset not found. Ensure it is loaded first.")
+
+        df_normalized, metadata = dataset
+
+        # Create the 2D LUT object to store the 2D LUT characteristics
+        lut_object = LUT2D(
+            payload.inputChannelX,
+            payload.inputChannelY,
+            np.array(payload.rowHeaders),
+            np.array(payload.colHeaders),
+            np.array(payload.gridData),
+            payload.outputChannelName
+        )
+
+        # Compute the output channel (assuming LUT2D is callable on the DataFrame directly)
+        output_values = lut_object.apply2DLUT(df_normalized)
+        
+        # Ensure output is a numpy array for processing
+        if not isinstance(output_values, np.ndarray):
+            output_values = np.array(output_values)
+
+        # We add the new channel to the requested dataset for future display
+        sourcepath = mat_loader.add_new_channel(
+            payload.outputChannelName,
+            output_values,
+            payload.datasetId,
+        )
+
+        return {
+            "message": f"Map '{payload.outputChannelName}' calculated successfully",
+            "samplesProcessed": output_values.size,
+            "outputSignal": output_values.tolist(), # Convert to list for JSON serialization
+            "sourcePath": sourcepath,
+        }
+
+    except Exception as e:
+        raise HTTPException(
+            status_code=500, detail=f"Failed to calculate map output:{str(e)}"
+        )
+

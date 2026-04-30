@@ -296,6 +296,16 @@ export default function App() {
       : "Desactive";
   const hasImportedDataset = Boolean(datasetId && datasetMetadata);
 
+  const refreshDatasetMetadata = async () => {
+    if (!datasetId) return;
+    try {
+      const updated = await fetchDatasetMetadata(datasetId);
+      setDatasetMetadata(updated);
+    } catch (err) {
+      console.error("Failed to refresh dataset metadata:", err);
+    }
+  };
+
   const inspectorPanel = (
     <section className="panel import-panel inspector-panel">
       <div className="panel-header">
@@ -723,6 +733,7 @@ export default function App() {
             onInspectorSelectedWidgetIdChange={setInspectorSelectedWidgetId}
             onInspectorSnapshotChange={setInspectorSnapshot}
             inspectorCommand={inspectorCommand}
+            onRefreshDatasetMetadata={refreshDatasetMetadata}
           />
         ) : (
           <section className="panel dashboard-empty-state" role="status" aria-live="polite">

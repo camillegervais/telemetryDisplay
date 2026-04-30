@@ -131,7 +131,8 @@ export async function saveMapTuning(request: MapTuningSaveRequest): Promise<MapT
 }
 
 export async function calculateMapTuning(request: MapTuningCalculateRequest): Promise<MapTuningCalculateResponse> {
-  const response = await fetch(`${API_BASE_URL}/map-tuning/calculate`, {
+  console.log('Computation from api.ts');
+  const response = await fetch(`${API_BASE_URL}/datasets/calculate`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -145,4 +146,24 @@ export async function calculateMapTuning(request: MapTuningCalculateRequest): Pr
   }
 
   return (await response.json()) as MapTuningCalculateResponse;
+}
+
+export async function getSavedMapConfigs(): Promise<{ configs: string[]; count: number }> {
+  const response = await fetch(`${API_BASE_URL}/map-tuning/configs`);
+
+  if (!response.ok) {
+    throw new Error("Failed to fetch saved configurations");
+  }
+
+  return (await response.json()) as { configs: string[]; count: number };
+}
+
+export async function loadMapConfig(configKey: string): Promise<any> {
+  const response = await fetch(`${API_BASE_URL}/map-tuning/configs/${configKey}`);
+
+  if (!response.ok) {
+    throw new Error("Failed to load configuration");
+  }
+
+  return (await response.json()) as any;
 }
