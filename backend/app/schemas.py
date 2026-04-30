@@ -80,6 +80,8 @@ class MapTuningRequest(BaseModel):
     rowHeaders: List[float]
     colHeaders: List[float]
     braking_signal: bool
+    gainVal: float
+    offsetVal: float
 
 
 class MapTuningSaveResponse(BaseModel):

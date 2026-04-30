@@ -41,7 +41,9 @@ async def save_map(payload: MapTuningRequest):
             "rowHeaders": np.array(payload.rowHeaders),
             "colHeaders": np.array(payload.colHeaders),
             "datasetId": payload.datasetId,
-            "braking_signal": payload.braking_signal
+            "braking_signal": payload.braking_signal,
+            "gainVal": payload.gainVal,
+            "offsetVal": payload.offsetVal
         }
 
         return {

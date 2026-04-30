@@ -4,15 +4,7 @@ import { calculateMapTuning } from "../api";
 // ============================================================================
 // TYPES ET PERSISTENCE LOCALSTORAGE
 // ============================================================================
-export type MapTuningData = {
-  inputChannelX: string;
-  inputChannelY: string;
-  outputChannelName: string;
-  gridData: number[][];
-  rowHeaders: number[];
-  colHeaders: number[];
-  braking_signal: boolean;
-};
+import { MapTuningData } from "../types";
 
 const STORAGE_KEY = "map_tuning_local_configs";
 const STORAGE_CURRENT_KEY = "current_config";
@@ -135,6 +127,8 @@ export default function MapTuning({
   // State: Grid
   const [numRows, setNumRows] = useState<number>(5);
   const [numCols, setNumCols] = useState<number>(5);
+  const [gainVal, setGainVal] = useState<number>(1);
+  const [offsetVal, setOffsetVal] = useState<number>(0);
   const [gridData, setGridData] = useState<number[][]>(
     Array(5).fill(null).map(() => Array(5).fill(50.0))
   );
@@ -286,6 +280,16 @@ export default function MapTuning({
     }
   };
 
+  const handleGainChange = (newGain: number) => {
+    if (newGain < -50 || newGain > 50) return;
+    setGainVal(newGain);
+  };
+
+  const handleOffsetChange = (newOffset: number) => {
+    if (newOffset < -50 || newOffset > 50) return;
+    setOffsetVal(newOffset);
+  };
+
   // ============================================================================
   // ACTIONS (API & LOCALSTORAGE)
   // ============================================================================
@@ -299,7 +303,9 @@ export default function MapTuning({
       gridData, 
       rowHeaders, 
       colHeaders,
-      braking_signal 
+      braking_signal,
+      gainVal,
+      offsetVal
     };
     try {
       saveLocalConfig(outputChannelName, data);
@@ -324,7 +330,9 @@ export default function MapTuning({
       gridData, 
       rowHeaders, 
       colHeaders,
-      braking_signal 
+      braking_signal,
+      gainVal,
+      offsetVal
     };
     try {
       const result: any = await calculateMapTuning({ datasetId, ...data });
@@ -358,6 +366,8 @@ export default function MapTuning({
       setNumRows(config.rowHeaders.length);
       setNumCols(config.colHeaders.length);
       setBraking_signal(config.braking_signal || false);
+      setGainVal(config.gainVal ?? 1);
+      setOffsetVal(config.offsetVal ?? 0);
       setShowConfigMenu(false);
       setSaveMessage({ type: "success", text: `Configuration "${name}" chargée.` });
     }
@@ -494,6 +504,18 @@ export default function MapTuning({
             <button className="small-button" onClick={() => handleColsChange(numCols - 1)}>−</button>
             <span style={{ minWidth: "20px", textAlign: "center" }}>{numCols}</span>
             <button className="small-button" onClick={() => handleColsChange(numCols + 1)}>+</button>
+          </div>
+          <div style={{ display: "flex", gap: "1rem", alignItems: "center" }}>
+            <span className="field-label" style={{ margin: 0 }}>Gain:</span>
+            <button className="small-button" onClick={() => handleGainChange(gainVal - 1)}>−</button>
+            <span style={{ minWidth: "20px", textAlign: "center" }}>{gainVal}</span>
+            <button className="small-button" onClick={() => handleGainChange(gainVal + 1)}>+</button>
+          </div>
+          <div style={{ display: "flex", gap: "1rem", alignItems: "center" }}>
+            <span className="field-label" style={{ margin: 0 }}>Offset:</span>
+            <button className="small-button" onClick={() => handleOffsetChange(offsetVal - 1)}>−</button>
+            <span style={{ minWidth: "20px", textAlign: "center" }}>{offsetVal}</span>
+            <button className="small-button" onClick={() => handleOffsetChange(offsetVal + 1)}>+</button>
           </div>
           <div className="map-tuning-min-max">
             <span>Min: <strong style={{ color: "#22c55e" }}>{minValue.toFixed(2)}</strong></span>

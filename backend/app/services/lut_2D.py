@@ -13,8 +13,10 @@ class LUT2D:
     lut_values: np.ndarray
     output_channel: str
     braking_signal: bool
+    gainVal: float
+    offsetVal: float
 
-    def __init__(self, x_axis_label, y_axis_label, x_axis_values, y_axis_values, lut_values, output_channel, braking_signal):
+    def __init__(self, x_axis_label, y_axis_label, x_axis_values, y_axis_values, lut_values, output_channel, braking_signal, gainVal, offsetVal):
         assert x_axis_values.size == lut_values.shape[0], 'Incorrect size for x axis'
         assert y_axis_values.size == lut_values.shape[1], 'Incorrect size for y axis'
         self.x_axis_label = x_axis_label
@@ -24,6 +26,8 @@ class LUT2D:
         self.lut_values = lut_values
         self.output_channel = output_channel
         self.braking_signal = braking_signal
+        self.gainVal = gainVal
+        self.offsetVal = offsetVal
 
     def apply2DLUT(self, dataset: dict):
         """ Apply a 2D LUT on dataset's channels with the 2DLUT defined in lut_data """
@@ -47,6 +51,8 @@ class LUT2D:
 
         if self.braking_signal:
             output_channel = np.where(MBrakeR > np.min(MBrakeR) * 0.1, np.nan, output_channel)
+
+        output_channel = self.gainVal * output_channel + self.offsetVal
 
         return output_channel
 
