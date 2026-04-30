@@ -1,10 +1,10 @@
 import { useEffect, useMemo, useState } from "react";
 
-import { queryDataset } from "../api";
+import { queryDataset, calculateMapTuning } from "../api";
 import { evaluateMathChannel } from "../mathChannels";
 import { useTelemetryStore } from "../store/telemetryStore";
 
-import type { AppInfo, DatasetMetadata, MathChannel } from "../types";
+import type { AppInfo, DatasetMetadata, MathChannel, MapTuningData } from "../types";
 
 type ImportPanelProps = {
   appInfo: AppInfo | null;
@@ -18,6 +18,7 @@ type ImportPanelProps = {
   onImportFromPath: (matPath: string) => Promise<void>;
   onAddMathChannel: (name: string, expression: string) => string | null;
   onRemoveMathChannel: (name: string) => void;
+  onRefreshMetaData: () => void;
 };
 
 type SignalStats = {
@@ -29,6 +30,24 @@ type SignalStats = {
 
 const LAST_MAT_PATH_KEY = "telemetry-display.last-mat-path.v1";
 const LAST_PICKER_PATH_KEY = "telemetry-display.last-picker-path.v1";
+const MAP_TUNING_STORAGE_KEY = "map_tuning_local_configs";
+
+function getMapTuningConfigs(): Record<string, MapTuningData> {
+  try {
+    const data = localStorage.getItem(MAP_TUNING_STORAGE_KEY);
+    return data ? JSON.parse(data) : {};
+  } catch (e) {
+    return {};
+  }
+}
+
+function saveMapTuningConfigs(configs: Record<string, MapTuningData>): void {
+  try {
+    localStorage.setItem(MAP_TUNING_STORAGE_KEY, JSON.stringify(configs));
+  } catch (e) {
+    console.error("Failed to save map tuning configs", e);
+  }
+}
 
 function isAbortError(error: unknown): boolean {
   return error instanceof DOMException && error.name === "AbortError";
@@ -104,6 +123,7 @@ export default function ImportPanel({
   onImportFromPath,
   onAddMathChannel,
   onRemoveMathChannel,
+  onRefreshMetaData
 }: ImportPanelProps) {
   const { xAxisMode, startFinishOffsetM, setXAxisMode, setStartFinishOffsetM } = useTelemetryStore();
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
@@ -120,6 +140,9 @@ export default function ImportPanel({
   const [mathName, setMathName] = useState("");
   const [mathExpression, setMathExpression] = useState("");
   const [mathError, setMathError] = useState<string | null>(null);
+  const [mapTuningSectionOpen, setMapTuningSectionOpen] = useState(false);
+  const [mapTuningGainOffsets, setMapTuningGainOffsets] = useState<Record<string, { gain: number; offset: number }>>({});
+
 
   const canImport = useMemo(() => selectedFile !== null && !importing, [importing, selectedFile]);
   const canImportFromPath = useMemo(() => matPath.trim().length > 0 && !importing, [importing, matPath]);
@@ -255,6 +278,42 @@ export default function ImportPanel({
   function formatStat(value: number): string {
     return Number.isFinite(value) ? value.toFixed(3) : "-";
   }
+
+  const recalculateMapTuning = async (configName: string, gain: number, offset: number) => {
+    if (!datasetId) return;
+    const configs = getMapTuningConfigs();
+    const config = configs[configName];
+    if (!config) return;
+
+    try {
+      await calculateMapTuning({
+        datasetId,
+        inputChannelX: config.inputChannelX,
+        inputChannelY: config.inputChannelY,
+        outputChannelName: config.outputChannelName,
+        gridData: config.gridData,
+        rowHeaders: config.rowHeaders,
+        colHeaders: config.colHeaders,
+        braking_signal: config.braking_signal,
+        gainVal: gain,
+        offsetVal: offset,
+      });
+
+      // Update the stored config with new gain/offset
+      const updatedConfigs = { ...configs };
+      updatedConfigs[configName] = {
+        ...config,
+        gainVal: gain,
+        offsetVal: offset,
+      };
+      saveMapTuningConfigs(updatedConfigs);
+
+      // Refresh all math channels that depend on this map
+      await onRefreshMetaData();
+    } catch (err) {
+      console.error("Failed to recalculate map tuning:", err);
+    }
+  };
 
   async function handleImportClick() {
     if (!selectedFile) {
@@ -605,6 +664,115 @@ export default function ImportPanel({
                 })}
               </div>
             ) : null}
+          </div>
+        ) : null}
+      </div>
+
+      {/* Sous-menu Cartographies */}
+      <div className="import-submenu">
+        <button
+          type="button"
+          className="import-submenu-toggle"
+          onClick={() => setMapTuningSectionOpen((prev) => !prev)}
+        >
+          <span>{mapTuningSectionOpen ? "▾" : "▸"}</span>
+          <span>Cartographies Stockées</span>
+        </button>
+        {mapTuningSectionOpen ? (
+          <div className="import-submenu-content">
+            {(() => {
+              const configs = getMapTuningConfigs();
+              const configNames = Object.keys(configs);
+              if (configNames.length === 0) {
+                return (
+                  <div style={{ padding: "1rem", textAlign: "center", fontSize: "0.8rem", color: "var(--fg-2)" }}>
+                    Aucune cartographie stockée
+                  </div>
+                );
+              }
+
+              return (
+                <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
+                  {configNames.map((configName) => {
+                    const config = configs[configName];
+                    const gains = mapTuningGainOffsets[configName] ?? {
+                      gain: config.gainVal ?? 1,
+                      offset: config.offsetVal ?? 0,
+                    };
+
+                    return (
+                      <div
+                        key={configName}
+                        style={{
+                          padding: "0.75rem",
+                          border: "1px solid var(--line)",
+                          borderRadius: "4px",
+                          display: "flex",
+                          flexDirection: "column",
+                          gap: "0.5rem",
+                        }}
+                      >
+                        <div style={{ fontSize: "0.85rem", fontWeight: "500", color: "var(--fg-1)" }}>
+                          {configName}
+                        </div>
+                        <div style={{ display: "flex", flexDirection: "column" }}>
+                          <label style={{ display: "flex", flexDirection: "column", gap: "0.25rem" }}>
+                            <span>Gain:</span>
+                            <input
+                              type="number"
+                              value={gains.gain}
+                              onChange={(e) => {
+                                const newGain = Number(e.target.value);
+                                setMapTuningGainOffsets((prev) => ({
+                                  ...prev,
+                                  [configName]: { ...gains, gain: newGain },
+                                }));
+                              }}
+                              style={{
+                                padding: "0.4rem",
+                                border: "1px solid var(--line)",
+                                borderRadius: "2px",
+                                background: "var(--bg-2)",
+                                color: "var(--fg-1)",
+                              }}
+                            />
+                          </label>
+                          <label style={{ display: "flex", flexDirection: "column", gap: "0.25rem" }}>
+                            <span>Offset:</span>
+                            <input
+                              type="number"
+                              value={gains.offset}
+                              onChange={(e) => {
+                                const newOffset = Number(e.target.value);
+                                setMapTuningGainOffsets((prev) => ({
+                                  ...prev,
+                                  [configName]: { ...gains, offset: newOffset },
+                                }));
+                              }}
+                              style={{
+                                padding: "0.4rem",
+                                border: "1px solid var(--line)",
+                                borderRadius: "2px",
+                                background: "var(--bg-2)",
+                                color: "var(--fg-1)",
+                              }}
+                            />
+                          </label>
+                        </div>
+                        <button
+                          className="small-button"
+                          onClick={() => recalculateMapTuning(configName, gains.gain, gains.offset)}
+                          disabled={!datasetId}
+                          style={{ fontSize: "0.8rem" }}
+                        >
+                          🔄 Recalculer
+                        </button>
+                      </div>
+                    );
+                  })}
+                </div>
+              );
+            })()}
           </div>
         ) : null}
       </div>
