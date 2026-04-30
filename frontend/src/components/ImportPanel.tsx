@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type CSSProperties, type KeyboardEvent } from "react";
 
 import { queryDataset, calculateMapTuning } from "../api";
 import { evaluateMathChannel } from "../mathChannels";
@@ -47,6 +47,56 @@ function saveMapTuningConfigs(configs: Record<string, MapTuningData>): void {
   } catch (e) {
     console.error("Failed to save map tuning configs", e);
   }
+}
+
+interface DecimalNumberInputProps {
+  value: number;
+  onChange: (value: number) => void;
+  style?: CSSProperties;
+}
+
+function DecimalNumberInput({ value, onChange, style }: DecimalNumberInputProps) {
+  const [localValue, setLocalValue] = useState(String(value));
+  const [isFocused, setIsFocused] = useState(false);
+
+  useEffect(() => {
+    if (!isFocused) {
+      setLocalValue(String(value));
+    }
+  }, [value, isFocused]);
+
+  const handleBlur = () => {
+    setIsFocused(false);
+    const parsed = parseFloat(localValue.replace(",", "."));
+    if (!isNaN(parsed)) {
+      onChange(parsed);
+      setLocalValue(String(parsed));
+    } else {
+      setLocalValue(String(value));
+    }
+  };
+
+  const handleKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "Enter") {
+      e.currentTarget.blur();
+    }
+  };
+
+  return (
+    <input
+      type="text"
+      inputMode="decimal"
+      value={localValue}
+      onChange={(e) => setLocalValue(e.target.value)}
+      onFocus={(e) => {
+        setIsFocused(true);
+        e.target.select();
+      }}
+      onBlur={handleBlur}
+      onKeyDown={handleKeyDown}
+      style={style}
+    />
+  );
 }
 
 function isAbortError(error: unknown): boolean {
@@ -715,49 +765,113 @@ export default function ImportPanel({
                         <div style={{ fontSize: "0.85rem", fontWeight: "500", color: "var(--fg-1)" }}>
                           {configName}
                         </div>
-                        <div style={{ display: "flex", flexDirection: "column" }}>
-                          <label style={{ display: "flex", flexDirection: "column", gap: "0.25rem" }}>
-                            <span>Gain:</span>
-                            <input
-                              type="number"
-                              value={gains.gain}
-                              onChange={(e) => {
-                                const newGain = Number(e.target.value);
-                                setMapTuningGainOffsets((prev) => ({
-                                  ...prev,
-                                  [configName]: { ...gains, gain: newGain },
-                                }));
-                              }}
-                              style={{
-                                padding: "0.4rem",
-                                border: "1px solid var(--line)",
-                                borderRadius: "2px",
-                                background: "var(--bg-2)",
-                                color: "var(--fg-1)",
-                              }}
-                            />
-                          </label>
-                          <label style={{ display: "flex", flexDirection: "column", gap: "0.25rem" }}>
-                            <span>Offset:</span>
-                            <input
-                              type="number"
-                              value={gains.offset}
-                              onChange={(e) => {
-                                const newOffset = Number(e.target.value);
-                                setMapTuningGainOffsets((prev) => ({
-                                  ...prev,
-                                  [configName]: { ...gains, offset: newOffset },
-                                }));
-                              }}
-                              style={{
-                                padding: "0.4rem",
-                                border: "1px solid var(--line)",
-                                borderRadius: "2px",
-                                background: "var(--bg-2)",
-                                color: "var(--fg-1)",
-                              }}
-                            />
-                          </label>
+                        <div style={{ display: "grid", gap: "0.75rem" }}>
+                          <div style={{ display: "flex", flexDirection: "column" }}>
+                            <label style={{ display: "flex", flexDirection: "column", gap: "0.25rem"}}>
+                              <span>Gain:</span>
+                              <div style={{ display: "flex", gap: "0.25rem", alignItems: "center"}}>
+                                <button
+                                  type="button"
+                                  className="small-button"
+                                  onClick={() =>
+                                    setMapTuningGainOffsets((prev) => ({
+                                      ...prev,
+                                      [configName]: {
+                                        ...gains,
+                                        gain: Number((gains.gain - 0.1).toFixed(1)),
+                                      },
+                                    }))
+                                  }
+                                >
+                                  −
+                                </button>
+                                <DecimalNumberInput
+                                  value={gains.gain}
+                                  onChange={(newGain) =>
+                                    setMapTuningGainOffsets((prev) => ({
+                                      ...prev,
+                                      [configName]: { ...gains, gain: newGain },
+                                    }))
+                                  }
+                                  style={{
+                                    flex: 1,
+                                    padding: "0.4rem",
+                                    border: "1px solid var(--line)",
+                                    borderRadius: "2px",
+                                    background: "var(--bg-2)",
+                                    color: "var(--fg-1)",
+                                  }}
+                                />
+                                <button
+                                  type="button"
+                                  className="small-button"
+                                  onClick={() =>
+                                    setMapTuningGainOffsets((prev) => ({
+                                      ...prev,
+                                      [configName]: {
+                                        ...gains,
+                                        gain: Number((gains.gain + 0.1).toFixed(1)),
+                                      },
+                                    }))
+                                  }
+                                >
+                                  +
+                                </button>
+                              </div>
+                            </label>
+                            <label style={{ display: "flex", flexDirection: "column", gap: "0.25rem" }}>
+                              <span>Offset:</span>
+                              <div style={{ display: "flex", gap: "0.25rem", alignItems: "center" }}>
+                                <button
+                                  type="button"
+                                  className="small-button"
+                                  onClick={() =>
+                                    setMapTuningGainOffsets((prev) => ({
+                                      ...prev,
+                                      [configName]: {
+                                        ...gains,
+                                        offset: Number((gains.offset - 0.1).toFixed(1)),
+                                      },
+                                    }))
+                                  }
+                                >
+                                  −
+                                </button>
+                                <DecimalNumberInput
+                                  value={gains.offset}
+                                  onChange={(newOffset) =>
+                                    setMapTuningGainOffsets((prev) => ({
+                                      ...prev,
+                                      [configName]: { ...gains, offset: newOffset },
+                                    }))
+                                  }
+                                  style={{
+                                    flex: 1,
+                                    padding: "0.4rem",
+                                    border: "1px solid var(--line)",
+                                    borderRadius: "2px",
+                                    background: "var(--bg-2)",
+                                    color: "var(--fg-1)",
+                                  }}
+                                />
+                                <button
+                                  type="button"
+                                  className="small-button"
+                                  onClick={() =>
+                                    setMapTuningGainOffsets((prev) => ({
+                                      ...prev,
+                                      [configName]: {
+                                        ...gains,
+                                        offset: Number((gains.offset + 0.1).toFixed(1)),
+                                      },
+                                    }))
+                                  }
+                                >
+                                  +
+                                </button>
+                              </div>
+                            </label>
+                          </div>
                         </div>
                         <button
                           className="small-button"
