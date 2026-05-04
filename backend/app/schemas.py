@@ -49,7 +49,7 @@ class DatasetQueryRequest(BaseModel):
 class DatasetQueryResponse(BaseModel):
     lap_distance: List[float]
     lap_time: Optional[List[float]] = None
-    signals: dict[str, List[float]]
+    signals: Dict[str, List[float]]
     decimation_factor: int = Field(description="Points were averaged by this factor")
 
 

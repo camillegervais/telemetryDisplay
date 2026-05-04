@@ -412,7 +412,7 @@ export default function MapTuning({
           </div>
           <div>
             <label className="field-label">Entrée Y (Lignes)</label>
-            <select className="mini-select" style={{ width: "100%" }} value={inputChannelY} onChange={(e) => setInputChannelX(e.target.value)}>
+            <select className="mini-select" style={{ width: "100%" }} value={inputChannelY} onChange={(e) => setInputChannelY(e.target.value)}>
               {availableSignals.map((ch) => <option key={ch} value={ch}>{ch}</option>)}
             </select>
           </div>

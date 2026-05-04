@@ -5,7 +5,7 @@ MAT file loading, validation, and normalization.
 import uuid
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Dict, Optional, Tuple, Union
+from typing import List, Dict, Optional, Tuple, Union
 
 import numpy as np
 import pandas as pd
@@ -43,7 +43,7 @@ class MatLoader:
 
     def __init__(self, reference_step_m: float = 1.0):
         self.reference_step_m = reference_step_m
-        self.loaded_datasets: dict[str, Tuple[pd.DataFrame, DatasetMetadata]] = {}
+        self.loaded_datasets: Dict[str, Tuple[pd.DataFrame, DatasetMetadata]] = {}
 
     def load_and_normalize(self, mat_path: Union[str, Path]) -> Tuple[pd.DataFrame, DatasetMetadata]:
         """
@@ -106,7 +106,7 @@ class MatLoader:
         if not signal_names:
             raise MatValidationError("No signal variables found in .mat file")
 
-        trimmed_signals: dict[str, np.ndarray] = {}
+        trimmed_signals: Dict[str, np.ndarray] = {}
         source_time: Optional[np.ndarray] = None
         if sample_rate_hz is not None and sample_rate_hz > 0:
             source_time_raw = np.arange(source_points, dtype=float) / sample_rate_hz
@@ -365,7 +365,7 @@ class MatLoader:
     def _resample_to_reference_step(
         self,
         lap_distance: np.ndarray,
-        signals: dict[str, np.ndarray],
+        signals: Dict[str, np.ndarray],
         source_time: Optional[np.ndarray] = None,
     ) -> pd.DataFrame:
         """
@@ -402,7 +402,7 @@ class MatLoader:
         """Retrieve cached dataset by ID."""
         return self.loaded_datasets.get(dataset_id)
 
-    def get_all_datasets(self) -> dict[str, DatasetMetadata]:
+    def get_all_datasets(self) -> Dict[str, DatasetMetadata]:
         """Get metadata of all loaded datasets."""
         return {
             dataset_id: metadata for dataset_id, (_, metadata) in self.loaded_datasets.items()

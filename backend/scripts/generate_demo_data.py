@@ -4,7 +4,7 @@ import numpy as np
 from scipy.io import savemat
 
 
-def build_demo_dataset(num_points: int = 2000) -> dict[str, np.ndarray]:
+def build_demo_dataset(num_points: int = 2000) -> Dict[str, np.ndarray]:
     lap_distance = np.linspace(0.0, 7000.0, num_points)
     distance_step_m = np.array([float(np.median(np.diff(lap_distance)))])
 
