@@ -52,7 +52,7 @@ def _track_csv_path_from_metadata(source_path: str) -> Optional[Path]:
     if not csv_files:
         return None
 
-    candidates: list[tuple[int, Path]] = []
+    candidates: List[Tuple[int, Path]] = []
     generic_tokens = {"data", "track", "pilote", "reference", "midline", "result", "import", "cache"}
 
     for csv_path in csv_files:

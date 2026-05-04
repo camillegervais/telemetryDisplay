@@ -25,7 +25,7 @@ class DatasetMetadataResponse(BaseModel):
     num_samples: int
     lap_distance_min: float
     lap_distance_max: float
-    signal_names: list[str]
+    signal_names: List[str]
     source_sample_rate_hz: Optional[float]
     has_time_axis: bool
     interpolation_method: str
@@ -34,7 +34,7 @@ class DatasetMetadataResponse(BaseModel):
 
 # === Dataset Query ===
 class DatasetQueryRequest(BaseModel):
-    signals: list[str] = Field(..., description="List of signal names to fetch")
+    signals: List[str] = Field(..., description="List of signal names to fetch")
     start_distance: float = Field(
         default=0.0, description="Start distance in meters"
     )
@@ -47,17 +47,17 @@ class DatasetQueryRequest(BaseModel):
 
 
 class DatasetQueryResponse(BaseModel):
-    lap_distance: list[float]
-    lap_time: Optional[list[float]] = None
-    signals: dict[str, list[float]]
+    lap_distance: List[float]
+    lap_time: Optional[List[float]] = None
+    signals: dict[str, List[float]]
     decimation_factor: int = Field(description="Points were averaged by this factor")
 
 
 # === Track Map ===
 class TrackMapResponse(BaseModel):
-    lap_distance: list[float]
-    x_position: list[float]
-    y_position: list[float]
+    lap_distance: List[float]
+    x_position: List[float]
+    y_position: List[float]
 
 
 # === Import Status ===

@@ -30,8 +30,8 @@ class DatasetMetadata:
     source_distance_step_m: float
     normalized_distance_step_m: float
     num_samples: int
-    lap_distance_range: tuple[float, float]
-    signal_names: list[str]
+    lap_distance_range: Tuple[float, float]
+    signal_names: List[str]
     source_sample_rate_hz: Optional[float] = None
     has_time_axis: bool = False
     interpolation_method: str = "linear"
@@ -43,7 +43,7 @@ class MatLoader:
 
     def __init__(self, reference_step_m: float = 1.0):
         self.reference_step_m = reference_step_m
-        self.loaded_datasets: dict[str, tuple[pd.DataFrame, DatasetMetadata]] = {}
+        self.loaded_datasets: dict[str, Tuple[pd.DataFrame, DatasetMetadata]] = {}
 
     def load_and_normalize(self, mat_path: Union[str, Path]) -> Tuple[pd.DataFrame, DatasetMetadata]:
         """
@@ -222,7 +222,7 @@ class MatLoader:
 
         return step
 
-    def _extract_signal_names(self, mat_data: dict, expected_length: int) -> list[str]:
+    def _extract_signal_names(self, mat_data: dict, expected_length: int) -> List[str]:
         """
         Extract signal variable names, excluding metadata and structural keys.
 

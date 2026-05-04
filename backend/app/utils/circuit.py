@@ -69,7 +69,7 @@ def fetch_circuit_coordinates(circuit_name: str, year: int = 2024) -> Optional[n
         return None
 
 
-def generate_synthetic_circuit(lap_distance: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+def generate_synthetic_circuit(lap_distance: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
     """
     Generate synthetic circuit coordinates for demo/fallback.
 
