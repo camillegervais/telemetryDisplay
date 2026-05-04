@@ -34,6 +34,7 @@ export type InspectorWidgetSummary = {
   alignZero: boolean;
   alignMode: "off" | "origin-scale" | "origin-only";
   menuOpen: boolean;
+  options?: WidgetOptions;
 };
 
 export type InspectorSnapshot = {
@@ -46,7 +47,7 @@ export type InspectorSnapshot = {
 };
 
 export type InspectorCommand = {
-  type: "toggle-menu" | "set-align-zero" | "set-align-mode" | "set-size" | "set-position";
+  type: "toggle-menu" | "set-align-zero" | "set-align-mode" | "set-size" | "set-position" | "set-hide-positive" | "set-hide-negative" | "set-filter-braking" | "set-y-axis-min" | "set-y-axis-max";
   widgetId: number;
   alignZero?: boolean;
   alignMode?: "origin-scale" | "origin-only";
@@ -54,6 +55,11 @@ export type InspectorCommand = {
   heightSpan?: number;
   row?: number;
   col?: number;
+  hidePositive?: boolean;
+  hideNegative?: boolean;
+  filterByBraking?: boolean;
+  yAxisMin?: number;
+  yAxisMax?: number;
 };
 
 type YAxisMatchMode = "origin-scale" | "origin-only";
@@ -61,6 +67,11 @@ type YAxisMatchMode = "origin-scale" | "origin-only";
 type WidgetOptions = {
   alignZero?: boolean;
   yAxisMatchMode?: YAxisMatchMode;
+  hidePositive?: boolean;
+  hideNegative?: boolean;
+  filterByBraking?: boolean;
+  yAxisMin?: number;
+  yAxisMax?: number;
   [key: string]: unknown;
 };
 
@@ -192,6 +203,9 @@ function normalizeWidget(widget: GraphWidget, forceCloseMenu: boolean): GraphWid
     ...(options ?? {}),
     alignZero: options?.alignZero ?? legacyAlignZero ?? false,
     yAxisMatchMode: normalizedMatchMode,
+    hidePositive: options?.hidePositive ?? false,
+    hideNegative: options?.hideNegative ?? false,
+    filterByBraking: options?.filterByBraking ?? false,
   };
 
   return {
@@ -521,7 +535,8 @@ function buildChartConfig(
   graphOnlyMode: boolean,
   homeRevision: number,
   yAxisMatchMode: "off" | YAxisMatchMode,
-  xAxisMode: "distance" | "time"
+  xAxisMode: "distance" | "time",
+  options?: WidgetOptions
 ) {
   if (!series || selectedSignals.length === 0) {
     return {
@@ -550,19 +565,35 @@ function buildChartConfig(
         )
       : {};
 
-  const data = selectedSignals.map((signal, index) => ({
-    type: "scatter" as const,
-    mode: "lines" as const,
-    name: signal,
-    x: xValues,
-    y: series.signals[signal] ?? [],
-    line: {
-      color: COLORS[index % COLORS.length],
-      width: 2,
-    },
-    yaxis: useSharedYAxis ? "y" : index === 0 ? "y" : `y${index + 1}`,
-    hovertemplate: `%{y:.3f}<extra></extra>`,
-  }));
+  const data = selectedSignals.map((signal, index) => {
+    let yValues = series.signals[signal] ?? [];
+    
+    // Apply filters
+    if (options?.hidePositive) {
+      yValues = yValues.map(v => v > 0 ? NaN : v);
+    }
+    if (options?.hideNegative) {
+      yValues = yValues.map(v => v < 0 ? NaN : v);
+    }
+    if (options?.filterByBraking && series.signals['MBrakeR']) {
+      const brakeValues = series.signals['MBrakeR'];
+      yValues = yValues.map((v, i) => brakeValues[i] !== 0 ? v : NaN);
+    }
+
+    return {
+      type: "scatter" as const,
+      mode: "lines" as const,
+      name: signal,
+      x: xValues,
+      y: yValues,
+      line: {
+        color: COLORS[index % COLORS.length],
+        width: 2,
+      },
+      yaxis: useSharedYAxis ? "y" : index === 0 ? "y" : `y${index + 1}`,
+      hovertemplate: `%{y:.3f}<extra></extra>`,
+    };
+  });
 
   const layout: Record<string, unknown> = {
     title: graphOnlyMode ? undefined : title,
@@ -596,6 +627,12 @@ function buildChartConfig(
             autorange: false,
           }
         : {}),
+      ...(options?.yAxisMin !== undefined && options?.yAxisMax !== undefined
+        ? {
+            range: [options.yAxisMin, options.yAxisMax],
+            autorange: false,
+          }
+        : {}),
     },
     hovermode: "x",
     uirevision: `telemetry-grid-${homeRevision}`,
@@ -624,6 +661,12 @@ function buildChartConfig(
               range: originOnlyRanges[signal],
               autorange: false,
               tickmode: "sync",
+            }
+          : {}),
+        ...(options?.yAxisMin !== undefined && options?.yAxisMax !== undefined
+          ? {
+              range: [options.yAxisMin, options.yAxisMax],
+              autorange: false,
             }
           : {}),
       };
@@ -656,7 +699,8 @@ function buildXYChartConfig(
   xSignal: string | null,
   ySignals: string[],
   graphOnlyMode: boolean,
-  homeRevision: number
+  homeRevision: number,
+  options?: WidgetOptions
 ) {
   if (!series || !xSignal || ySignals.length === 0) {
     return {
@@ -671,19 +715,35 @@ function buildXYChartConfig(
   }
 
   const xValues = series.signals[xSignal] ?? [];
-  const data = ySignals.map((signal, index) => ({
-    type: "scatter" as const,
-    mode: "markers" as const,
-    name: `${signal} vs ${xSignal}`,
-    x: xValues,
-    y: series.signals[signal] ?? [],
-    marker: {
-      color: COLORS[index % COLORS.length],
-      size: 5,
-      opacity: 0.8,
-    },
-    hovertemplate: `%{y:.3f}<extra></extra>`,
-  }));
+  const data = ySignals.map((signal, index) => {
+    let yValues = series.signals[signal] ?? [];
+    
+    // Apply filters to y values
+    if (options?.hidePositive) {
+      yValues = yValues.map(v => v > 0 ? NaN : v);
+    }
+    if (options?.hideNegative) {
+      yValues = yValues.map(v => v < 0 ? NaN : v);
+    }
+    if (options?.filterByBraking && series.signals['MBrakeR']) {
+      const brakeValues = series.signals['MBrakeR'];
+      yValues = yValues.map((v, i) => brakeValues[i] !== 0 ? v : NaN);
+    }
+
+    return {
+      type: "scatter" as const,
+      mode: "markers" as const,
+      name: `${signal} vs ${xSignal}`,
+      x: xValues,
+      y: yValues,
+      marker: {
+        color: COLORS[index % COLORS.length],
+        size: 5,
+        opacity: 0.8,
+      },
+      hovertemplate: `%{y:.3f}<extra></extra>`,
+    };
+  });
 
   const layout: Record<string, unknown> = {
     title: graphOnlyMode ? undefined : title,
@@ -702,7 +762,14 @@ function buildXYChartConfig(
       title: graphOnlyMode ? undefined : "Y",
       gridcolor: "rgba(255, 93, 120, 0.22)",
       zeroline: false,
-      autorange: true,
+      ...(options?.yAxisMin !== undefined && options?.yAxisMax !== undefined
+        ? {
+            range: [options.yAxisMin, options.yAxisMax],
+            autorange: false,
+          }
+        : {
+            autorange: true,
+          }),
     },
     hovermode: "closest",
     uirevision: `telemetry-xy-${homeRevision}`,
@@ -893,6 +960,7 @@ export default function SignalWorkspace({
       alignZero: getWidgetAlignZero(widget),
       alignMode: getWidgetYAxisMatchMode(widget),
       menuOpen: widget.menuOpen,
+      options: widget.options,
     }));
 
     onInspectorSnapshotChange({
@@ -1008,6 +1076,92 @@ export default function SignalWorkspace({
           item.id === inspectorCommand.widgetId ? { ...item, row, col } : item
         );
       });
+      return;
+    }
+
+    if (inspectorCommand.type === "set-hide-positive") {
+      setWidgets((prev) =>
+        prev.map((item) =>
+          item.id === inspectorCommand.widgetId
+            ? {
+                ...item,
+                options: {
+                  ...(item.options ?? {}),
+                  hidePositive: inspectorCommand.hidePositive,
+                },
+              }
+            : item
+        )
+      );
+      return;
+    }
+
+    if (inspectorCommand.type === "set-hide-negative") {
+      setWidgets((prev) =>
+        prev.map((item) =>
+          item.id === inspectorCommand.widgetId
+            ? {
+                ...item,
+                options: {
+                  ...(item.options ?? {}),
+                  hideNegative: inspectorCommand.hideNegative,
+                },
+              }
+            : item
+        )
+      );
+      return;
+    }
+
+    if (inspectorCommand.type === "set-filter-braking") {
+      setWidgets((prev) =>
+        prev.map((item) =>
+          item.id === inspectorCommand.widgetId
+            ? {
+                ...item,
+                options: {
+                  ...(item.options ?? {}),
+                  filterByBraking: inspectorCommand.filterByBraking,
+                },
+              }
+            : item
+        )
+      );
+      return;
+    }
+
+    if (inspectorCommand.type === "set-y-axis-min") {
+      setWidgets((prev) =>
+        prev.map((item) =>
+          item.id === inspectorCommand.widgetId
+            ? {
+                ...item,
+                options: {
+                  ...(item.options ?? {}),
+                  yAxisMin: inspectorCommand.yAxisMin,
+                },
+              }
+            : item
+        )
+      );
+      return;
+    }
+
+    if (inspectorCommand.type === "set-y-axis-max") {
+      setWidgets((prev) =>
+        prev.map((item) =>
+          item.id === inspectorCommand.widgetId
+            ? {
+                ...item,
+                options: {
+                  ...(item.options ?? {}),
+                  yAxisMax: inspectorCommand.yAxisMax,
+                },
+              }
+            : item
+        )
+      );
+      return;
     }
   }, [inspectorCommand, gridCols, gridRows]);
 
@@ -2532,7 +2686,8 @@ export default function SignalWorkspace({
                   widget.xSignal ?? null,
                   widget.signals,
                   graphOnlyMode,
-                  homeRevision
+                  homeRevision,
+                  widget.options
                 )
               : buildChartConfig(
                   widget.title,
@@ -2543,7 +2698,8 @@ export default function SignalWorkspace({
                   graphOnlyMode,
                   homeRevision,
                   getWidgetYAxisMatchMode(widget),
-                  xAxisMode
+                  xAxisMode,
+                  widget.options
                 );
 
           return (

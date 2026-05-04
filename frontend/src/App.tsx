@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import type { CSSProperties, KeyboardEvent } from "react";
 
 import {
   fetchAppInfo,
@@ -12,6 +13,62 @@ import { analyzeMathExpression } from "./mathChannels";
 import { useTelemetryStore } from "./store/telemetryStore";
 import type { AppInfo, DatasetMetadata, MapTuningData, MathChannel, TrackMapResponse } from "./types";
 import type { InspectorCommand, InspectorSnapshot } from "./components/SignalWorkspace";
+
+interface DecimalNumberInputProps {
+  value: number | undefined;
+  onChange: (value: number | undefined) => void;
+  style?: CSSProperties;
+}
+
+function DecimalNumberInput({ value, onChange, style }: DecimalNumberInputProps) {
+  const [localValue, setLocalValue] = useState(value === undefined ? "" : String(value));
+  const [isFocused, setIsFocused] = useState(false);
+
+  useEffect(() => {
+    if (!isFocused) {
+      setLocalValue(value === undefined ? "" : String(value));
+    }
+  }, [value, isFocused]);
+
+  const handleBlur = () => {
+    setIsFocused(false);
+    const trimmed = localValue.trim();
+    if (trimmed === "") {
+      onChange(undefined);
+      return;
+    }
+    const parsed = parseFloat(trimmed.replace(",", "."));
+    if (!isNaN(parsed)) {
+      onChange(parsed);
+      setLocalValue(String(parsed));
+    } else {
+      setLocalValue(value === undefined ? "" : String(value));
+    }
+  };
+
+  const handleKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "Enter") {
+      e.currentTarget.blur();
+    }
+  };
+
+  return (
+    <input
+      type="text"
+      inputMode="decimal"
+      value={localValue}
+      onChange={(e) => setLocalValue(e.target.value)}
+      onFocus={(e) => {
+        setIsFocused(true);
+        e.target.select();
+      }}
+      onBlur={handleBlur}
+      onKeyDown={handleKeyDown}
+      style={style}
+      placeholder="auto"
+    />
+  );
+}
 
 const USER_DISPLAY_NAME_KEY = "telemetry-display.user-display-name.v1";
 const MATH_CHANNELS_KEY = "telemetry-display.math-channels.v1";
@@ -517,6 +574,95 @@ export default function App() {
                         </select>
                       </label>
                     </div>
+                  </div>
+                </div>
+
+                <div className="inspector-section" style={{ display: 'flex', justifyContent: 'space-between'}}>
+                  <label className="inspector-field-label">Masquer valeurs positives</label>
+                  <input
+                    className="checkbox-inspector"
+                    type="checkbox"
+                    checked={activeInspectorWidget.options?.hidePositive ?? false}
+                    onChange={(e) =>
+                      pushInspectorCommand({
+                        type: "set-hide-positive",
+                        widgetId: activeInspectorWidget.id,
+                        hidePositive: e.target.checked,
+                      })
+                    }
+                  />
+                </div>
+
+                <div className="inspector-section" style={{ display: 'flex', justifyContent: 'space-between'}}>
+                  <label className="inspector-field-label">Masquer valeurs négatives</label>
+                  <input
+                    type="checkbox"
+                    checked={activeInspectorWidget.options?.hideNegative ?? false}
+                    onChange={(e) =>
+                      pushInspectorCommand({
+                        type: "set-hide-negative",
+                        widgetId: activeInspectorWidget.id,
+                        hideNegative: e.target.checked,
+                      })
+                    }
+                  />
+                </div>
+
+                <div className="inspector-section" style={{ display: 'flex', justifyContent: 'space-between'}}>
+                  <label className="inspector-field-label">Signal de freinage</label>
+                  <input
+                    type="checkbox"
+                    checked={activeInspectorWidget.options?.filterByBraking ?? false}
+                    onChange={(e) =>
+                      pushInspectorCommand({
+                        type: "set-filter-braking",
+                        widgetId: activeInspectorWidget.id,
+                        filterByBraking: e.target.checked,
+                      })
+                    }
+                  />
+                </div>
+
+                <div className="inspector-section">
+                  <label className="inspector-field-label">Échelle Y manuelle</label>
+                  <div style={{ display: 'flex', gap: '0.5rem', flexDirection: 'column' }}>
+                    <DecimalNumberInput
+                      value={activeInspectorWidget.options?.yAxisMin}
+                      onChange={(val) =>
+                        pushInspectorCommand({
+                          type: "set-y-axis-min",
+                          widgetId: activeInspectorWidget.id,
+                          yAxisMin: val,
+                        })
+                      }
+                      style={{
+                        flex: 1,
+                        padding: "0.4rem",
+                        border: "1px solid var(--line)",
+                        borderRadius: "2px",
+                        background: "var(--bg-2)",
+                        color: "var(--fg-1)",
+                      }}
+                    />
+                    <span>à</span>
+                    <DecimalNumberInput
+                      value={activeInspectorWidget.options?.yAxisMax}
+                      onChange={(val) =>
+                        pushInspectorCommand({
+                          type: "set-y-axis-max",
+                          widgetId: activeInspectorWidget.id,
+                          yAxisMax: val,
+                        })
+                      }
+                      style={{
+                        flex: 1,
+                        padding: "0.4rem",
+                        border: "1px solid var(--line)",
+                        borderRadius: "2px",
+                        background: "var(--bg-2)",
+                        color: "var(--fg-1)",
+                      }}
+                    />
                   </div>
                 </div>
               </div>

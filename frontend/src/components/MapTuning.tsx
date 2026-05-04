@@ -55,7 +55,7 @@ interface MapTuningProps {
 }
 
 // ============================================================================
-// COMPOSANT INPUT SUR-MESURE (Utilise .table-input du CSS)
+// COMPOSANT INPUT SUR-MESURE
 // ============================================================================
 interface NumberInputProps {
   value: number;

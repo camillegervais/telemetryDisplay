@@ -50,29 +50,34 @@ function saveMapTuningConfigs(configs: Record<string, MapTuningData>): void {
 }
 
 interface DecimalNumberInputProps {
-  value: number;
-  onChange: (value: number) => void;
+  value: number | undefined;
+  onChange: (value: number | undefined) => void;
   style?: CSSProperties;
 }
 
 function DecimalNumberInput({ value, onChange, style }: DecimalNumberInputProps) {
-  const [localValue, setLocalValue] = useState(String(value));
+  const [localValue, setLocalValue] = useState(value === undefined ? "" : String(value));
   const [isFocused, setIsFocused] = useState(false);
 
   useEffect(() => {
     if (!isFocused) {
-      setLocalValue(String(value));
+      setLocalValue(value === undefined ? "" : String(value));
     }
   }, [value, isFocused]);
 
   const handleBlur = () => {
     setIsFocused(false);
-    const parsed = parseFloat(localValue.replace(",", "."));
+    const trimmed = localValue.trim();
+    if (trimmed === "") {
+      onChange(undefined);
+      return;
+    }
+    const parsed = parseFloat(trimmed.replace(",", "."));
     if (!isNaN(parsed)) {
       onChange(parsed);
       setLocalValue(String(parsed));
     } else {
-      setLocalValue(String(value));
+      setLocalValue(value === undefined ? "" : String(value));
     }
   };
 
@@ -95,6 +100,7 @@ function DecimalNumberInput({ value, onChange, style }: DecimalNumberInputProps)
       onBlur={handleBlur}
       onKeyDown={handleKeyDown}
       style={style}
+      placeholder="auto"
     />
   );
 }

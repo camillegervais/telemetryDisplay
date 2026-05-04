@@ -1456,6 +1456,9 @@ body::after {
   border-color: currentColor;
 }
 
+.checkbox-inspector {
+  background-color: rgba(255, 70, 93, 0.45);
+}
 
 .plot-shell {
   position: relative;
