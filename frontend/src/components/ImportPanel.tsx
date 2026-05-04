@@ -87,6 +87,17 @@ function DecimalNumberInput({ value, onChange, style }: DecimalNumberInputProps)
     }
   };
 
+  const defaultStyle: CSSProperties = {
+    padding: "0.5rem 0.5rem",
+    border: "1.5px solid rgba(255, 70, 93, 0.4)",
+    borderRadius: "2px",
+    background: "rgba(22, 8, 12, 0.9)",
+    color: "var(--fg-1)",
+    fontSize: "0.82rem",
+    fontFamily: '"Space Grotesk", monospace',
+    transition: "all 0.2s ease",
+  };
+
   return (
     <input
       type="text"
@@ -99,7 +110,7 @@ function DecimalNumberInput({ value, onChange, style }: DecimalNumberInputProps)
       }}
       onBlur={handleBlur}
       onKeyDown={handleKeyDown}
-      style={style}
+      style={{ ...defaultStyle, ...style }}
       placeholder="auto"
     />
   );
