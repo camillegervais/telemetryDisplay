@@ -1881,34 +1881,65 @@ export default function SignalWorkspace({
   }
 
   function saveCurrentConfiguration() {
-    const defaultName = `Configuration ${savedConfigs.length + 1}`;
+    // Create a default name for the prompt
+    const defaultName = savedConfigs.find(elem => elem.id === currentConfigId)?.name || `Configuration ${savedConfigs.length + 1}`;
+    // Get the new name from the user
     const nextName = window.prompt("Nom de la configuration", defaultName);
+    // If no name entered we abort
     if (!nextName) {
       return;
     }
 
+    // Create the tab configuration
     const normalizedTabs = tabs.map((tab) => ({
       ...tab,
       widgets: sanitizeWidgetsForStorage(tab.widgets),
     }));
 
-    const newId = makeId("cfg");
-    const newConfig: SavedWorkspaceConfig = {
-      id: newId,
-      name: nextName.trim() || defaultName,
-      tabs: normalizedTabs,
-      activeTabId,
-      mapTuning: mapTuningData,
-    };
+    // If the name is already saved, we update the saved configuration
+    if(savedConfigs.find(e => e.name === nextName)) {
+      setSavedConfigs((prev) => {
+        const nextConfigs = prev.map((elem) => {
+          if(elem.name === nextName) {
+            return {
+              id: elem.id,
+              name: elem.name,
+              tabs: normalizedTabs,
+              activeTabId,
+              mapTuning: mapTuningData,
+            };
+          } else {
+            return elem;
+          }
+        });
+        return nextConfigs;
+      });
+    }
+    // Else we add the current configuration
+    else {
+      // Create a fully new object with all the data
+      const newId = makeId("cfg");
+      const newConfig: SavedWorkspaceConfig = {
+        id: newId,
+        name: nextName.trim() || defaultName,
+        tabs: normalizedTabs,
+        activeTabId,
+        mapTuning: mapTuningData,
+      };
 
-    setCurrentConfigId(newId);
-    setSelectedConfigId(newId);
+      // Update the current configuration
+      setCurrentConfigId(newId);
+      setSelectedConfigId(newId);
 
-    setSavedConfigs((prev) => {
-      const nextConfigs = [...prev, newConfig];
-      storeWorkspaceConfigs(nextConfigs);
-      return nextConfigs;
-    });
+      // Add the new configuration to the list
+      setSavedConfigs((prev) => {
+        const nextConfigs = [...prev, newConfig];
+        storeWorkspaceConfigs(nextConfigs);
+        return nextConfigs;
+      });
+    }
+    
+    
   }
 
   function loadConfiguration(configId: string) {
