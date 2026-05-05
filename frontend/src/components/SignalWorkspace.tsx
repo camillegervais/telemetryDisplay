@@ -141,6 +141,19 @@ const ANALYSIS_TAB_ID = "tab-analysis";
 const TRAJECTORY_SIGNALS = ["xCar", "yCar", "xRef", "yRef", "xTrack", "yTrack"] as const;
 const BRAKING_NAME_SIGNAL = 'MBrakeR';
 
+// Empty MapTuningData to avoid errors
+const emptyMapTuningData = {
+  inputChannelX: "",
+  inputChannelY: "",
+  outputChannelName: "",
+  gridData: [[0]],
+  rowHeaders: [0],
+  colHeaders: [0],
+  braking_signal: false,
+  gainVal: 1,
+  offsetVal: 0
+};
+
 function isEditableElement(target: EventTarget | null): boolean {
   if (!(target instanceof HTMLElement)) {
     return false;
@@ -1907,7 +1920,7 @@ export default function SignalWorkspace({
               name: elem.name,
               tabs: normalizedTabs,
               activeTabId,
-              mapTuning: mapTuningData,
+              mapTuning: mapTuningData || emptyMapTuningData,
             };
           } else {
             return elem;
@@ -1925,7 +1938,7 @@ export default function SignalWorkspace({
         name: nextName.trim() || defaultName,
         tabs: normalizedTabs,
         activeTabId,
-        mapTuning: mapTuningData,
+        mapTuning: mapTuningData || emptyMapTuningData,
       };
 
       // Update the current configuration
