@@ -96,7 +96,7 @@ En résumé:
 - `sLap` est obligatoire et doit être monotone croissante.
 - Chaque signal doit avoir la même longueur que `sLap`.
 - `distance_step_m` est recommandé pour décrire l’échantillonnage spatial.
-- Les `NaN` en fin de signal sont acceptés, mais pas au milieu.
+- Les `NaN` dans le signal sont acceptés, s'ils sont en fin de signal et uniquement en fin de signal on trim les données du dataset (explosion d'une simulation)
 
 ## Données d’exemple
 

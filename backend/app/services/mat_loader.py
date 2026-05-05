@@ -87,7 +87,7 @@ class MatLoader:
         segment_indices = self._select_clean_lap_indices(lap_distance_raw)
         lap_distance = lap_distance_raw[segment_indices] # Apply segment selection first to focus on the most complete lap
         lap_distance_mask = self._trim_NAN_values_mask(lap_distance)
-        lap_distance = lap_distance[lap_distance_mask] # Remove any NaN values that may be present
+        lap_distance = lap_distance[lap_distance_mask] # Remove any values whre sLap in NAN
         monotonic_mask = self._strictly_increasing_mask(lap_distance)
         lap_distance = lap_distance[monotonic_mask]
 
@@ -334,13 +334,21 @@ class MatLoader:
         NaNs are allowed only as a suffix. Any NaN in the middle of the signal is rejected.
         """
         nan_mask = np.isnan(signal)
-        if not nan_mask.any():
+        if not nan_mask.any() or nan_mask.all(): # In edge cases we use the full signal
             return len(signal)
 
-        first_nan_index = int(np.flatnonzero(nan_mask)[0])
-        if not nan_mask[first_nan_index:].all():
+        all_nan = [int(index) for index in np.flatnonzero(nan_mask)] # All the nan in the signal
+        nan_of_interest = [int(index) for index in np.flatnonzero(nan_mask) if nan_mask[int(index):].all()] # It is the list of trailing nan
+
+        # If nan in the middle of the signal, it is data not from simulation so we don't trim the data
+        if all_nan != nan_of_interest:
+            return len(signal)
+            
+        first_nan_index = nan_of_interest[0] if nan_of_interest else len(signal) # select the first trailing nan if there are triling nan, if not the case we take the full signal
+
+        if first_nan_index < 3:
             raise MatValidationError(
-                f"Signal '{signal_name}' contains NaN values in the middle of the signal"
+                f'Not enough points for {signal_name}, first trailing nan detected at index {first_nan_index}, number of valid points is {np.sum(~nan_mask)}'
             )
 
         return first_nan_index
