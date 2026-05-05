@@ -139,6 +139,7 @@ const SIGNAL_DRAG_MIME = "application/x-telemetry-signal";
 const TRAJECTORY_TAB_ID = "tab-trajectory";
 const ANALYSIS_TAB_ID = "tab-analysis";
 const TRAJECTORY_SIGNALS = ["xCar", "yCar", "xRef", "yRef", "xTrack", "yTrack"] as const;
+const BRAKING_NAME_SIGNAL = 'MBrakeR';
 
 function isEditableElement(target: EventTarget | null): boolean {
   if (!(target instanceof HTMLElement)) {
@@ -575,8 +576,8 @@ function buildChartConfig(
     if (options?.hideNegative) {
       yValues = yValues.map(v => v < 0 ? NaN : v);
     }
-    if (options?.filterByBraking && series.signals['MBrakeR']) {
-      const brakeValues = series.signals['MBrakeR'];
+    if (options?.filterByBraking && series.signals[BRAKING_NAME_SIGNAL]) {
+      const brakeValues = series.signals[BRAKING_NAME_SIGNAL];
       yValues = yValues.map((v, i) => brakeValues[i] !== 0 ? v : NaN);
     }
 
@@ -725,8 +726,8 @@ function buildXYChartConfig(
     if (options?.hideNegative) {
       yValues = yValues.map(v => v < 0 ? NaN : v);
     }
-    if (options?.filterByBraking && series.signals['MBrakeR']) {
-      const brakeValues = series.signals['MBrakeR'];
+    if (options?.filterByBraking && series.signals[BRAKING_NAME_SIGNAL]) {
+      const brakeValues = series.signals[BRAKING_NAME_SIGNAL];
       yValues = yValues.map((v, i) => brakeValues[i] !== 0 ? v : NaN);
     }
 
