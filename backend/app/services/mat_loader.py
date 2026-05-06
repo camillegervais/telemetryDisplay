@@ -192,7 +192,6 @@ class MatLoader:
 
         df[channel_name] = channel_array
         
-
         self.loaded_datasets[dataset_id] = (df, metadata)
 
         return metadata.source_path
