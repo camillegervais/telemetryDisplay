@@ -807,7 +807,7 @@ export default function ImportPanel({
                                   onChange={(newGain) =>
                                     setMapTuningGainOffsets((prev) => ({
                                       ...prev,
-                                      [configName]: { ...gains, gain: newGain },
+                                      [configName]: { ...gains, gain: newGain || 1 },
                                     }))
                                   }
                                   style={{
@@ -859,7 +859,7 @@ export default function ImportPanel({
                                   onChange={(newOffset) =>
                                     setMapTuningGainOffsets((prev) => ({
                                       ...prev,
-                                      [configName]: { ...gains, offset: newOffset },
+                                      [configName]: { ...gains, offset: newOffset || 0 },
                                     }))
                                   }
                                   style={{
