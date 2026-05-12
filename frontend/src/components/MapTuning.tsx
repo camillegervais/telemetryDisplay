@@ -257,7 +257,7 @@ export default function MapTuning({
   // ============================================================================
 
   const handleRowsChange = (newRows: number) => {
-    if (newRows < 2 || newRows > 50) return;
+    if (newRows < 1 || newRows > 50) return;
     setNumRows(newRows);
     if (newRows > gridData.length) {
       setGridData(p => [...p, ...Array(newRows - p.length).fill(null).map(() => Array(numCols).fill(50))]);
@@ -269,7 +269,7 @@ export default function MapTuning({
   };
 
   const handleColsChange = (newCols: number) => {
-    if (newCols < 2 || newCols > 50) return;
+    if (newCols < 1 || newCols > 50) return;
     setNumCols(newCols);
     if (newCols > colHeaders.length) {
       setGridData(p => p.map(row => [...row, ...Array(newCols - row.length).fill(50)]));
