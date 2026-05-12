@@ -2696,7 +2696,7 @@ export default function SignalWorkspace({
           </article>
         </div>
       ) : isAnalysisActive ? (
-        <div className="w-full h-full overflow-auto">
+        <div className="hide-scroll" style={{ overflowY: "auto"}}>
           <MapTuning
             availableSignals={availableSignals}
             datasetId={datasetId}

@@ -2011,3 +2011,7 @@ body::after {
   font-weight: 600;
   flex-shrink: 0;
 }
+
+.hide-scroll::-webkit-scrollbar {
+  display: none;
+}

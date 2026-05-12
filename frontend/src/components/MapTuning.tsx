@@ -381,7 +381,7 @@ export default function MapTuning({
   };
 
   return (
-    <div className="panel" style={{ height: "100%", overflow: "auto", display: "flex", flexDirection: "column", gap: "1rem" }}>
+    <div className="panel" style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
       
       <div className="panel-header panel-header-tight">
         <h2>Tuning de Cartographie</h2>
