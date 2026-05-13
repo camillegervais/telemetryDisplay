@@ -484,208 +484,14 @@ export default function ImportPanel({
         <button
           type="button"
           className="import-submenu-toggle"
-          onClick={() => setImportSectionOpen((prev) => !prev)}
-        >
-          <span>{importSectionOpen ? "▾" : "▸"}</span>
-          <span>Import de donnees</span>
-        </button>
-
-        {importSectionOpen ? (
-          <div className="import-submenu-content">
-            <p className="panel-text">Chargez un MAT.</p>
-
-            <label className="field-label" htmlFor="mat-file-input">
-              MAT file - Load un fichier une seule fois
-            </label>
-            <input
-              id="mat-file-input"
-              type="file"
-              accept=".mat"
-              className="file-input"
-              onChange={(event) => {
-                const pickedFile = event.target.files?.[0] ?? null;
-                setSelectedFile(pickedFile);
-
-                const pickerPath = event.target.value?.trim() ?? "";
-                if (pickerPath.length > 0) {
-                  window.localStorage.setItem(LAST_PICKER_PATH_KEY, pickerPath);
-
-                  // Browser file inputs often return C:\\fakepath\\..., which cannot be reused by backend path import.
-                  const normalized = pickerPath.replace(/\\\\/g, "/");
-                  const isFakePath = normalized.toLowerCase().includes("/fakepath/");
-                  if (!isFakePath && normalized.toLowerCase().endsWith(".mat")) {
-                    setMatPath(normalized);
-                    window.localStorage.setItem(LAST_MAT_PATH_KEY, normalized);
-                  }
-                }
-              }}
-            />
-
-            <button className="import-button" disabled={!canImport} onClick={handleImportClick}>
-              {importing ? (
-                <span className="loading-inline">
-                  <span className="loading-spinner" aria-hidden="true" />
-                  Import en cours...
-                </span>
-              ) : (
-                "Importer le dataset"
-              )}
-            </button>
-
-            <label className="field-label" htmlFor="mat-path-input">
-              MAT path - Permet de refresh entre les simulations
-            </label>
-            <input
-              id="mat-path-input"
-              type="text"
-              className="signals-filter-input"
-              value={matPath}
-              onChange={(event) => setMatPath(event.target.value)}
-              placeholder="Ex: C:/Users/camil/Documents/Code/telemetryDisplay/data/imola.mat"
-            />
-            <button
-              className="import-button"
-              disabled={!canImportFromPath}
-              onClick={handleImportFromPathClick}
-            >
-              {importing ? (
-                <span className="loading-inline">
-                  <span className="loading-spinner" aria-hidden="true" />
-                  Import en cours...
-                </span>
-              ) : (
-                "Importer depuis chemin"
-              )}
-            </button>
-
-            {selectedFile ? <p className="panel-text file-picked">{selectedFile.name}</p> : null}
-            {importMessageLines.length > 0 ? (
-              <p className="panel-text import-message">
-                {importMessageLines.map((line, index) => (
-                  <span key={`import-msg-${index}`}>
-                    {line}
-                    {index < importMessageLines.length - 1 ? <br /> : null}
-                  </span>
-                ))}
-              </p>
-            ) : null}
-
-            <div className="meta-grid">
-              <div className="meta-item">
-                <span>Reference step</span>
-                <strong>
-                  {loadingAppInfo ? "Loading..." : `${appInfo?.reference_distance_step_m ?? "-"} m`}
-                </strong>
-              </div>
-              <div className="meta-item">
-                <span>Source step</span>
-                <strong>
-                  {datasetMetadata ? `${datasetMetadata.source_distance_step_m.toFixed(2)} m` : "-"}
-                </strong>
-              </div>
-              <div className="meta-item">
-                <span>Normalization</span>
-                <strong>
-                  {datasetMetadata
-                    ? `${datasetMetadata.interpolation_method} (x${datasetMetadata.enrichment_factor.toFixed(2)})`
-                    : "Linear interpolation"}
-                </strong>
-              </div>
-            </div>
-          </div>
-        ) : null}
-      </div>
-
-      <div className="import-submenu">
-        <button
-          type="button"
-          className="import-submenu-toggle"
-          onClick={() => setAxisSectionOpen((prev) => !prev)}
-        >
-          <span>{axisSectionOpen ? "▾" : "▸"}</span>
-          <span>Axe X</span>
-        </button>
-        {axisSectionOpen ? (
-          <div className="import-submenu-content">
-            <div className="meta-grid" style={{ marginBottom: "0" }}>
-              <div className="meta-item">
-                <span>Axe X</span>
-                <select
-                  className="mini-select"
-                  value={xAxisMode}
-                  onChange={(event) => setXAxisMode(event.target.value as "distance" | "time")}
-                >
-                  <option value="distance">Distance</option>
-                  <option value="time" disabled={!datasetMetadata?.has_time_axis}>
-                    Temps
-                  </option>
-                </select>
-              </div>
-              <div className="meta-item">
-                <span>Frequence source</span>
-                <strong>
-                  {datasetMetadata?.source_sample_rate_hz
-                    ? `${datasetMetadata.source_sample_rate_hz.toFixed(2)} Hz`
-                    : "Non disponible"}
-                </strong>
-              </div>
-            </div>
-
-            <details style={{ marginTop: "0.5rem" }}>
-              <summary className="panel-text" style={{ cursor: "pointer" }}>
-                Avance: ligne depart/arrivee
-              </summary>
-              <label className="field-label" htmlFor="start-finish-offset-input">
-                Decalage (m)
-              </label>
-              <input
-                id="start-finish-offset-input"
-                type="number"
-                className="signals-filter-input"
-                value={Number.isFinite(startFinishOffsetM) ? startFinishOffsetM : 0}
-                step={1}
-                onChange={(event) => {
-                  const next = Number(event.target.value);
-                  if (Number.isFinite(next)) {
-                    setStartFinishOffsetM(next);
-                  }
-                }}
-                placeholder="Ex: 15"
-              />
-            </details>
-          </div>
-        ) : null}
-      </div>
-
-      <div className="import-submenu">
-        <button
-          type="button"
-          className="import-submenu-toggle"
           onClick={() => setMathSectionOpen((prev) => !prev)}
         >
           <span>{mathSectionOpen ? "▾" : "▸"}</span>
           <span>Math channel ({mathChannels.length})</span>
         </button>
+        
         {mathSectionOpen ? (
           <div className="import-submenu-content math-channel-content">
-            <input
-              type="text"
-              className="signals-filter-input"
-              value={mathName}
-              onChange={(event) => setMathName(event.target.value)}
-              placeholder="Nom du canal (ex: speed_gain)"
-            />
-            <input
-              type="text"
-              className="signals-filter-input"
-              value={mathExpression}
-              onChange={(event) => setMathExpression(event.target.value)}
-              placeholder="Expression (ex: gain(speed_kmh, 1.05) - 3)"
-            />
-            <button className="small-button" onClick={handleAddMathChannelClick}>
-              Ajouter math
-            </button>
-            {mathError ? <p className="panel-text">{mathError}</p> : null}
 
             {/* Guide des fonctions */}
             <details
@@ -697,6 +503,7 @@ export default function ImportPanel({
                 border: "1px solid var(--line)",
                 borderRadius: "4px",
                 background: "rgba(255, 70, 93, 0.05)",
+                marginBottom: "0.75rem"
               }}
             >
               <summary
@@ -708,7 +515,7 @@ export default function ImportPanel({
                   marginBottom: "0.5rem",
                 }}
               >
-                ? Guide des fonctions
+                Guide des fonctions
               </summary>
 
               <div
@@ -719,6 +526,8 @@ export default function ImportPanel({
                   maxHeight: "300px",
                   overflowY: "auto",
                 }}
+
+                className="hide-scroll"
               >
                 <div style={{ marginBottom: "0.5rem" }}>
                   <strong>Fonctions:</strong>
@@ -750,15 +559,34 @@ export default function ImportPanel({
                       color: "var(--fg-1)",
                     }}
                   >
-                    {`speed_smoothed: gain(speed, 0.95)
-is_braking: sign(accel) * -1
-threshold: speed > 100
-active: and(engine_on, not(fault))
-toggle: xor(left, right)`}
+                    {`speed_amplified: gain(vCarRef, 1.05)
+isBraking: sign(gLong) * -1
+threshold: vCarRef > 100
+active: and(bStarter, not(fault))`}
                   </pre>
                 </div>
               </div>
             </details>
+
+
+            <input
+              type="text"
+              className="signals-filter-input"
+              value={mathName}
+              onChange={(event) => setMathName(event.target.value)}
+              placeholder="Nom du canal (ex: speed_gain)"
+            />
+            <input
+              type="text"
+              className="signals-filter-input"
+              value={mathExpression}
+              onChange={(event) => setMathExpression(event.target.value)}
+              placeholder="Expression (ex: gain(speed_kmh, 1.05) - 3)"
+            />
+            <button className="small-button" onClick={handleAddMathChannelClick} style={{width: '100%'}}>
+              Ajouter math
+            </button>
+            {mathError ? <p className="panel-text">{mathError}</p> : null}
 
             {mathChannels.length > 0 ? (
               <div className="signals-stats-list math-channel-list">
@@ -783,50 +611,6 @@ toggle: xor(left, right)`}
         ) : null}
       </div>
 
-      <div className="import-submenu">
-        <button
-          type="button"
-          className="import-submenu-toggle"
-          onClick={() => setStatsSectionOpen((prev) => !prev)}
-        >
-          <span>{statsSectionOpen ? "▾" : "▸"}</span>
-          <span>Stats signaux</span>
-        </button>
-        {statsSectionOpen ? (
-          <div className="import-submenu-content">
-            {loadingStats ? (
-              <p className="panel-text loading-inline">
-                <span className="loading-spinner" aria-hidden="true" />
-                Calcul des statistiques...
-              </p>
-            ) : null}
-            {statsError ? <p className="panel-text">{statsError}</p> : null}
-            {!datasetMetadata || datasetMetadata.signal_names.length === 0 ? (
-              <p className="panel-text">Importez un dataset pour afficher les stats.</p>
-            ) : null}
-            {!loadingStats && !statsError && datasetMetadata && datasetMetadata.signal_names.length > 0 ? (
-              <div className="signals-stats-list">
-                {filteredSignals.map((signal) => {
-                  const stat = signalStats[signal];
-                  return (
-                    <div key={`stat-${signal}`} className="signals-stats-item">
-                      <div className="signals-stats-title">{signal}</div>
-                      <div className="signals-stats-values">
-                        <span>moy: {stat ? formatStat(stat.mean) : "-"}</span>
-                        <span>std: {stat ? formatStat(stat.std) : "-"}</span>
-                        <span>min: {stat ? formatStat(stat.min) : "-"}</span>
-                        <span>max: {stat ? formatStat(stat.max) : "-"}</span>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            ) : null}
-          </div>
-        ) : null}
-      </div>
-
-      {/* Sous-menu Cartographies */}
       <div className="import-submenu">
         <button
           type="button"
@@ -998,6 +782,195 @@ toggle: xor(left, right)`}
           </div>
         ) : null}
       </div>
+
+      <div className="import-submenu">
+        <button
+          type="button"
+          className="import-submenu-toggle"
+          onClick={() => setImportSectionOpen((prev) => !prev)}
+        >
+          <span>{importSectionOpen ? "▾" : "▸"}</span>
+          <span>Import de donnees</span>
+        </button>
+
+        {importSectionOpen ? (
+          <div className="import-submenu-content">
+            <label className="field-label" htmlFor="mat-file-input">
+              MAT file - Load un fichier une seule fois
+            </label>
+            <input
+              id="mat-file-input"
+              type="file"
+              accept=".mat"
+              className="file-input"
+              onChange={(event) => {
+                const pickedFile = event.target.files?.[0] ?? null;
+                setSelectedFile(pickedFile);
+
+                const pickerPath = event.target.value?.trim() ?? "";
+                if (pickerPath.length > 0) {
+                  window.localStorage.setItem(LAST_PICKER_PATH_KEY, pickerPath);
+
+                  // Browser file inputs often return C:\\fakepath\\..., which cannot be reused by backend path import.
+                  const normalized = pickerPath.replace(/\\\\/g, "/");
+                  const isFakePath = normalized.toLowerCase().includes("/fakepath/");
+                  if (!isFakePath && normalized.toLowerCase().endsWith(".mat")) {
+                    setMatPath(normalized);
+                    window.localStorage.setItem(LAST_MAT_PATH_KEY, normalized);
+                  }
+                }
+              }}
+            />
+
+            <button className="import-button" disabled={!canImport} onClick={handleImportClick}>
+              {importing ? (
+                <span className="loading-inline">
+                  <span className="loading-spinner" aria-hidden="true" />
+                  Import en cours...
+                </span>
+              ) : (
+                "Importer le dataset"
+              )}
+            </button>
+
+            <label className="field-label" htmlFor="mat-path-input">
+              MAT path - Permet de refresh entre les simulations
+            </label>
+            <input
+              id="mat-path-input"
+              type="text"
+              className="signals-filter-input"
+              value={matPath}
+              onChange={(event) => setMatPath(event.target.value)}
+              placeholder="Ex: C:/Users/camil/Documents/Code/telemetryDisplay/data/imola.mat"
+            />
+            <button
+              className="import-button"
+              disabled={!canImportFromPath}
+              onClick={handleImportFromPathClick}
+            >
+              {importing ? (
+                <span className="loading-inline">
+                  <span className="loading-spinner" aria-hidden="true" />
+                  Import en cours...
+                </span>
+              ) : (
+                "Importer depuis chemin"
+              )}
+            </button>
+
+            {selectedFile ? <p className="panel-text file-picked">{selectedFile.name}</p> : null}
+          </div>
+        ) : null}
+      </div>
+
+      <div className="import-submenu">
+        <button
+          type="button"
+          className="import-submenu-toggle"
+          onClick={() => setAxisSectionOpen((prev) => !prev)}
+        >
+          <span>{axisSectionOpen ? "▾" : "▸"}</span>
+          <span>Axe X</span>
+        </button>
+        {axisSectionOpen ? (
+          <div className="import-submenu-content">
+            <div className="meta-grid" style={{ marginBottom: "0" }}>
+              <div className="meta-item">
+                <span>Axe X</span>
+                <select
+                  className="mini-select"
+                  value={xAxisMode}
+                  onChange={(event) => setXAxisMode(event.target.value as "distance" | "time")}
+                >
+                  <option value="distance">Distance</option>
+                  <option value="time" disabled={!datasetMetadata?.has_time_axis}>
+                    Temps
+                  </option>
+                </select>
+              </div>
+              <div className="meta-item">
+                <span>Frequence source</span>
+                <strong>
+                  {datasetMetadata?.source_sample_rate_hz
+                    ? `${datasetMetadata.source_sample_rate_hz.toFixed(2)} Hz`
+                    : "Non disponible"}
+                </strong>
+              </div>
+            </div>
+
+            <details style={{ marginTop: "0.5rem" }}>
+              <summary className="panel-text" style={{ cursor: "pointer" }}>
+                Avance: ligne depart/arrivee
+              </summary>
+              <label className="field-label" htmlFor="start-finish-offset-input">
+                Decalage (m)
+              </label>
+              <input
+                id="start-finish-offset-input"
+                type="number"
+                className="signals-filter-input"
+                value={Number.isFinite(startFinishOffsetM) ? startFinishOffsetM : 0}
+                step={1}
+                onChange={(event) => {
+                  const next = Number(event.target.value);
+                  if (Number.isFinite(next)) {
+                    setStartFinishOffsetM(next);
+                  }
+                }}
+                placeholder="Ex: 15"
+              />
+            </details>
+          </div>
+        ) : null}
+      </div>
+
+      
+
+      <div className="import-submenu">
+        <button
+          type="button"
+          className="import-submenu-toggle"
+          onClick={() => setStatsSectionOpen((prev) => !prev)}
+        >
+          <span>{statsSectionOpen ? "▾" : "▸"}</span>
+          <span>Stats signaux</span>
+        </button>
+        {statsSectionOpen ? (
+          <div className="import-submenu-content">
+            {loadingStats ? (
+              <p className="panel-text loading-inline">
+                <span className="loading-spinner" aria-hidden="true" />
+                Calcul des statistiques...
+              </p>
+            ) : null}
+            {statsError ? <p className="panel-text">{statsError}</p> : null}
+            {!datasetMetadata || datasetMetadata.signal_names.length === 0 ? (
+              <p className="panel-text">Importez un dataset pour afficher les stats.</p>
+            ) : null}
+            {!loadingStats && !statsError && datasetMetadata && datasetMetadata.signal_names.length > 0 ? (
+              <div className="signals-stats-list">
+                {filteredSignals.map((signal) => {
+                  const stat = signalStats[signal];
+                  return (
+                    <div key={`stat-${signal}`} className="signals-stats-item">
+                      <div className="signals-stats-title">{signal}</div>
+                      <div className="signals-stats-values">
+                        <span>moy: {stat ? formatStat(stat.mean) : "-"}</span>
+                        <span>std: {stat ? formatStat(stat.std) : "-"}</span>
+                        <span>min: {stat ? formatStat(stat.min) : "-"}</span>
+                        <span>max: {stat ? formatStat(stat.max) : "-"}</span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : null}
+          </div>
+        ) : null}
+      </div>
+
+      
     </section>
   );
 }

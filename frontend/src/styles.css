@@ -535,6 +535,7 @@ body::after {
 
 .global-side-panel .panel {
   padding: 0.3rem;
+  min-height: 100%;
 }
 
 .global-side-panel .import-submenu-content {
@@ -688,10 +689,11 @@ body::after {
 }
 
 .import-submenu {
-  margin-bottom: 0.85rem;
+  margin-bottom: 0.5rem;
   border: 1px solid rgba(73, 23, 33, 0.85);
-  border-radius: 0;
+  border-radius: 5px 5px 0 0;
   background: rgba(18, 7, 10, 0.72);
+  border-top: 3px solid rgb(145, 46, 66);
 }
 
 .import-submenu-toggle {
@@ -708,6 +710,10 @@ body::after {
   font-family: "Rajdhani", sans-serif;
   letter-spacing: 0.06em;
   text-transform: uppercase;
+}
+
+.import-submenu-toggle span {
+  font-size: medium;
 }
 
 .import-submenu-content {
@@ -2015,3 +2021,4 @@ body::after {
 .hide-scroll::-webkit-scrollbar {
   display: none;
 }
+

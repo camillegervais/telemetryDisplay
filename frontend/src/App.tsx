@@ -377,7 +377,7 @@ export default function App() {
   const inspectorPanel = (
     <section className="panel import-panel inspector-panel">
       <div className="panel-header">
-        <h2>Inspecteur</h2>
+        <h2>Graphe Perso</h2>
         <span className="panel-badge">Graphes</span>
       </div>
       <div className="import-submenu-content">
@@ -678,7 +678,7 @@ export default function App() {
       items: [
         { keys: "H", action: "Reset Home (zoom/axes)" },
         { keys: "G", action: "Basculer mode Graphes/UI" },
-        { keys: "I", action: "Basculer Data Hub/Inspecteur" },
+        { keys: "I", action: "Basculer Data Hub/Graphe Perso" },
         { keys: "P", action: "Basculer panneau gauche/droite" },
       ],
     },
@@ -766,8 +766,8 @@ export default function App() {
           <button
             className="small-button topbar-icon-button"
             onClick={() => setPanelMode((prev) => (prev === "data" ? "inspector" : "data"))}
-            title={panelMode === "data" ? "Ouvrir Inspecteur (I)" : "Ouvrir Data Hub (I)"}
-            aria-label="Basculer Data Hub Inspecteur"
+            title={panelMode === "data" ? "Ouvrir Graphe Perso (I)" : "Ouvrir Data Hub (I)"}
+            aria-label="Basculer Data Hub Graphe Perso"
           >
             <span aria-hidden="true">⌘</span>
           </button>
@@ -844,7 +844,7 @@ export default function App() {
             className="panel-button"
             onClick={() => setPanelMode((prev) => (prev === "data" ? "inspector" : "data"))}
           >
-            {panelMode === "data" ? "Inspecteur" : "Data Hub"}
+            {panelMode === "data" ? "Graphe Perso" : "Data Hub"}
           </button>
             {panelMode === "data" ? (
               <ImportPanel
