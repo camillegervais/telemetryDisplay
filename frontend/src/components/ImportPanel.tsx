@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState, type CSSProperties, type KeyboardEvent } 
 
 import { queryDataset, calculateMapTuning } from "../api";
 import { evaluateMathChannel } from "../mathChannels";
+import { getFunctionDocumentation, getOperatorDocumentation, USAGE_GUIDE } from "../mathFunctions";
 import { useTelemetryStore } from "../store/telemetryStore";
 
 import type { AppInfo, DatasetMetadata, MathChannel, MapTuningData } from "../types";
@@ -207,6 +208,7 @@ export default function ImportPanel({
   const [mathName, setMathName] = useState("");
   const [mathExpression, setMathExpression] = useState("");
   const [mathError, setMathError] = useState<string | null>(null);
+  const [mathGuideOpen, setMathGuideOpen] = useState(false);
   const [mapTuningSectionOpen, setMapTuningSectionOpen] = useState(false);
   const [mapTuningGainOffsets, setMapTuningGainOffsets] = useState<Record<string, { gain: number; offset: number }>>({});
 
@@ -684,6 +686,80 @@ export default function ImportPanel({
               Ajouter math
             </button>
             {mathError ? <p className="panel-text">{mathError}</p> : null}
+
+            {/* Guide des fonctions */}
+            <details
+              open={mathGuideOpen}
+              onToggle={(e) => setMathGuideOpen(e.currentTarget.open)}
+              style={{
+                marginTop: "0.75rem",
+                padding: "0.5rem",
+                border: "1px solid var(--line)",
+                borderRadius: "4px",
+                background: "rgba(255, 70, 93, 0.05)",
+              }}
+            >
+              <summary
+                style={{
+                  cursor: "pointer",
+                  fontWeight: "500",
+                  fontSize: "0.8rem",
+                  color: "var(--fg-2)",
+                  marginBottom: "0.5rem",
+                }}
+              >
+                ? Guide des fonctions
+              </summary>
+
+              <div
+                style={{
+                  fontSize: "0.75rem",
+                  color: "var(--fg-2)",
+                  lineHeight: "1.4",
+                  maxHeight: "300px",
+                  overflowY: "auto",
+                }}
+              >
+                <div style={{ marginBottom: "0.5rem" }}>
+                  <strong>Fonctions:</strong>
+                  {getFunctionDocumentation().map((func) => (
+                    <div key={func.name} style={{ paddingLeft: "0.5rem", marginTop: "0.25rem" }}>
+                      <code>{func.description}</code>
+                    </div>
+                  ))}
+                </div>
+
+                <div style={{ marginBottom: "0.5rem" }}>
+                  <strong>Opérateurs:</strong>
+                  {getOperatorDocumentation().map((op) => (
+                    <div key={op.symbol} style={{ paddingLeft: "0.5rem", marginTop: "0.25rem" }}>
+                      <code>{op.description}</code>
+                    </div>
+                  ))}
+                </div>
+
+                <div>
+                  <strong>Exemples:</strong>
+                  <pre
+                    style={{
+                      paddingLeft: "0.5rem",
+                      marginTop: "0.25rem",
+                      fontSize: "0.7rem",
+                      whiteSpace: "pre-wrap",
+                      wordBreak: "break-word",
+                      color: "var(--fg-1)",
+                    }}
+                  >
+                    {`speed_smoothed: gain(speed, 0.95)
+is_braking: sign(accel) * -1
+threshold: speed > 100
+active: and(engine_on, not(fault))
+toggle: xor(left, right)`}
+                  </pre>
+                </div>
+              </div>
+            </details>
+
             {mathChannels.length > 0 ? (
               <div className="signals-stats-list math-channel-list">
                 {mathChannels.map((channel) => (

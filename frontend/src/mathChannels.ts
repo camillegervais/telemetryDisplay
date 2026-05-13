@@ -1,4 +1,15 @@
 import type { MathChannel } from "./types";
+import {
+  FUNCTIONS,
+  OPERATORS,
+  COMPARISON_OPERATORS,
+  ARITHMETIC_OPERATORS,
+  ALL_OPERATORS,
+  evaluateFunction,
+  evaluateOperator,
+  type FunctionName,
+  type OperatorName,
+} from "./mathFunctions";
 
 type TokenType = "number" | "identifier" | "operator" | "left-paren" | "right-paren" | "comma";
 
@@ -10,23 +21,21 @@ type Token = {
 type RpnToken =
   | { type: "number"; value: number }
   | { type: "identifier"; value: string }
-  | { type: "operator"; value: "+" | "-" | "*" | "/" }
-  | { type: "function"; name: "gain" | "sqrt" | "abs" | "min" | "max"; arity: 1 | 2 };
+  | { type: "operator"; value: OperatorName }
+  | { type: "function"; name: FunctionName; arity: 1 | 2 };
 
-const SUPPORTED_FUNCTIONS: Record<string, 1 | 2> = {
-  gain: 2,
-  sqrt: 1,
-  abs: 1,
-  min: 2,
-  max: 2,
-};
+function getSupportedFunctions(): Record<string, 1 | 2> {
+  const result: Record<string, 1 | 2> = {};
+  Object.entries(FUNCTIONS).forEach(([name, def]) => {
+    result[name] = def.arity;
+  });
+  return result;
+}
 
-const OP_PRECEDENCE: Record<string, number> = {
-  "+": 1,
-  "-": 1,
-  "*": 2,
-  "/": 2,
-};
+const SUPPORTED_FUNCTIONS = getSupportedFunctions();
+const OP_PRECEDENCE = Object.fromEntries(
+  Object.entries(OPERATORS).map(([op, def]) => [op, def.precedence])
+);
 
 function tokenize(expression: string): Token[] {
   const tokens: Token[] = [];
@@ -60,7 +69,18 @@ function tokenize(expression: string): Token[] {
       continue;
     }
 
-    if (ch === "+" || ch === "-" || ch === "*" || ch === "/") {
+    // Handle multi-character operators (>=, <=, ==, !=)
+    if (idx + 1 < expression.length) {
+      const twoChar = expression.slice(idx, idx + 2);
+      if (ALL_OPERATORS.has(twoChar)) {
+        tokens.push({ type: "operator", value: twoChar });
+        idx += 2;
+        continue;
+      }
+    }
+
+    // Handle single-character operators and delimiters
+    if (ALL_OPERATORS.has(ch)) {
       tokens.push({ type: "operator", value: ch });
       idx += 1;
       continue;
@@ -100,6 +120,7 @@ function injectUnaryMinus(tokens: Token[]): Token[] {
     const isUnaryMinus =
       token.type === "operator" &&
       token.value === "-" &&
+      !COMPARISON_OPERATORS.has("-") &&
       (prev === null ||
         prev.type === "operator" ||
         prev.type === "left-paren" ||
@@ -149,15 +170,16 @@ function toRpn(tokens: Token[]): { rpn: RpnToken[]; dependencies: string[] } {
     }
 
     if (token.type === "operator") {
+      const currentPrec = OP_PRECEDENCE[token.value] ?? -1;
       while (stack.length > 0) {
         const top = stack[stack.length - 1];
-        if (
-          top.type === "operator" &&
-          OP_PRECEDENCE[top.value] >= OP_PRECEDENCE[token.value]
-        ) {
-          output.push({ type: "operator", value: top.value as "+" | "-" | "*" | "/" });
-          stack.pop();
-          continue;
+        if (top.type === "operator") {
+          const topPrec = OP_PRECEDENCE[top.value] ?? -1;
+          if (topPrec >= currentPrec) {
+            output.push({ type: "operator", value: top.value as OperatorName });
+            stack.pop();
+            continue;
+          }
         }
         break;
       }
@@ -177,7 +199,7 @@ function toRpn(tokens: Token[]): { rpn: RpnToken[]; dependencies: string[] } {
           break;
         }
         if (top.type === "operator") {
-          output.push({ type: "operator", value: top.value as "+" | "-" | "*" | "/" });
+          output.push({ type: "operator", value: top.value as OperatorName });
         }
       }
       if (stack.length === 0) {
@@ -193,7 +215,7 @@ function toRpn(tokens: Token[]): { rpn: RpnToken[]; dependencies: string[] } {
           break;
         }
         if (top.type === "operator") {
-          output.push({ type: "operator", value: top.value as "+" | "-" | "*" | "/" });
+          output.push({ type: "operator", value: top.value as OperatorName });
         }
       }
 
@@ -207,7 +229,7 @@ function toRpn(tokens: Token[]): { rpn: RpnToken[]; dependencies: string[] } {
         stack.pop();
         output.push({
           type: "function",
-          name: maybeFunction.functionName as "gain" | "sqrt" | "abs" | "min" | "max",
+          name: maybeFunction.functionName as FunctionName,
           arity: SUPPORTED_FUNCTIONS[maybeFunction.functionName],
         });
       }
@@ -224,7 +246,7 @@ function toRpn(tokens: Token[]): { rpn: RpnToken[]; dependencies: string[] } {
       throw new Error("Parentheses desequilibrees");
     }
     if (top.type === "operator") {
-      output.push({ type: "operator", value: top.value as "+" | "-" | "*" | "/" });
+      output.push({ type: "operator", value: top.value as OperatorName });
       continue;
     }
     if (top.type === "identifier") {
@@ -260,53 +282,20 @@ function evaluateRpnAtIndex(rpn: RpnToken[], signalValues: Record<string, number
       if (left === undefined || right === undefined) {
         throw new Error("Expression invalide");
       }
-      if (token.value === "+") {
-        stack.push(left + right);
-      } else if (token.value === "-") {
-        stack.push(left - right);
-      } else if (token.value === "*") {
-        stack.push(left * right);
-      } else {
-        stack.push(right === 0 ? Number.NaN : left / right);
-      }
+      stack.push(evaluateOperator(token.value, left, right));
       continue;
     }
 
     if (token.type === "function") {
-      if (token.name === "gain") {
-        const factor = stack.pop();
-        const value = stack.pop();
-        if (value === undefined || factor === undefined) {
-          throw new Error("gain() attend 2 arguments");
+      const args: number[] = [];
+      for (let i = 0; i < token.arity; i += 1) {
+        const arg = stack.pop();
+        if (arg === undefined) {
+          throw new Error(`${token.name}() attend ${token.arity} arguments`);
         }
-        stack.push(value * factor);
-      } else if (token.name === "sqrt") {
-        const value = stack.pop();
-        if (value === undefined) {
-          throw new Error("sqrt() attend 1 argument");
-        }
-        stack.push(Math.sqrt(value));
-      } else if (token.name === "abs") {
-        const value = stack.pop();
-        if (value === undefined) {
-          throw new Error("abs() attend 1 argument");
-        }
-        stack.push(Math.abs(value));
-      } else if (token.name === "min") {
-        const right = stack.pop();
-        const left = stack.pop();
-        if (left === undefined || right === undefined) {
-          throw new Error("min() attend 2 arguments");
-        }
-        stack.push(Math.min(left, right));
-      } else if (token.name === "max") {
-        const right = stack.pop();
-        const left = stack.pop();
-        if (left === undefined || right === undefined) {
-          throw new Error("max() attend 2 arguments");
-        }
-        stack.push(Math.max(left, right));
+        args.unshift(arg); // prepend to maintain order
       }
+      stack.push(evaluateFunction(token.name, args));
     }
   }
 
