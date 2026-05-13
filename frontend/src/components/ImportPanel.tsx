@@ -352,6 +352,8 @@ export default function ImportPanel({
     const config = configs[configName];
     if (!config) return;
 
+    console.log('Computing');
+
     try {
       await calculateMapTuning({
         datasetId,
@@ -387,6 +389,13 @@ export default function ImportPanel({
       return;
     }
     await onImport(selectedFile);
+
+    const configs = getMapTuningConfigs();
+    const configNames = Object.keys(configs);
+    for(let configName of configNames){
+      console.log('Computing: ', configName);
+      await recalculateMapTuning(configName, 1, 0);
+    }
   }
 
   async function handleImportFromPathClick() {
@@ -396,6 +405,12 @@ export default function ImportPanel({
     }
     window.localStorage.setItem(LAST_MAT_PATH_KEY, path);
     await onImportFromPath(path);
+
+    const configs = getMapTuningConfigs();
+    const configNames = Object.keys(configs);
+    for(let configName of configNames){
+      await recalculateMapTuning(configName, 1, 0);
+    }
   }
 
   function handleAddMathChannelClick() {

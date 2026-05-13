@@ -1,7 +1,7 @@
 """Dataset import, query, and track map endpoints."""
 
 from pathlib import Path
-from typing import List, Dict, Optional
+from typing import List, Dict, Optional, Tuple
 import uuid
 
 import numpy as np
