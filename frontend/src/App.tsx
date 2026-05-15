@@ -8,7 +8,7 @@ import {
   importDataset,
   importDatasetFromPath,
 } from "./api";
-import { ImportPanel, SignalWorkspace } from "./components";
+import { ImportPanel, SignalWorkspace, ConfigExportImport } from "./components";
 import { analyzeMathExpression } from "./mathChannels";
 import { useTelemetryStore } from "./store/telemetryStore";
 import { ConfigManager } from "./store/ConfigManager";
@@ -155,9 +155,11 @@ export default function App() {
         if (!active) return;
         setDatasetMetadata(metadata);
         setTrackMap(trackMapData);
-      }).catch((err: unknown) => {
+      }).catch(() => {
         if (!active) return;
-        setError(err instanceof Error ? err.message : "Failed to load dataset");
+        // Dataset no longer exists - silently clear it
+        ConfigManager.set("dataset-id", null);
+        setDatasetId(null);
       });
     }
     
@@ -728,6 +730,9 @@ export default function App() {
           </div>
         </div>
         <div className="topbar-actions">
+          <ConfigExportImport
+                  onImportSuccess={refreshDatasetMetadata}
+                />
           <details className="topbar-user-menu">
             <summary className="small-button topbar-icon-button" title="Profil" aria-label="Profil">
               <span aria-hidden="true">◉</span>
@@ -850,20 +855,20 @@ export default function App() {
             {panelMode === "data" ? "Graphe Perso" : "Data Hub"}
           </button>
             {panelMode === "data" ? (
-              <ImportPanel
-                appInfo={appInfo}
-                loadingAppInfo={loadingAppInfo}
-                importing={importing}
-                importMessage={importMessage}
-                datasetId={datasetId}
-                datasetMetadata={datasetMetadata}
-                mathChannels={mathChannels}
-                onImport={handleImport}
-                onImportFromPath={handleImportFromPath}
-                onAddMathChannel={handleAddMathChannel}
-                onRemoveMathChannel={handleRemoveMathChannel}
-                onRefreshMetaData={refreshDatasetMetadata}
-              />
+                <ImportPanel
+                  appInfo={appInfo}
+                  loadingAppInfo={loadingAppInfo}
+                  importing={importing}
+                  importMessage={importMessage}
+                  datasetId={datasetId}
+                  datasetMetadata={datasetMetadata}
+                  mathChannels={mathChannels}
+                  onImport={handleImport}
+                  onImportFromPath={handleImportFromPath}
+                  onAddMathChannel={handleAddMathChannel}
+                  onRemoveMathChannel={handleRemoveMathChannel}
+                  onRefreshMetaData={refreshDatasetMetadata}
+                />
             ) : (
               inspectorPanel
             )}
@@ -895,20 +900,25 @@ export default function App() {
         {!graphOnlyMode && panelSide === "right" ? (
           <div className="global-side-panel">
             {panelMode === "data" ? (
-              <ImportPanel
-                appInfo={appInfo}
-                loadingAppInfo={loadingAppInfo}
-                importing={importing}
-                importMessage={importMessage}
-                datasetId={datasetId}
-                datasetMetadata={datasetMetadata}
-                mathChannels={mathChannels}
-                onImport={handleImport}
-                onImportFromPath={handleImportFromPath}
-                onAddMathChannel={handleAddMathChannel}
-                onRemoveMathChannel={handleRemoveMathChannel}
-                onRefreshMetaData={refreshDatasetMetadata}
-              />
+              <>
+                <ConfigExportImport
+                  onImportSuccess={refreshDatasetMetadata}
+                />
+                <ImportPanel
+                  appInfo={appInfo}
+                  loadingAppInfo={loadingAppInfo}
+                  importing={importing}
+                  importMessage={importMessage}
+                  datasetId={datasetId}
+                  datasetMetadata={datasetMetadata}
+                  mathChannels={mathChannels}
+                  onImport={handleImport}
+                  onImportFromPath={handleImportFromPath}
+                  onAddMathChannel={handleAddMathChannel}
+                  onRemoveMathChannel={handleRemoveMathChannel}
+                  onRefreshMetaData={refreshDatasetMetadata}
+                />
+              </>
             ) : (
               inspectorPanel
             )}

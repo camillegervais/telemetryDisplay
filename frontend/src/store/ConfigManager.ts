@@ -13,6 +13,8 @@
  *   const unsubscribe = ConfigManager.subscribe('layouts', (newValue) => {...});
  */
 
+import * as TOML from "smol-toml";
+
 import {
   CONFIG_DEFAULTS,
   type ConfigStorage,
@@ -263,6 +265,60 @@ class ConfigManagerClass {
   public destroy(): void {
     if (this.storageEventListener && typeof window !== "undefined") {
       window.removeEventListener("storage", this.storageEventListener);
+    }
+  }
+
+  /**
+   * Export all configurations to TOML format (excluding dataset-id)
+   */
+  public exportToToml(): string {
+    const exportData: Record<string, unknown> = {
+      _meta: {
+        version: "1.0",
+        exportDate: new Date().toISOString(),
+      },
+      session: this.storage.session,
+      layouts: this.storage.layouts,
+      "math-channels": this.storage["math-channels"],
+      "map-configs": this.storage["map-configs"],
+      "current-map-config": this.storage["current-map-config"],
+      "user-preferences": this.storage["user-preferences"],
+    };
+
+    return TOML.stringify(exportData);
+  }
+
+  /**
+   * Import configurations from TOML format (replaces all existing configs)
+   */
+  public importFromToml(tomlString: string): void {
+    try {
+      const parsed = TOML.parse(tomlString) as Record<string, unknown>;
+
+      // Extract configs, ignoring _meta
+      const configsToImport: Partial<ConfigStorage> = {
+        session: (parsed.session as ConfigStorage["session"]) || this.storage.session,
+        layouts: (parsed.layouts as ConfigStorage["layouts"]) || this.storage.layouts,
+        "math-channels": (parsed["math-channels"] as ConfigStorage["math-channels"]) || this.storage["math-channels"],
+        "map-configs": (parsed["map-configs"] as ConfigStorage["map-configs"]) || this.storage["map-configs"],
+        "current-map-config": (parsed["current-map-config"] as ConfigStorage["current-map-config"]) || this.storage["current-map-config"],
+        "user-preferences": (parsed["user-preferences"] as ConfigStorage["user-preferences"]) || this.storage["user-preferences"],
+        "dataset-id": this.storage["dataset-id"], // Keep current dataset
+      };
+
+      // Replace all configs (except dataset-id which stays unchanged)
+      for (const key of Object.keys(configsToImport) as Array<keyof ConfigStorage>) {
+        if (key === "dataset-id") continue; // Don't override dataset
+
+        const value = configsToImport[key];
+        if (value !== undefined) {
+          this.storage[key] = value;
+          this.saveToLocalStorage(key, value);
+          this.notifySubscribers(key, value);
+        }
+      }
+    } catch (error) {
+      throw new Error(`Failed to import TOML configuration: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
 }
