@@ -4,6 +4,7 @@ import { queryDataset, calculateMapTuning } from "../api";
 import { evaluateMathChannel } from "../mathChannels";
 import { getFunctionDocumentation, getOperatorDocumentation, USAGE_GUIDE } from "../mathFunctions";
 import { useTelemetryStore } from "../store/telemetryStore";
+import { ConfigManager } from "../store/ConfigManager";
 
 import type { AppInfo, DatasetMetadata, MathChannel, MapTuningData } from "../types";
 
@@ -31,24 +32,6 @@ type SignalStats = {
 
 const LAST_MAT_PATH_KEY = "telemetry-display.last-mat-path.v1";
 const LAST_PICKER_PATH_KEY = "telemetry-display.last-picker-path.v1";
-const MAP_TUNING_STORAGE_KEY = "map_tuning_local_configs";
-
-function getMapTuningConfigs(): Record<string, MapTuningData> {
-  try {
-    const data = localStorage.getItem(MAP_TUNING_STORAGE_KEY);
-    return data ? JSON.parse(data) : {};
-  } catch (e) {
-    return {};
-  }
-}
-
-function saveMapTuningConfigs(configs: Record<string, MapTuningData>): void {
-  try {
-    localStorage.setItem(MAP_TUNING_STORAGE_KEY, JSON.stringify(configs));
-  } catch (e) {
-    console.error("Failed to save map tuning configs", e);
-  }
-}
 
 interface DecimalNumberInputProps {
   value: number | undefined;
@@ -211,6 +194,9 @@ export default function ImportPanel({
   const [mathGuideOpen, setMathGuideOpen] = useState(false);
   const [mapTuningSectionOpen, setMapTuningSectionOpen] = useState(false);
   const [mapTuningGainOffsets, setMapTuningGainOffsets] = useState<Record<string, { gain: number; offset: number }>>({});
+  const [mapConfigs, setMapConfigs] = useState<Record<string, MapTuningData>>(() =>
+    ConfigManager.get<Record<string, MapTuningData>>("map-configs") ?? {}
+  );
 
 
   const canImport = useMemo(() => selectedFile !== null && !importing, [importing, selectedFile]);
@@ -241,6 +227,20 @@ export default function ImportPanel({
       setMatPath(savedPath);
     }
   }, []);
+
+  // Listen for map-configs changes from other tabs and reload signals (cross-tab sync)
+  useEffect(() => {
+    const unsubscribe = ConfigManager.subscribe<Record<string, MapTuningData>>("map-configs", (newConfigs) => {
+      setMapConfigs(newConfigs);
+      // Reload signals for the dataset when map configs change (to recalculate dependent math channels)
+      // This happens when a map is calculated in another tab
+      if (datasetId && datasetMetadata) {
+        onRefreshMetaData();
+      }
+    });
+
+    return () => unsubscribe();
+  }, [datasetId, datasetMetadata, onRefreshMetaData]);
 
   useEffect(() => {
     if (datasetMetadata?.source_path) {
@@ -350,7 +350,7 @@ export default function ImportPanel({
 
   const recalculateMapTuning = async (configName: string, gain: number, offset: number) => {
     if (!datasetId) return;
-    const configs = getMapTuningConfigs();
+    const configs = ConfigManager.get<Record<string, MapTuningData>>("map-configs") ?? {};
     const config = configs[configName];
     if (!config) return;
 
@@ -377,7 +377,7 @@ export default function ImportPanel({
         gainVal: gain,
         offsetVal: offset,
       };
-      saveMapTuningConfigs(updatedConfigs);
+      ConfigManager.set("map-configs", updatedConfigs);
 
       // Refresh all math channels that depend on this map
       await onRefreshMetaData();
@@ -392,7 +392,7 @@ export default function ImportPanel({
     }
     await onImport(selectedFile);
 
-    const configs = getMapTuningConfigs();
+    const configs = ConfigManager.get<Record<string, MapTuningData>>("map-configs") ?? {};
     const configNames = Object.keys(configs);
     for(let configName of configNames){
       console.log('Computing: ', configName);
@@ -408,7 +408,7 @@ export default function ImportPanel({
     window.localStorage.setItem(LAST_MAT_PATH_KEY, path);
     await onImportFromPath(path);
 
-    const configs = getMapTuningConfigs();
+    const configs = ConfigManager.get<Record<string, MapTuningData>>("map-configs") ?? {};
     const configNames = Object.keys(configs);
     for(let configName of configNames){
       await recalculateMapTuning(configName, 1, 0);
@@ -623,7 +623,7 @@ active: and(bStarter, not(fault))`}
         {mapTuningSectionOpen ? (
           <div className="import-submenu-content">
             {(() => {
-              const configs = getMapTuningConfigs();
+              const configs = mapConfigs;
               const configNames = Object.keys(configs);
               if (configNames.length === 0) {
                 return (

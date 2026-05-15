@@ -1,0 +1,278 @@
+/**
+ * ConfigManager - Centralized configuration storage and state management
+ *
+ * Singleton class that manages all application configurations:
+ * - Persists to localStorage with dot-notation access
+ * - Manages Zustand store for runtime state
+ * - Provides subscribers pattern for reactive updates
+ * - Supports cross-tab synchronization via StorageEvent
+ *
+ * Usage:
+ *   const layouts = ConfigManager.get('layouts');
+ *   ConfigManager.set('math-channels', [...]);
+ *   const unsubscribe = ConfigManager.subscribe('layouts', (newValue) => {...});
+ */
+
+import {
+  CONFIG_DEFAULTS,
+  type ConfigStorage,
+  getNestedValue,
+  isValidConfigKey,
+  setNestedValue,
+} from "../types/ConfigTypes";
+
+type SubscriberCallback<T = unknown> = (newValue: T) => void;
+type Subscribers = Map<string, Set<SubscriberCallback>>;
+
+const STORAGE_PREFIX = "telemetry-display.config";
+
+/**
+ * ConfigManager Singleton - unified configuration management
+ */
+class ConfigManagerClass {
+  private storage: ConfigStorage;
+  private subscribers: Subscribers = new Map();
+  private storageEventListener: ((e: StorageEvent) => void) | null = null;
+
+  constructor() {
+    this.storage = this.loadFromLocalStorage();
+    this.setupStorageEventListener();
+  }
+
+  /**
+   * Load all configurations from localStorage
+   */
+  private loadFromLocalStorage(): ConfigStorage {
+    if (typeof window === "undefined") {
+      return CONFIG_DEFAULTS;
+    }
+
+    const result: Partial<ConfigStorage> = {};
+
+    for (const key of Object.keys(CONFIG_DEFAULTS) as Array<keyof ConfigStorage>) {
+      const storageKey = `${STORAGE_PREFIX}.${key}`;
+      try {
+        const raw = window.localStorage.getItem(storageKey);
+        if (raw) {
+          result[key] = JSON.parse(raw);
+        } else {
+          result[key] = CONFIG_DEFAULTS[key];
+        }
+      } catch (error) {
+        console.error(`Failed to load config ${key}:`, error);
+        result[key] = CONFIG_DEFAULTS[key];
+      }
+    }
+
+    return result as ConfigStorage;
+  }
+
+  /**
+   * Save a specific configuration to localStorage
+   */
+  private saveToLocalStorage<K extends keyof ConfigStorage>(key: K, value: ConfigStorage[K]): void {
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    try {
+      const storageKey = `${STORAGE_PREFIX}.${key}`;
+      window.localStorage.setItem(storageKey, JSON.stringify(value));
+    } catch (error) {
+      console.error(`Failed to save config ${key}:`, error);
+    }
+  }
+
+  /**
+   * Setup listener for cross-tab synchronization
+   */
+  private setupStorageEventListener(): void {
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    this.storageEventListener = (event: StorageEvent) => {
+      // Only process events for our config keys
+      if (!event.key || !event.key.startsWith(STORAGE_PREFIX)) {
+        return;
+      }
+
+      const key = event.key.replace(`${STORAGE_PREFIX}.`, "");
+      if (!isValidConfigKey(key)) {
+        return;
+      }
+
+      try {
+        let newValue: unknown;
+        if (event.newValue) {
+          newValue = JSON.parse(event.newValue);
+        } else {
+          newValue = CONFIG_DEFAULTS[key as keyof ConfigStorage];
+        }
+
+        // Update internal storage
+        (this.storage as Record<string, unknown>)[key] = newValue;
+
+        // Notify subscribers
+        this.notifySubscribers(key, newValue);
+      } catch (error) {
+        console.error(`Failed to process storage event for ${key}:`, error);
+      }
+    };
+
+    window.addEventListener("storage", this.storageEventListener);
+  }
+
+  /**
+   * Get a configuration value using dot notation
+   * @example get('layouts') or get('layouts.0.name')
+   */
+  public get<T = unknown>(path: string): T | undefined {
+    const parts = path.split(".");
+    const topLevelKey = parts[0];
+
+    if (!isValidConfigKey(topLevelKey)) {
+      console.warn(`Invalid config key: ${topLevelKey}`);
+      return undefined;
+    }
+
+    if (parts.length === 1) {
+      return this.storage[topLevelKey] as T;
+    }
+
+    const nestedPath = parts.slice(1).join(".");
+    return getNestedValue<T>(this.storage[topLevelKey], nestedPath);
+  }
+
+  /**
+   * Set a configuration value using dot notation
+   * Updates both internal storage and localStorage
+   * @example set('layouts', [...]) or set('layouts.0.name', 'New Name')
+   */
+  public set<T = unknown>(path: string, value: T): void {
+    const parts = path.split(".");
+    const topLevelKey = parts[0];
+
+    if (!isValidConfigKey(topLevelKey)) {
+      throw new Error(`Invalid config key: ${topLevelKey}`);
+    }
+
+    if (parts.length === 1) {
+      // Setting top-level key
+      this.storage[topLevelKey] = value as ConfigStorage[typeof topLevelKey];
+      this.saveToLocalStorage(topLevelKey, value as ConfigStorage[typeof topLevelKey]);
+      this.notifySubscribers(path, value);
+    } else {
+      // Setting nested value
+      const nestedPath = parts.slice(1).join(".");
+      const updated = setNestedValue(
+        this.storage[topLevelKey] as Record<string, unknown>,
+        nestedPath,
+        value
+      );
+      this.storage[topLevelKey] = updated as ConfigStorage[typeof topLevelKey];
+      this.saveToLocalStorage(topLevelKey, updated as ConfigStorage[typeof topLevelKey]);
+      this.notifySubscribers(path, value);
+    }
+  }
+
+  /**
+   * Subscribe to changes on a configuration value
+   * Returns unsubscribe function
+   * @example
+   *   const unsubscribe = ConfigManager.subscribe('layouts', (newValue) => {
+   *     console.log('Layouts changed:', newValue);
+   *   });
+   *   unsubscribe(); // stop listening
+   */
+  public subscribe<T = unknown>(path: string, callback: SubscriberCallback<T>): () => void {
+    if (!this.subscribers.has(path)) {
+      this.subscribers.set(path, new Set());
+    }
+
+    this.subscribers.get(path)!.add(callback as SubscriberCallback);
+
+    return () => {
+      this.subscribers.get(path)?.delete(callback as SubscriberCallback);
+      if (this.subscribers.get(path)?.size === 0) {
+        this.subscribers.delete(path);
+      }
+    };
+  }
+
+  /**
+   * Notify all subscribers for a config path
+   */
+  private notifySubscribers(path: string, value: unknown): void {
+    const callbacks = this.subscribers.get(path);
+    if (callbacks) {
+      callbacks.forEach((callback) => {
+        try {
+          callback(value);
+        } catch (error) {
+          console.error(`Subscriber error for ${path}:`, error);
+        }
+      });
+    }
+
+    // Also notify parent subscribers (e.g., if 'layouts.0' changed, notify 'layouts' subscribers)
+    const parts = path.split(".");
+    if (parts.length > 1) {
+      const parentPath = parts.slice(0, -1).join(".");
+      const parentCallbacks = this.subscribers.get(parentPath);
+      if (parentCallbacks) {
+        const parentValue = this.get(parentPath);
+        parentCallbacks.forEach((callback) => {
+          try {
+            callback(parentValue);
+          } catch (error) {
+            console.error(`Subscriber error for ${parentPath}:`, error);
+          }
+        });
+      }
+    }
+  }
+
+  /**
+   * Get all configurations as a snapshot
+   * Useful for export functionality
+   */
+  public getAllConfig(): ConfigStorage {
+    return JSON.parse(JSON.stringify(this.storage));
+  }
+
+  /**
+   * Clear all configurations and reset to defaults
+   */
+  public clear(): void {
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    for (const key of Object.keys(CONFIG_DEFAULTS) as Array<keyof ConfigStorage>) {
+      const storageKey = `${STORAGE_PREFIX}.${key}`;
+      window.localStorage.removeItem(storageKey);
+      this.storage[key] = CONFIG_DEFAULTS[key];
+      this.notifySubscribers(key, CONFIG_DEFAULTS[key]);
+    }
+  }
+
+  /**
+   * Cleanup event listeners (called on app shutdown if needed)
+   */
+  public destroy(): void {
+    if (this.storageEventListener && typeof window !== "undefined") {
+      window.removeEventListener("storage", this.storageEventListener);
+    }
+  }
+}
+
+/**
+ * Singleton instance - exported as the public API
+ */
+export const ConfigManager = new ConfigManagerClass();
+
+/**
+ * Type export for dependency injection scenarios (optional)
+ */
+export type { ConfigManagerClass };

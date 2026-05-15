@@ -11,7 +11,8 @@ import {
 import { ImportPanel, SignalWorkspace } from "./components";
 import { analyzeMathExpression } from "./mathChannels";
 import { useTelemetryStore } from "./store/telemetryStore";
-import type { AppInfo, DatasetMetadata, MapTuningData, MathChannel, TrackMapResponse } from "./types";
+import { ConfigManager } from "./store/ConfigManager";
+import type { AppInfo, DatasetMetadata, MathChannel, TrackMapResponse } from "./types";
 import type { InspectorCommand, InspectorSnapshot } from "./components/SignalWorkspace";
 
 interface DecimalNumberInputProps {
@@ -81,67 +82,6 @@ function DecimalNumberInput({ value, onChange, style }: DecimalNumberInputProps)
   );
 }
 
-const USER_DISPLAY_NAME_KEY = "telemetry-display.user-display-name.v1";
-const MATH_CHANNELS_KEY = "telemetry-display.math-channels.v1";
-
-function loadSavedMathChannels(): MathChannel[] {
-  if (typeof window === "undefined") {
-    return [];
-  }
-
-  try {
-    const raw = window.localStorage.getItem(MATH_CHANNELS_KEY);
-    if (!raw) {
-      return [];
-    }
-
-    const parsed = JSON.parse(raw) as unknown;
-    if (!Array.isArray(parsed)) {
-      return [];
-    }
-
-    const sanitized = parsed
-      .filter((item): item is MathChannel => {
-        if (!item || typeof item !== "object") {
-          return false;
-        }
-
-        const candidate = item as MathChannel;
-        return (
-          typeof candidate.name === "string" &&
-          typeof candidate.expression === "string" &&
-          Array.isArray(candidate.dependencies) &&
-          candidate.dependencies.every((dependency) => typeof dependency === "string")
-        );
-      })
-      .map((channel) => ({
-        name: channel.name,
-        expression: channel.expression,
-        dependencies: [...channel.dependencies],
-      }));
-
-    // Guard against stale localStorage entries that may contain duplicate channel names.
-    const seenNames = new Set<string>();
-    return sanitized.filter((channel) => {
-      if (seenNames.has(channel.name)) {
-        return false;
-      }
-      seenNames.add(channel.name);
-      return true;
-    });
-  } catch {
-    return [];
-  }
-}
-
-function storeSavedMathChannels(mathChannels: MathChannel[]): void {
-  if (typeof window === "undefined") {
-    return;
-  }
-
-  window.localStorage.setItem(MATH_CHANNELS_KEY, JSON.stringify(mathChannels));
-}
-
 function isEditableElement(target: EventTarget | null): boolean {
   if (!(target instanceof HTMLElement)) {
     return false;
@@ -158,12 +98,15 @@ export default function App() {
   const [importing, setImporting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [importMessage, setImportMessage] = useState<string | null>(null);
-  const [datasetId, setDatasetId] = useState<string | null>(null);
+  const [datasetId, setDatasetId] = useState<string | null>(() => ConfigManager.get<string | null>("dataset-id") ?? null);
   const [datasetMetadata, setDatasetMetadata] = useState<DatasetMetadata | null>(null);
   const [trackMap, setTrackMap] = useState<TrackMapResponse | null>(null);
-  const [mathChannels, setMathChannels] = useState<MathChannel[]>(() => loadSavedMathChannels());
+  const [mathChannels, setMathChannels] = useState<MathChannel[]>(() => ConfigManager.get<MathChannel[]>("math-channels") ?? []);
   const [graphOnlyMode, setGraphOnlyMode] = useState(false);
-  const [userDisplayName, setUserDisplayName] = useState("");
+  const [userDisplayName, setUserDisplayName] = useState(() => {
+    const prefs = ConfigManager.get("user-preferences");
+    return (prefs as { displayName?: string } | undefined)?.displayName ?? "";
+  });
   const [panelSide, setPanelSide] = useState<"left" | "right">("left");
   const [panelMode, setPanelMode] = useState<"data" | "inspector">("data");
   const [inspectorSnapshot, setInspectorSnapshot] = useState<InspectorSnapshot | null>(null);
@@ -179,11 +122,6 @@ export default function App() {
   }
 
   useEffect(() => {
-    const savedName = window.localStorage.getItem(USER_DISPLAY_NAME_KEY);
-    if (savedName) {
-      setUserDisplayName(savedName);
-    }
-
     let active = true;
     fetchAppInfo()
       .then((data) => {
@@ -204,52 +142,117 @@ export default function App() {
     };
   }, []);
 
+  // Auto-load dataset metadata and track map on startup
   useEffect(() => {
-    window.localStorage.setItem(USER_DISPLAY_NAME_KEY, userDisplayName.trim());
+    let active = true;
+    
+    const savedDatasetId = ConfigManager.get<string | null>("dataset-id");
+    if (savedDatasetId) {
+      Promise.all([
+        fetchDatasetMetadata(savedDatasetId),
+        fetchTrackMap(savedDatasetId)
+      ]).then(([metadata, trackMapData]) => {
+        if (!active) return;
+        setDatasetMetadata(metadata);
+        setTrackMap(trackMapData);
+      }).catch((err: unknown) => {
+        if (!active) return;
+        setError(err instanceof Error ? err.message : "Failed to load dataset");
+      });
+    }
+    
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    ConfigManager.set("user-preferences", { displayName: userDisplayName.trim() });
   }, [userDisplayName]);
 
   useEffect(() => {
-    storeSavedMathChannels(mathChannels);
+    ConfigManager.set("math-channels", mathChannels);
+  }, [mathChannels]);
+
+  // Save dataset ID to ConfigManager for cross-tab sync
+  useEffect(() => {
+    if (datasetId !== null) {
+      ConfigManager.set("dataset-id", datasetId);
+    }
+  }, [datasetId]);
+
+  // Listen for dataset ID changes from other tabs and reload
+  useEffect(() => {
+    const unsubscribe = ConfigManager.subscribe<string | null>("dataset-id", async (newDatasetId) => {
+      // Only update if it's different from current and not null
+      if (newDatasetId && newDatasetId !== datasetId) {
+        setDatasetId(newDatasetId);
+        // Reload dataset metadata and track map
+        try {
+          const metadata = await fetchDatasetMetadata(newDatasetId);
+          setDatasetMetadata(metadata);
+          const trackMapData = await fetchTrackMap(newDatasetId);
+          setTrackMap(trackMapData);
+        } catch (err) {
+          setError(err instanceof Error ? err.message : "Failed to load dataset");
+        }
+      }
+    });
+
+    return () => unsubscribe();
+  }, [datasetId]);
+
+  // Listen for math channels changes from other tabs
+  useEffect(() => {
+    const unsubscribe = ConfigManager.subscribe<MathChannel[]>("math-channels", (newChannels) => {
+      // Update local state only if it differs (to avoid loops)
+      if (JSON.stringify(newChannels) !== JSON.stringify(mathChannels)) {
+        setMathChannels(newChannels);
+      }
+    });
+
+    return () => unsubscribe();
   }, [mathChannels]);
 
   useEffect(() => {
-    function onGlobalKeyDown(event: KeyboardEvent) {
-      if (isEditableElement(event.target)) {
+    function onGlobalKeyDown(event: Event): void {
+      const kbEvent = event as KeyboardEvent;
+      if (isEditableElement(kbEvent.target)) {
         return;
       }
 
       if (shortcutsModalOpen) {
-        if (event.code === "Escape") {
-          event.preventDefault();
+        if (kbEvent.code === "Escape") {
+          kbEvent.preventDefault();
           setShortcutsModalOpen(false);
         }
         return;
       }
 
-      if (event.ctrlKey || event.metaKey || event.altKey) {
+      if (kbEvent.ctrlKey || kbEvent.metaKey || kbEvent.altKey) {
         return;
       }
 
-      if (event.code === "KeyH") {
-        event.preventDefault();
+      if (kbEvent.code === "KeyH") {
+        kbEvent.preventDefault();
         resetAllGraphsToHome();
         return;
       }
 
-      if (event.code === "KeyG") {
-        event.preventDefault();
+      if (kbEvent.code === "KeyG") {
+        kbEvent.preventDefault();
         setGraphOnlyMode((prev) => !prev);
         return;
       }
 
-      if (event.code === "KeyI") {
-        event.preventDefault();
+      if (kbEvent.code === "KeyI") {
+        kbEvent.preventDefault();
         setPanelMode((prev) => (prev === "data" ? "inspector" : "data"));
         return;
       }
 
-      if (event.code === "KeyP") {
-        event.preventDefault();
+      if (kbEvent.code === "KeyP") {
+        kbEvent.preventDefault();
         setPanelSide((prev) => (prev === "left" ? "right" : "left"));
       }
     }

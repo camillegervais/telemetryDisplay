@@ -5,6 +5,7 @@ import Plot from "react-plotly.js";
 import { queryDataset } from "../api";
 import { evaluateMathChannel } from "../mathChannels";
 import { useTelemetryStore } from "../store/telemetryStore";
+import { ConfigManager } from "../store/ConfigManager";
 import type { DatasetMetadata, DistanceRange, MathChannel, SignalSeries, TrackMapResponse, MapTuningData } from "../types";
 import MapTuning from "./MapTuning";
 
@@ -133,8 +134,6 @@ type ResizeState = {
 };
 
 const COLORS = ["#00a8ff", "#ff2d4f", "#ffd447", "#34d399", "#ff8a33", "#ff9aa8"];
-const WORKSPACE_CONFIGS_KEY = "telemetry-display.workspace-configs.v1";
-const WORKSPACE_SESSION_KEY = "telemetry-display.workspace-session.v1";
 const SIGNAL_DRAG_MIME = "application/x-telemetry-signal";
 const TRAJECTORY_TAB_ID = "tab-trajectory";
 const ANALYSIS_TAB_ID = "tab-analysis";
@@ -273,81 +272,6 @@ function getWidgetYAxisMatchMode(widget: GraphWidget): "off" | YAxisMatchMode {
     return "off";
   }
   return widget.options?.yAxisMatchMode === "origin-only" ? "origin-only" : "origin-scale";
-}
-
-function loadSavedWorkspaceConfigs(): SavedWorkspaceConfig[] {
-  if (typeof window === "undefined") {
-    return [];
-  }
-  try {
-    const raw = window.localStorage.getItem(WORKSPACE_CONFIGS_KEY);
-    if (!raw) {
-      return [];
-    }
-    const parsed = JSON.parse(raw) as SavedWorkspaceConfig[];
-    if (!Array.isArray(parsed)) {
-      return [];
-    }
-    return parsed
-      .filter((cfg) => Array.isArray(cfg.tabs) && cfg.tabs.length > 0)
-      .map((cfg) => ({
-        ...cfg,
-        tabs: cfg.tabs.map((tab) => sanitizeTabWidgetIds(tab)),
-      }));
-  } catch {
-    return [];
-  }
-}
-
-function storeWorkspaceConfigs(configs: SavedWorkspaceConfig[]): void {
-  if (typeof window === "undefined") {
-    return;
-  }
-  window.localStorage.setItem(WORKSPACE_CONFIGS_KEY, JSON.stringify(configs));
-}
-
-function loadWorkspaceSessionSnapshot(): WorkspaceSessionSnapshot | null {
-  if (typeof window === "undefined") {
-    return null;
-  }
-
-  try {
-    const raw = window.localStorage.getItem(WORKSPACE_SESSION_KEY);
-    if (!raw) {
-      return null;
-    }
-
-    const parsed = JSON.parse(raw) as WorkspaceSessionSnapshot;
-    if (!Array.isArray(parsed.tabs) || parsed.tabs.length === 0 || typeof parsed.activeTabId !== "string") {
-      return null;
-    }
-
-    return parsed;
-  } catch {
-    return null;
-  }
-}
-
-function storeWorkspaceSessionSnapshot(snapshot: WorkspaceSessionSnapshot): void {
-  if (typeof window === "undefined") {
-    return;
-  }
-
-  const cleanTabs = snapshot.tabs.map((tab) => {
-    const sanitizedTab = sanitizeTabWidgetIds(tab);
-    return {
-      ...sanitizedTab,
-      widgets: sanitizeWidgetsForStorage(sanitizedTab.widgets),
-    };
-  });
-
-  window.localStorage.setItem(
-    WORKSPACE_SESSION_KEY,
-    JSON.stringify({
-      ...snapshot,
-      tabs: cleanTabs,
-    })
-  );
 }
 
 function createWidget(id: number, title: string, row: number, col: number): GraphWidget {
@@ -879,7 +803,7 @@ export default function SignalWorkspace({
   const [gridRows, setGridRows] = useState(initialTab.gridRows);
   const [nextId, setNextId] = useState(initialTab.nextId);
   const [widgets, setWidgets] = useState<GraphWidget[]>(initialTab.widgets);
-  const [savedConfigs, setSavedConfigs] = useState<SavedWorkspaceConfig[]>(() => loadSavedWorkspaceConfigs());
+  const [savedConfigs, setSavedConfigs] = useState<SavedWorkspaceConfig[]>(() => ConfigManager.get<SavedWorkspaceConfig[]>("layouts") ?? []);
   const [selectedConfigId, setSelectedConfigId] = useState<string>("");
   const [currentConfigId, setCurrentConfigId] = useState<string | null>(null);
   const [dragFromId, setDragFromId] = useState<number | null>(null);
@@ -1209,7 +1133,7 @@ export default function SignalWorkspace({
   }
 
   useEffect(() => {
-    const snapshot = loadWorkspaceSessionSnapshot();
+    const snapshot = ConfigManager.get<WorkspaceSessionSnapshot>("session");
     if (!snapshot) {
       setSessionHydrated(true);
       return;
@@ -1243,13 +1167,66 @@ export default function SignalWorkspace({
       return;
     }
 
-    storeWorkspaceSessionSnapshot({
+    ConfigManager.set("session", {
       tabs,
       activeTabId,
       currentConfigId,
       selectedConfigId,
     });
   }, [sessionHydrated, tabs, activeTabId, currentConfigId, selectedConfigId]);
+
+  // Listen for layout changes from other tabs (cross-tab sync)
+  useEffect(() => {
+    const unsubscribe = ConfigManager.subscribe<SavedWorkspaceConfig[]>("layouts", (newLayouts) => {
+      // Update savedConfigs if different (avoid loops)
+      if (JSON.stringify(newLayouts) !== JSON.stringify(savedConfigs)) {
+        setSavedConfigs(newLayouts);
+      }
+    });
+
+    return () => unsubscribe();
+  }, [savedConfigs]);
+
+  // Listen for session changes from other tabs (active workspace state)
+  useEffect(() => {
+    const unsubscribe = ConfigManager.subscribe<WorkspaceSessionSnapshot>("session", (newSnapshot) => {
+      if (!newSnapshot) return;
+
+      // Only update if different from current state (avoid loops)
+      const currentSnapshot = {
+        tabs,
+        activeTabId,
+        currentConfigId,
+        selectedConfigId,
+      };
+
+      if (JSON.stringify(newSnapshot) !== JSON.stringify(currentSnapshot)) {
+        const clonedTabs = newSnapshot.tabs.map((tab) => sanitizeTabWidgetIds(tab));
+        const restoredActiveId =
+          newSnapshot.activeTabId === TRAJECTORY_TAB_ID
+            ? TRAJECTORY_TAB_ID
+            : clonedTabs.some((tab) => tab.id === newSnapshot.activeTabId)
+          ? newSnapshot.activeTabId
+          : clonedTabs[0]?.id;
+
+        setTabs(clonedTabs);
+        if (restoredActiveId) {
+          setActiveTabId(restoredActiveId);
+          const restoredActiveTab = clonedTabs.find((tab) => tab.id === restoredActiveId) ?? clonedTabs[0];
+          if (restoredActiveTab && restoredActiveId !== TRAJECTORY_TAB_ID) {
+            setGridCols(restoredActiveTab.gridCols);
+            setGridRows(restoredActiveTab.gridRows);
+            setNextId(restoredActiveTab.nextId);
+            setWidgets(restoredActiveTab.widgets);
+          }
+        }
+        setCurrentConfigId(newSnapshot.currentConfigId);
+        setSelectedConfigId(newSnapshot.selectedConfigId);
+      }
+    });
+
+    return () => unsubscribe();
+  }, [tabs, activeTabId, currentConfigId, selectedConfigId]);
 
   useEffect(() => {
     if (!resizeState) {
@@ -1948,7 +1925,7 @@ export default function SignalWorkspace({
       // Add the new configuration to the list
       setSavedConfigs((prev) => {
         const nextConfigs = [...prev, newConfig];
-        storeWorkspaceConfigs(nextConfigs);
+        ConfigManager.set("layouts", nextConfigs);
         return nextConfigs;
       });
     }
@@ -1985,7 +1962,7 @@ export default function SignalWorkspace({
   function deleteConfiguration(configId: string) {
     setSavedConfigs((prev) => {
       const nextConfigs = prev.filter((cfg) => cfg.id !== configId);
-      storeWorkspaceConfigs(nextConfigs);
+      ConfigManager.set("layouts", nextConfigs);
       return nextConfigs;
     });
     if (currentConfigId === configId) {
