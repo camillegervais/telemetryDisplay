@@ -14,9 +14,8 @@ export const FUNCTIONS = {
   abs: { arity: 1 as const, description: "Valeur absolue: abs(signal)" },
   min: { arity: 2 as const, description: "Minimum de deux signaux: min(a, b)" },
   max: { arity: 2 as const, description: "Maximum de deux signaux: max(a, b)" },
-
-  // New: Sign function
   sign: { arity: 1 as const, description: "Signe: 1 si positif, -1 si négatif, 0 si zéro: sign(signal)" },
+  norm2: { arity: 2 as const, description: "Norme 2: Fait la norme euclidienne du vecteur" },
 
   // Logical operations (treat as 0=false, 1=true)
   and: { arity: 2 as const, description: "ET logique: and(a, b) — 1 si tous deux non-zéro" },
@@ -76,6 +75,8 @@ export function evaluateFunction(
       if (args[0] > 0) return 1;
       if (args[0] < 0) return -1;
       return 0;
+    case "norm2":
+      return Math.sqrt(args[0]**2 + args[1]**1);
     case "and":
       return args[0] !== 0 && args[1] !== 0 ? 1 : 0;
     case "or":
