@@ -1207,6 +1207,7 @@ export default function SignalWorkspace({
 
   // Listen for session changes from other tabs (active workspace state)
   // Note: activeTabId is NOT synced to allow different tabs on different windows
+  // Also: we skip updating the currently active tab to avoid interfering with local state changes
   useEffect(() => {
     const unsubscribe = ConfigManager.subscribe<WorkspaceSessionSnapshot>("session", (newSnapshot) => {
       if (!newSnapshot) return;
@@ -1217,16 +1218,21 @@ export default function SignalWorkspace({
           newSnapshot.selectedConfigId !== selectedConfigId) {
         
         const clonedTabs = newSnapshot.tabs.map((tab) => sanitizeTabWidgetIds(tab));
-        setTabs(clonedTabs);
         
-        // Update widgets for current active tab if it exists in the new tabs
-        const currentActiveTab = clonedTabs.find((tab) => tab.id === activeTabId);
-        if (currentActiveTab && activeTabId !== TRAJECTORY_TAB_ID) {
-          setGridCols(currentActiveTab.gridCols);
-          setGridRows(currentActiveTab.gridRows);
-          setNextId(currentActiveTab.nextId);
-          setWidgets(currentActiveTab.widgets);
-        }
+        // Only sync INACTIVE tabs - don't restore the currently active tab's widgets
+        // This prevents cross-tab sync from overwriting local UI state (like menuOpen)
+        const syncedTabs = clonedTabs.map((newTab) => {
+          // If this is the active tab, keep the local widgets state instead of restoring from session
+          if (newTab.id === activeTabId && activeTabId !== TRAJECTORY_TAB_ID) {
+            return {
+              ...newTab,
+              widgets: tabs.find((t) => t.id === activeTabId)?.widgets ?? newTab.widgets,
+            };
+          }
+          return newTab;
+        });
+        
+        setTabs(syncedTabs);
         
         setCurrentConfigId(newSnapshot.currentConfigId);
         setSelectedConfigId(newSnapshot.selectedConfigId);
