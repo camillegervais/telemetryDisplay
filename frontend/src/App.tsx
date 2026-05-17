@@ -168,53 +168,60 @@ export default function App() {
     };
   }, []);
 
+  // Sync user preferences to localStorage
   useEffect(() => {
     ConfigManager.set("user-preferences", { displayName: userDisplayName.trim() });
   }, [userDisplayName]);
 
+  // Sync math channels to localStorage
   useEffect(() => {
     ConfigManager.set("math-channels", mathChannels);
   }, [mathChannels]);
 
-  // Save dataset ID to ConfigManager for cross-tab sync
+  // Sync dataset ID to localStorage
   useEffect(() => {
     if (datasetId !== null) {
       ConfigManager.set("dataset-id", datasetId);
     }
   }, [datasetId]);
 
-  // Listen for dataset ID changes from other tabs and reload
+  // Listen for dataset ID changes from other tabs - with debounce for API calls
   useEffect(() => {
-    const unsubscribe = ConfigManager.subscribe<string | null>("dataset-id", async (newDatasetId) => {
-      // Only update if it's different from current and not null
-      if (newDatasetId && newDatasetId !== datasetId) {
-        setDatasetId(newDatasetId);
-        // Reload dataset metadata and track map
-        try {
-          const metadata = await fetchDatasetMetadata(newDatasetId);
-          setDatasetMetadata(metadata);
-          const trackMapData = await fetchTrackMap(newDatasetId);
-          setTrackMap(trackMapData);
-        } catch (err) {
-          setError(err instanceof Error ? err.message : "Failed to load dataset");
+    const unsubscribe = ConfigManager.subscribeDebouncedFull<string | null>(
+      "dataset-id",
+      async (newDatasetId) => {
+        // Only update if it's different from current and not null
+        if (newDatasetId && newDatasetId !== datasetId) {
+          setDatasetId(newDatasetId);
+          // Reload dataset metadata and track map
+          try {
+            const metadata = await fetchDatasetMetadata(newDatasetId);
+            setDatasetMetadata(metadata);
+            const trackMapData = await fetchTrackMap(newDatasetId);
+            setTrackMap(trackMapData);
+          } catch (err) {
+            setError(err instanceof Error ? err.message : "Failed to load dataset");
+          }
         }
-      }
-    });
+      },
+      300 // Debounce longer for API calls
+    );
 
     return () => unsubscribe();
   }, [datasetId]);
 
   // Listen for math channels changes from other tabs
   useEffect(() => {
-    const unsubscribe = ConfigManager.subscribe<MathChannel[]>("math-channels", (newChannels) => {
-      // Update local state only if it differs (to avoid loops)
-      if (JSON.stringify(newChannels) !== JSON.stringify(mathChannels)) {
+    const unsubscribe = ConfigManager.subscribeDebouncedFull<MathChannel[]>(
+      "math-channels",
+      (newChannels) => {
         setMathChannels(newChannels);
-      }
-    });
+      },
+      150 // Shorter debounce for state updates
+    );
 
     return () => unsubscribe();
-  }, [mathChannels]);
+  }, []);
 
   useEffect(() => {
     function onGlobalKeyDown(event: Event): void {

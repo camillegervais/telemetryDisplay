@@ -1157,7 +1157,12 @@ export default function SignalWorkspace({
       return;
     }
 
-    const clonedTabs = snapshot.tabs.map((tab) => sanitizeTabWidgetIds(tab));
+    const clonedTabs = snapshot.tabs
+      .map((tab) => sanitizeTabWidgetIds(tab))
+      .map(tab => ({
+        ...tab,
+        widgets: tab.widgets.map(w => ({ ...w, menuOpen: false }))
+      }));
     const restoredActiveId =
       snapshot.activeTabId === TRAJECTORY_TAB_ID
         ? TRAJECTORY_TAB_ID
@@ -1186,7 +1191,10 @@ export default function SignalWorkspace({
     }
 
     ConfigManager.set("session", {
-      tabs,
+      tabs: tabs.map(tab => ({
+        ...tab,
+        widgets: tab.widgets.map(({ menuOpen, ...w }) => w)
+      })),
       activeTabId,
       currentConfigId,
       selectedConfigId,

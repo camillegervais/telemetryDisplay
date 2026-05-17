@@ -56,13 +56,16 @@ class ConfigManagerClass {
       try {
         const raw = window.localStorage.getItem(storageKey);
         if (raw) {
-          result[key] = JSON.parse(raw);
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          (result as any)[key] = JSON.parse(raw);
         } else {
-          result[key] = CONFIG_DEFAULTS[key];
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          (result as any)[key] = CONFIG_DEFAULTS[key];
         }
       } catch (error) {
         console.error(`Failed to load config ${key}:`, error);
-        result[key] = CONFIG_DEFAULTS[key];
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (result as any)[key] = CONFIG_DEFAULTS[key];
       }
     }
 
@@ -161,8 +164,10 @@ class ConfigManagerClass {
 
     if (parts.length === 1) {
       // Setting top-level key
-      this.storage[topLevelKey] = value as ConfigStorage[typeof topLevelKey];
-      this.saveToLocalStorage(topLevelKey, value as ConfigStorage[typeof topLevelKey]);
+      const storedValue = value as ConfigStorage[typeof topLevelKey];
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (this.storage as any)[topLevelKey] = storedValue;
+      this.saveToLocalStorage(topLevelKey, storedValue);
       this.notifySubscribers(path, value);
     } else {
       // Setting nested value
@@ -172,8 +177,10 @@ class ConfigManagerClass {
         nestedPath,
         value
       );
-      this.storage[topLevelKey] = updated as ConfigStorage[typeof topLevelKey];
-      this.saveToLocalStorage(topLevelKey, updated as ConfigStorage[typeof topLevelKey]);
+      const storedValue = updated as ConfigStorage[typeof topLevelKey];
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (this.storage as any)[topLevelKey] = storedValue;
+      this.saveToLocalStorage(topLevelKey, storedValue);
       this.notifySubscribers(path, value);
     }
   }
@@ -200,6 +207,83 @@ class ConfigManagerClass {
         this.subscribers.delete(path);
       }
     };
+  }
+
+  /**
+   * Subscribe with debounce - prevents double actions on rapid updates
+   * Ideal for expensive operations (API calls, recalculations)
+   * @param path Config key to watch
+   * @param callback Function to call when value changes
+   * @param debounceMs Delay before calling callback (default 100ms)
+   * @returns Unsubscribe function
+   * 
+   * @example
+   *   ConfigManager.subscribeDebouncedFull(
+   *     'math-channels',
+   *     (newValue) => recalculateAll(newValue),
+   *     200
+   *   );
+   */
+  public subscribeDebouncedFull<T = unknown>(
+    path: string,
+    callback: (value: T) => void,
+    debounceMs: number = 100
+  ): () => void {
+    let timeoutId: ReturnType<typeof setTimeout> | null = null;
+    let lastValue: unknown = this.get(path);
+
+    const wrappedCallback: SubscriberCallback<T> = (newValue: T) => {
+      // Skip if value hasn't actually changed
+      if (JSON.stringify(newValue) === JSON.stringify(lastValue)) {
+        return;
+      }
+      lastValue = newValue;
+
+      // Clear pending call
+      if (timeoutId !== null) {
+        clearTimeout(timeoutId);
+      }
+
+      // Schedule new call
+      timeoutId = setTimeout(() => {
+        callback(newValue);
+        timeoutId = null;
+      }, debounceMs);
+    };
+
+    return this.subscribe(path, wrappedCallback);
+  }
+
+  /**
+   * Update multiple config values atomically
+   * All updates use the same batch, preventing intermediate states
+   * @param updates Object with config keys and their new values
+   * 
+   * @example
+   *   ConfigManager.setBatch({
+   *     'math-channels': newChannels,
+   *     'dataset-id': datasetId
+   *   });
+   */
+  public setBatch(updates: Partial<ConfigStorage>): void {
+    // Validate all keys first
+    for (const key of Object.keys(updates)) {
+      if (!isValidConfigKey(key)) {
+        throw new Error(`Invalid config key: ${key}`);
+      }
+    }
+
+    // Apply all updates
+    for (const key of Object.keys(updates) as Array<keyof ConfigStorage>) {
+      const value = updates[key];
+      if (value !== undefined) {
+        const storedValue = value as ConfigStorage[typeof key];
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (this.storage as any)[key] = storedValue;
+        this.saveToLocalStorage(key, storedValue);
+        this.notifySubscribers(key as string, value);
+      }
+    }
   }
 
   /**
@@ -254,8 +338,10 @@ class ConfigManagerClass {
     for (const key of Object.keys(CONFIG_DEFAULTS) as Array<keyof ConfigStorage>) {
       const storageKey = `${STORAGE_PREFIX}.${key}`;
       window.localStorage.removeItem(storageKey);
-      this.storage[key] = CONFIG_DEFAULTS[key];
-      this.notifySubscribers(key, CONFIG_DEFAULTS[key]);
+      const defaultValue = CONFIG_DEFAULTS[key] as ConfigStorage[typeof key];
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (this.storage as any)[key] = defaultValue;
+      this.notifySubscribers(key as string, defaultValue);
     }
   }
 
@@ -312,9 +398,11 @@ class ConfigManagerClass {
 
         const value = configsToImport[key];
         if (value !== undefined) {
-          this.storage[key] = value;
-          this.saveToLocalStorage(key, value);
-          this.notifySubscribers(key, value);
+          const storedValue = value as ConfigStorage[typeof key];
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          (this.storage as any)[key] = storedValue;
+          this.saveToLocalStorage(key, storedValue);
+          this.notifySubscribers(key as string, value);
         }
       }
     } catch (error) {

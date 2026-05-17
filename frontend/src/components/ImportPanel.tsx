@@ -348,8 +348,9 @@ export default function ImportPanel({
     return Number.isFinite(value) ? value.toFixed(3) : "-";
   }
 
-  const recalculateMapTuning = async (configName: string, gain: number, offset: number) => {
-    if (!datasetId) return;
+  const recalculateMapTuning = async (configName: string, gain: number, offset: number, datasetIdParam?: string) => {
+    const currentDatasetId = datasetIdParam ?? datasetId;
+    if (!currentDatasetId) return;
     const configs = ConfigManager.get<Record<string, MapTuningData>>("map-configs") ?? {};
     const config = configs[configName];
     if (!config) return;
@@ -358,7 +359,7 @@ export default function ImportPanel({
 
     try {
       await calculateMapTuning({
-        datasetId,
+        datasetId: currentDatasetId,
         inputChannelX: config.inputChannelX,
         inputChannelY: config.inputChannelY,
         outputChannelName: config.outputChannelName,
@@ -392,11 +393,14 @@ export default function ImportPanel({
     }
     await onImport(selectedFile);
 
+    const currentDatasetId = ConfigManager.get<string | null>("dataset-id");
+    if (!currentDatasetId) return;
+
     const configs = ConfigManager.get<Record<string, MapTuningData>>("map-configs") ?? {};
     const configNames = Object.keys(configs);
     for(let configName of configNames){
       console.log('Computing: ', configName);
-      await recalculateMapTuning(configName, 1, 0);
+      await recalculateMapTuning(configName, 1, 0, currentDatasetId);
     }
   }
 
@@ -408,10 +412,13 @@ export default function ImportPanel({
     window.localStorage.setItem(LAST_MAT_PATH_KEY, path);
     await onImportFromPath(path);
 
+    const currentDatasetId = ConfigManager.get<string | null>("dataset-id");
+    if (!currentDatasetId) return;
+
     const configs = ConfigManager.get<Record<string, MapTuningData>>("map-configs") ?? {};
     const configNames = Object.keys(configs);
     for(let configName of configNames){
-      await recalculateMapTuning(configName, 1, 0);
+      await recalculateMapTuning(configName, 1, 0, currentDatasetId);
     }
   }
 
