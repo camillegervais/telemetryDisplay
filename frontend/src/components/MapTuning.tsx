@@ -1,6 +1,7 @@
 import React, { useState, useMemo, useEffect, useCallback } from "react";
 import { calculateMapTuning } from "../api";
 import { ConfigManager } from "../store/ConfigManager";
+import { useHoverToLutCell } from "../hooks/useHoverToLutCell";
 
 // ============================================================================
 // TYPES
@@ -112,6 +113,15 @@ export default function MapTuning({
       maxValue: Math.max(...flat),
     };
   }, [gridData]);
+
+  // Highlight de la cellule LUT correspondant au sLap survolé dans SignalWorkspace
+  const highlightInfo = useHoverToLutCell({
+    datasetId,
+    inputChannelX,
+    inputChannelY,
+    rowHeaders,
+    colHeaders,
+  });
 
   // Charger les noms de configs au montage
   useEffect(() => {
@@ -534,15 +544,35 @@ export default function MapTuning({
                     onPaste={(e) => handlePasteRowHeaders(e, rIdx)}
                   />
                 </td>
-                {row.map((val, cIdx) => (
-                  <td key={cIdx} className="map-tuning-heatmap-cell" style={{ backgroundColor: getHeatmapColor(val) }}>
-                    <NumberInput 
-                      value={val} 
-                      onChange={v => updateGridCell(rIdx, cIdx, v)} 
-                      onPaste={e => handlePaste(e, rIdx, cIdx)} 
-                    />
-                  </td>
-                ))}
+                {row.map((val, cIdx) => {
+                  const isExact =
+                    highlightInfo?.exact?.row === rIdx &&
+                    highlightInfo?.exact?.col === cIdx;
+                  const isNearest =
+                    !isExact &&
+                    (highlightInfo?.nearest?.some(
+                      (c) => c.row === rIdx && c.col === cIdx
+                    ) ?? false);
+                  return (
+                    <td
+                      key={cIdx}
+                      className={[
+                        "map-tuning-heatmap-cell",
+                        isExact ? "lut-cell-active" : "",
+                        isNearest ? "lut-cell-nearby" : "",
+                      ]
+                        .filter(Boolean)
+                        .join(" ")}
+                      style={{ backgroundColor: getHeatmapColor(val) }}
+                    >
+                      <NumberInput
+                        value={val}
+                        onChange={v => updateGridCell(rIdx, cIdx, v)}
+                        onPaste={e => handlePaste(e, rIdx, cIdx)}
+                      />
+                    </td>
+                  );
+                })}
               </tr>
             ))}
           </tbody>

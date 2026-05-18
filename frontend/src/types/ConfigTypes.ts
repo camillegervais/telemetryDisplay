@@ -74,6 +74,25 @@ export type WorkspaceSessionSnapshot = {
 };
 
 /**
+ * Info on highlighted cell(s) in the 2D LUT map
+ * Populated by useHoverToLutCell when user hovers on a graph
+ */
+export type CellHighlightInfo = {
+  /** Exact matching cell (if the hover point falls exactly on breakpoints) */
+  exact: { row: number; col: number } | null;
+  /** Nearest surrounding cells when there is no exact match (up to 4 corners) */
+  nearest: Array<{ row: number; col: number }> | null;
+};
+
+/**
+ * Hover-sLap export from SignalWorkspace to sync with MapTuning
+ */
+export type HoverSLap = {
+  sLap: number;
+  timestamp: number;
+};
+
+/**
  * User preferences
  */
 export type UserPreferences = {
@@ -92,6 +111,10 @@ export type ConfigStorage = {
   "current-map-config": string | null;
   "user-preferences": UserPreferences;
   "dataset-id": string | null;
+  /** sLap exported by SignalWorkspace on graph hover */
+  "current-hover-slap": HoverSLap | null;
+  /** Highlighted LUT cell(s) computed by useHoverToLutCell */
+  "highlight-lut": CellHighlightInfo | null;
 };
 
 /**
@@ -107,6 +130,8 @@ export const CONFIG_DEFAULTS: ConfigStorage = {
     displayName: "",
   },
   "dataset-id": null,
+  "current-hover-slap": null,
+  "highlight-lut": null,
 };
 
 /**

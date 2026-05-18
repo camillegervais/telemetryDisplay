@@ -3118,6 +3118,10 @@ export default function SignalWorkspace({
                       const hoveredX = evt.points?.[0]?.x;
                       if (typeof hoveredX === "number") {
                         setCursorDistance(hoveredX);
+                        ConfigManager.set("current-hover-slap", {
+                          sLap: hoveredX,
+                          timestamp: Date.now(),
+                        });
                       }
                     }}
                     onRelayout={(eventData) => {
