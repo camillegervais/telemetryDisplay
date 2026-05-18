@@ -36,9 +36,10 @@ export function findCellIndices(
   const sortedCols = sortedColIdx.map((i) => colHeaders[i]);
   const sortedRows = sortedRowIdx.map((i) => rowHeaders[i]);
 
-  // Find bracketing indices in the sorted arrays
-  const colBracket = findBracket(sortedCols, channelX);
-  const rowBracket = findBracket(sortedRows, channelY);
+  // X labels the rows, Y labels the columns (convention: "X \ Y" corner cell).
+  // rowHeaders hold X-axis breakpoints; colHeaders hold Y-axis breakpoints.
+  const rowBracket = findBracket(sortedRows, channelX);
+  const colBracket = findBracket(sortedCols, channelY);
 
   const colLow = sortedColIdx[colBracket.low];
   const colHigh = sortedColIdx[colBracket.high];
