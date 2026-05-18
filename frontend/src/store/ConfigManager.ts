@@ -369,6 +369,7 @@ class ConfigManagerClass {
       "map-configs": this.storage["map-configs"],
       "current-map-config": this.storage["current-map-config"],
       "user-preferences": this.storage["user-preferences"],
+      "soft-blocks": this.storage["soft-blocks"],
     };
 
     return TOML.stringify(exportData);
@@ -389,6 +390,7 @@ class ConfigManagerClass {
         "map-configs": (parsed["map-configs"] as ConfigStorage["map-configs"]) || this.storage["map-configs"],
         "current-map-config": (parsed["current-map-config"] as ConfigStorage["current-map-config"]) || this.storage["current-map-config"],
         "user-preferences": (parsed["user-preferences"] as ConfigStorage["user-preferences"]) || this.storage["user-preferences"],
+        "soft-blocks": (parsed["soft-blocks"] as ConfigStorage["soft-blocks"]) || this.storage["soft-blocks"],
         "dataset-id": this.storage["dataset-id"], // Keep current dataset
       };
 
