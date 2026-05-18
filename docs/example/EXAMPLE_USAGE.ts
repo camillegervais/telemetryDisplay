@@ -77,10 +77,10 @@ export function SignalWorkspace({
   graphOnlyMode,
   // ... other props ...
 }: SignalWorkspaceProps) {
-  // ✅ Single source of truth - synced across tabs automatically
+  // Single source of truth - synced across tabs automatically
   const [mathChannels, setMathChannels] = useConfigValue('math-channels', []);
 
-  // ✅ Derived state - recomputes when inputs change
+  // Derived state - recomputes when inputs change
   const availableSignals = useMemo((): string[] => {
     if (!datasetMetadata) return [];
     return [
@@ -89,7 +89,7 @@ export function SignalWorkspace({
     ];
   }, [datasetMetadata, mathChannels]);
 
-  // ✅ Add math channel - automatically syncs to other tabs
+  // Add math channel - automatically syncs to other tabs
   function handleAddMathChannel(name: string, expression: string): string | null {
     if (!datasetMetadata) {
       return "Dataset requis";
@@ -120,7 +120,7 @@ export function SignalWorkspace({
       return error;
     }
 
-    // ✅ Update state - automatically syncs via useConfigValue
+    // Update state - automatically syncs via useConfigValue
     setMathChannels(prev => [
       ...prev,
       {
@@ -132,12 +132,12 @@ export function SignalWorkspace({
     return null;
   }
 
-  // ✅ Remove math channel - automatically syncs to other tabs
+  // Remove math channel - automatically syncs to other tabs
   function handleRemoveMathChannel(name: string) {
     setMathChannels(prev => prev.filter(ch => ch.name !== name));
   }
 
-  // ✅ Use availableSignals in your UI
+  // Use availableSignals in your UI
   return (
     <section className="workspace">
       {/* Signal list that updates reactively */}
@@ -170,7 +170,7 @@ export function SignalWorkspace({
 import { useConfigValue } from './store/useConfigValue';
 
 export default function App() {
-  // ✅ Single source - syncs across tabs
+  // Single source - syncs across tabs
   const [mathChannels, setMathChannels] = useConfigValue('math-channels', []);
   const [datasetId, setDatasetId] = useConfigValue('dataset-id', null, {
     debounceMs: 300
@@ -194,15 +194,12 @@ export default function App() {
 // ============================================================================
 
 /*
-✅ No manual subscription management
-✅ Debounce prevents rapid re-renders (150ms default)
-✅ Automatic change detection (doesn't duplicate actions)
-✅ Cross-tab sync "just works"
-✅ Single setState call per update
-✅ Type-safe (TypeScript knows all ConfigStorage keys)
-✅ Easy to add new config values (just add to ConfigTypes + use hook)
-✅ No race conditions (atomic updates via setBatch)
+No manual subscription management
+Debounce prevents rapid re-renders (150ms default)
+Automatic change detection (doesn't duplicate actions)
+Cross-tab sync "just works"
+Single setState call per update
+Type-safe (TypeScript knows all ConfigStorage keys)
+Easy to add new config values (just add to ConfigTypes + use hook)
 
-BEFORE: Multiple useEffect hooks, manual subscription cleanup, comparison logic
-AFTER: One useConfigValue hook call
 */
