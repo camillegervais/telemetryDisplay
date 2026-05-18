@@ -48,7 +48,6 @@ const deleteLocalConfig = (name: string) => {
 interface MapTuningProps {
   availableSignals?: string[];
   datasetId?: string | null;
-  currentData?: MapTuningData | null;
   onSave?: (data: MapTuningData) => void;
   onCalculate?: (data: MapTuningData) => void;
   onSignalsUpdated?: () => void;
@@ -113,7 +112,6 @@ const NumberInput: React.FC<NumberInputProps> = ({ value, onChange, onPaste, sty
 export default function MapTuning({
   availableSignals = ["RPM", "TPS", "MAP", "Lambda"],
   datasetId = "demo-dataset-123",
-  currentData = null,
   onSave,
   onCalculate,
   onSignalsUpdated,

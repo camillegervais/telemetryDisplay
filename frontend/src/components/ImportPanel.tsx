@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState, type CSSProperties, type KeyboardEvent } 
 
 import { queryDataset, calculateMapTuning } from "../api";
 import { evaluateMathChannel } from "../mathChannels";
-import { getFunctionDocumentation, getOperatorDocumentation, USAGE_GUIDE } from "../mathFunctions";
+import { getFunctionDocumentation, getOperatorDocumentation } from "../mathFunctions";
 import { useTelemetryStore } from "../store/telemetryStore";
 
 import type { AppInfo, DatasetMetadata, MathChannel, MapTuningData } from "../types";
@@ -121,49 +121,6 @@ function isAbortError(error: unknown): boolean {
   return error instanceof DOMException && error.name === "AbortError";
 }
 
-function formatImportMessageLines(message: string): string[] {
-  const normalized = message.replace(/\r?\n/g, " ").replace(/\s+/g, " ").trim();
-  if (!normalized) {
-    return [];
-  }
-
-  const lines: string[] = [];
-  const firstCommaIndex = normalized.indexOf(",");
-  if (firstCommaIndex > 0) {
-    lines.push(normalized.slice(0, firstCommaIndex).trim());
-  } else {
-    lines.push(normalized);
-  }
-
-  const sourceStepMatch = normalized.match(/source step\s*([^,\-\s]+m?)/i);
-  const referenceStepMatch = normalized.match(/reference step\s*([^,\s]+m?)/i);
-
-  if (sourceStepMatch) {
-    lines.push(`Source step: ${sourceStepMatch[1]}`);
-  }
-  if (referenceStepMatch) {
-    lines.push(`Reference step: ${referenceStepMatch[1]}`);
-  }
-
-  if (lines.length < 3) {
-    const chunks = normalized
-      .split(",")
-      .map((part) => part.trim())
-      .filter(Boolean);
-
-    chunks.forEach((chunk) => {
-      if (lines.length >= 3) {
-        return;
-      }
-      if (!lines.includes(chunk)) {
-        lines.push(chunk);
-      }
-    });
-  }
-
-  return lines.slice(0, 3);
-}
-
 function uniqueStrings(values: string[]): string[] {
   const seen = new Set<string>();
   const unique: string[] = [];
@@ -180,10 +137,7 @@ function uniqueStrings(values: string[]): string[] {
 }
 
 export default function ImportPanel({
-  appInfo,
-  loadingAppInfo,
   importing,
-  importMessage,
   datasetId,
   datasetMetadata,
   mathChannels,
@@ -230,10 +184,6 @@ export default function ImportPanel({
     }
     return allSignals.filter((signal) => signal.toLowerCase().includes(filter));
   }, [allSignals, signalFilter]);
-  const importMessageLines = useMemo(
-    () => (importMessage ? formatImportMessageLines(importMessage) : []),
-    [importMessage]
-  );
 
   useEffect(() => {
     const savedPath = window.localStorage.getItem(LAST_MAT_PATH_KEY);

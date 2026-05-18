@@ -2704,7 +2704,6 @@ export default function SignalWorkspace({
           <MapTuning
             availableSignals={availableSignals}
             datasetId={datasetId}
-            currentData={mapTuningData}
             onSave={(data) => setMapTuningData(data)}
             onCalculate={(data) => console.log("Map calculated:", data)}
             onSignalsUpdated={onRefreshDatasetMetadata}

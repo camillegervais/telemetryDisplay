@@ -11,7 +11,7 @@ import {
 import { ImportPanel, SignalWorkspace } from "./components";
 import { analyzeMathExpression } from "./mathChannels";
 import { useTelemetryStore } from "./store/telemetryStore";
-import type { AppInfo, DatasetMetadata, MapTuningData, MathChannel, TrackMapResponse } from "./types";
+import type { AppInfo, DatasetMetadata, MathChannel, TrackMapResponse } from "./types";
 import type { InspectorCommand, InspectorSnapshot } from "./components/SignalWorkspace";
 
 interface DecimalNumberInputProps {
@@ -213,7 +213,10 @@ export default function App() {
   }, [mathChannels]);
 
   useEffect(() => {
-    function onGlobalKeyDown(event: KeyboardEvent) {
+    function onGlobalKeyDown(event: Event) {
+      if (!(event instanceof KeyboardEvent)) {
+        return;
+      }
       if (isEditableElement(event.target)) {
         return;
       }
