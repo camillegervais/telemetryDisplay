@@ -19,6 +19,9 @@ export const FUNCTIONS = {
   sat: {arity: 3 as const, description: "Saturation: Sature le signal avec une borne sup et inf fixe: sat(signal, max, min)" },
   satdyn: {arity: 3 as const, description: "Saturation: Sature le signal avec une borne sup et inf dynamique: satdyn(signal, signal_max, signal_min)" },
 
+  // Conditional
+  where: { arity: 3 as const, description: "Ternaire: where(condition, val_si_vrai, val_si_faux) — retourne val_si_vrai si condition != 0, sinon val_si_faux" },
+
   // Logical operations (treat as 0=false, 1=true)
   and: { arity: 2 as const, description: "ET logique: and(a, b) — 1 si tous deux non-zéro" },
   or: { arity: 2 as const, description: "OU logique: or(a, b) — 1 si au moins un non-zéro" },
@@ -91,6 +94,8 @@ export function evaluateFunction(
       return (args[0] !== 0) !== (args[1] !== 0) ? 1 : 0;
     case "not":
       return args[0] === 0 ? 1 : 0;
+    case "where":
+      return args[0] !== 0 ? args[1] : args[2];
     default:
       throw new Error(`Fonction inconnue: ${name}`);
   }
@@ -169,6 +174,11 @@ Logique (0=faux, non-zéro=vrai):
 - or(a, b): OU logique
 - xor(a, b): OU exclusif
 - not(a): NON logique
+
+Conditionnel:
+- where(cond, a, b): Retourne a si cond != 0, sinon b
+  Exemples: where(speed > 100, torque_high, torque_low)
+            where(and(engine_on, not(fault)), nominal, 0)
 
 Exemples:
 - speed_filtered: gain(speed, 0.95)

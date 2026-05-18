@@ -375,6 +375,7 @@ _MATH_NAMESPACE = {
     "cos": np.cos,
     "tan": np.tan,
     "pow": np.power,
+    "where": np.where,   # ternary: where(cond, val_true, val_false)
     "__builtins__": {},  # block all Python builtins
 }
 
