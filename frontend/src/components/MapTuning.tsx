@@ -1,49 +1,12 @@
 import React, { useState, useMemo, useEffect, useCallback } from "react";
 import { calculateMapTuning } from "../api";
+import { ConfigManager } from "../store/ConfigManager";
+import { useHoverToLutCell } from "../hooks/useHoverToLutCell";
 
 // ============================================================================
-// TYPES ET PERSISTENCE LOCALSTORAGE
+// TYPES
 // ============================================================================
 import { MapTuningData } from "../types";
-
-const STORAGE_KEY = "map_tuning_local_configs";
-const STORAGE_CURRENT_KEY = "current_config";
-
-const getLocalConfigs = (): Record<string, MapTuningData> => {
-  try {
-    const data = localStorage.getItem(STORAGE_KEY);
-    return data ? JSON.parse(data) : {};
-  } catch (e) {
-    return {};
-  }
-};
-
-const getCurrentConfig = (): string | null => {
-  try {
-    const data = localStorage.getItem(STORAGE_CURRENT_KEY);
-    return data;
-  } catch (e) {
-    return null;
-  }
-}
-
-const saveCurrentConfig = (name: string): void => {
-  if(name != null){
-    localStorage.setItem(STORAGE_CURRENT_KEY, name);
-  }
-}
-
-const saveLocalConfig = (name: string, data: MapTuningData) => {
-  const configs = getLocalConfigs();
-  configs[name] = data;
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(configs));
-};
-
-const deleteLocalConfig = (name: string) => {
-  const configs = getLocalConfigs();
-  delete configs[name];
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(configs));
-};
 
 interface MapTuningProps {
   availableSignals?: string[];
@@ -149,12 +112,21 @@ export default function MapTuning({
     };
   }, [gridData]);
 
+  // Highlight de la cellule LUT correspondant au sLap survolé dans SignalWorkspace
+  const highlightInfo = useHoverToLutCell({
+    datasetId,
+    inputChannelX,
+    inputChannelY,
+    rowHeaders,
+    colHeaders,
+  });
+
   // Charger les noms de configs au montage
   useEffect(() => {
-    const configs = getLocalConfigs();
+    const configs = ConfigManager.get<Record<string, MapTuningData>>("map-configs") ?? {};
     setSavedConfigs(Object.keys(configs));
     // Charger la dernière config chargée au montage
-    const lastConfig = getCurrentConfig();
+    const lastConfig = ConfigManager.get<string | null>("current-map-config");
     handleLoadConfig(lastConfig ? lastConfig : "");
   }, []);
 
@@ -306,12 +278,20 @@ export default function MapTuning({
       offsetVal
     };
     try {
-      saveLocalConfig(outputChannelName, data);
-      setSavedConfigs(Object.keys(getLocalConfigs()));
-      setSaveMessage({ type: "success", text: `Configuration "${outputChannelName}" sauvegardée localement.` });
+      // Save to ConfigManager (persists to localStorage with cross-tab sync)
+      const existingConfigs = ConfigManager.get<Record<string, MapTuningData>>("map-configs") ?? {};
+      ConfigManager.set("map-configs", {
+        ...existingConfigs,
+        [outputChannelName]: data,
+      });
+      const configs = ConfigManager.get<Record<string, MapTuningData>>("map-configs") ?? {};
+      setSavedConfigs(Object.keys(configs));
+      setSaveMessage({ type: "success", text: `Configuration "${outputChannelName}" sauvegardée.` });
       onSave?.(data);
+      // Reload signals in all tabs when config is saved
+      onSignalsUpdated?.();
     } catch (e) {
-      setSaveMessage({ type: "error", text: "Erreur lors de la sauvegarde locale." });
+      setSaveMessage({ type: "error", text: "Erreur lors de la sauvegarde." });
     } finally {
       setIsSaving(false);
     }
@@ -334,6 +314,12 @@ export default function MapTuning({
     };
     try {
       const result: any = await calculateMapTuning({ datasetId, ...data });
+      // Update ConfigManager for cross-tab sync
+      const existingConfigs = ConfigManager.get<Record<string, MapTuningData>>("map-configs") ?? {};
+      ConfigManager.set("map-configs", {
+        ...existingConfigs,
+        [outputChannelName]: data,
+      });
       setSaveMessage({ 
         type: "success", 
         text: `Calcul terminé avec succès (${result.samplesProcessed} points).` 
@@ -352,8 +338,8 @@ export default function MapTuning({
   };
 
   const handleLoadConfig = (name: string) => {
-    const configs = getLocalConfigs();
-    saveCurrentConfig(name);
+    const configs = ConfigManager.get<Record<string, MapTuningData>>("map-configs") ?? {};
+    ConfigManager.set("current-map-config", name);
     const config = configs[name];
     if (config) {
       setInputChannelX(config.inputChannelX);
@@ -374,8 +360,10 @@ export default function MapTuning({
 
   const handleDeleteConfig = (e: React.MouseEvent, name: string) => {
     e.stopPropagation();
-    deleteLocalConfig(name);
-    setSavedConfigs(Object.keys(getLocalConfigs()));
+    const configs = ConfigManager.get<Record<string, MapTuningData>>("map-configs") ?? {};
+    delete configs[name];
+    ConfigManager.set("map-configs", configs);
+    setSavedConfigs(Object.keys(ConfigManager.get<Record<string, MapTuningData>>("map-configs") ?? {}));
   };
 
   return (
@@ -554,15 +542,35 @@ export default function MapTuning({
                     onPaste={(e) => handlePasteRowHeaders(e, rIdx)}
                   />
                 </td>
-                {row.map((val, cIdx) => (
-                  <td key={cIdx} className="map-tuning-heatmap-cell" style={{ backgroundColor: getHeatmapColor(val) }}>
-                    <NumberInput 
-                      value={val} 
-                      onChange={v => updateGridCell(rIdx, cIdx, v)} 
-                      onPaste={e => handlePaste(e, rIdx, cIdx)} 
-                    />
-                  </td>
-                ))}
+                {row.map((val, cIdx) => {
+                  const isExact =
+                    highlightInfo?.exact?.row === rIdx &&
+                    highlightInfo?.exact?.col === cIdx;
+                  const isNearest =
+                    !isExact &&
+                    (highlightInfo?.nearest?.some(
+                      (c) => c.row === rIdx && c.col === cIdx
+                    ) ?? false);
+                  return (
+                    <td
+                      key={cIdx}
+                      className={[
+                        "map-tuning-heatmap-cell",
+                        isExact ? "lut-cell-active" : "",
+                        isNearest ? "lut-cell-nearby" : "",
+                      ]
+                        .filter(Boolean)
+                        .join(" ")}
+                      style={{ backgroundColor: getHeatmapColor(val) }}
+                    >
+                      <NumberInput
+                        value={val}
+                        onChange={v => updateGridCell(rIdx, cIdx, v)}
+                        onPaste={e => handlePaste(e, rIdx, cIdx)}
+                      />
+                    </td>
+                  );
+                })}
               </tr>
             ))}
           </tbody>

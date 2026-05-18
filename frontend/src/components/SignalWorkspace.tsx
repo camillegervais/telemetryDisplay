@@ -5,6 +5,7 @@ import Plot from "react-plotly.js";
 import { queryDataset } from "../api";
 import { evaluateMathChannel } from "../mathChannels";
 import { useTelemetryStore } from "../store/telemetryStore";
+import { ConfigManager } from "../store/ConfigManager";
 import type { DatasetMetadata, DistanceRange, MathChannel, SignalSeries, TrackMapResponse, MapTuningData } from "../types";
 import MapTuning from "./MapTuning";
 
@@ -133,8 +134,6 @@ type ResizeState = {
 };
 
 const COLORS = ["#00a8ff", "#ff2d4f", "#ffd447", "#34d399", "#ff8a33", "#ff9aa8"];
-const WORKSPACE_CONFIGS_KEY = "telemetry-display.workspace-configs.v1";
-const WORKSPACE_SESSION_KEY = "telemetry-display.workspace-session.v1";
 const SIGNAL_DRAG_MIME = "application/x-telemetry-signal";
 const TRAJECTORY_TAB_ID = "tab-trajectory";
 const ANALYSIS_TAB_ID = "tab-analysis";
@@ -273,81 +272,6 @@ function getWidgetYAxisMatchMode(widget: GraphWidget): "off" | YAxisMatchMode {
     return "off";
   }
   return widget.options?.yAxisMatchMode === "origin-only" ? "origin-only" : "origin-scale";
-}
-
-function loadSavedWorkspaceConfigs(): SavedWorkspaceConfig[] {
-  if (typeof window === "undefined") {
-    return [];
-  }
-  try {
-    const raw = window.localStorage.getItem(WORKSPACE_CONFIGS_KEY);
-    if (!raw) {
-      return [];
-    }
-    const parsed = JSON.parse(raw) as SavedWorkspaceConfig[];
-    if (!Array.isArray(parsed)) {
-      return [];
-    }
-    return parsed
-      .filter((cfg) => Array.isArray(cfg.tabs) && cfg.tabs.length > 0)
-      .map((cfg) => ({
-        ...cfg,
-        tabs: cfg.tabs.map((tab) => sanitizeTabWidgetIds(tab)),
-      }));
-  } catch {
-    return [];
-  }
-}
-
-function storeWorkspaceConfigs(configs: SavedWorkspaceConfig[]): void {
-  if (typeof window === "undefined") {
-    return;
-  }
-  window.localStorage.setItem(WORKSPACE_CONFIGS_KEY, JSON.stringify(configs));
-}
-
-function loadWorkspaceSessionSnapshot(): WorkspaceSessionSnapshot | null {
-  if (typeof window === "undefined") {
-    return null;
-  }
-
-  try {
-    const raw = window.localStorage.getItem(WORKSPACE_SESSION_KEY);
-    if (!raw) {
-      return null;
-    }
-
-    const parsed = JSON.parse(raw) as WorkspaceSessionSnapshot;
-    if (!Array.isArray(parsed.tabs) || parsed.tabs.length === 0 || typeof parsed.activeTabId !== "string") {
-      return null;
-    }
-
-    return parsed;
-  } catch {
-    return null;
-  }
-}
-
-function storeWorkspaceSessionSnapshot(snapshot: WorkspaceSessionSnapshot): void {
-  if (typeof window === "undefined") {
-    return;
-  }
-
-  const cleanTabs = snapshot.tabs.map((tab) => {
-    const sanitizedTab = sanitizeTabWidgetIds(tab);
-    return {
-      ...sanitizedTab,
-      widgets: sanitizeWidgetsForStorage(sanitizedTab.widgets),
-    };
-  });
-
-  window.localStorage.setItem(
-    WORKSPACE_SESSION_KEY,
-    JSON.stringify({
-      ...snapshot,
-      tabs: cleanTabs,
-    })
-  );
 }
 
 function createWidget(id: number, title: string, row: number, col: number): GraphWidget {
@@ -879,7 +803,7 @@ export default function SignalWorkspace({
   const [gridRows, setGridRows] = useState(initialTab.gridRows);
   const [nextId, setNextId] = useState(initialTab.nextId);
   const [widgets, setWidgets] = useState<GraphWidget[]>(initialTab.widgets);
-  const [savedConfigs, setSavedConfigs] = useState<SavedWorkspaceConfig[]>(() => loadSavedWorkspaceConfigs());
+  const [savedConfigs, setSavedConfigs] = useState<SavedWorkspaceConfig[]>(() => ConfigManager.get<SavedWorkspaceConfig[]>("layouts") ?? []);
   const [selectedConfigId, setSelectedConfigId] = useState<string>("");
   const [currentConfigId, setCurrentConfigId] = useState<string | null>(null);
   const [dragFromId, setDragFromId] = useState<number | null>(null);
@@ -901,6 +825,26 @@ export default function SignalWorkspace({
   const gridRef = useRef<HTMLDivElement | null>(null);
   const queryGenerationRef = useRef(0);
   const tabSwitchGenerationRef = useRef(0);
+  const activeTabIdRef = useRef(activeTabId);
+  const sessionSaveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const lastSavedSessionRef = useRef<WorkspaceSessionSnapshot | null>(null);
+  
+  useEffect(() => {
+    activeTabIdRef.current = activeTabId;
+  }, [activeTabId]);
+
+  // Helper function to update widgets and sync to tabs
+  function updateWidgetsAndTabs(updater: (prev: GraphWidget[]) => GraphWidget[]): void {
+    setWidgets((prevWidgets) => {
+      const newWidgets = updater(prevWidgets);
+      setTabs((prevTabs) =>
+        prevTabs.map((tab) =>
+          tab.id === activeTabIdRef.current ? { ...tab, widgets: newWidgets } : tab
+        )
+      );
+      return newWidgets;
+    });
+  }
 
   const availableSignals = useMemo(
     () => [...(datasetMetadata?.signal_names ?? []), ...mathChannels.map((channel) => channel.name)],
@@ -993,7 +937,7 @@ export default function SignalWorkspace({
     }
 
     if (inspectorCommand.type === "toggle-menu") {
-      setWidgets((prev) =>
+      updateWidgetsAndTabs((prev) =>
         prev.map((item) =>
           item.id === inspectorCommand.widgetId ? { ...item, menuOpen: !item.menuOpen } : item
         )
@@ -1209,13 +1153,18 @@ export default function SignalWorkspace({
   }
 
   useEffect(() => {
-    const snapshot = loadWorkspaceSessionSnapshot();
+    const snapshot = ConfigManager.get<WorkspaceSessionSnapshot>("session");
     if (!snapshot) {
       setSessionHydrated(true);
       return;
     }
 
-    const clonedTabs = snapshot.tabs.map((tab) => sanitizeTabWidgetIds(tab));
+    const clonedTabs = snapshot.tabs
+      .map((tab) => sanitizeTabWidgetIds(tab))
+      .map(tab => ({
+        ...tab,
+        widgets: tab.widgets.map(w => ({ ...w, menuOpen: false }))
+      }));
     const restoredActiveId =
       snapshot.activeTabId === TRAJECTORY_TAB_ID
         ? TRAJECTORY_TAB_ID
@@ -1238,18 +1187,96 @@ export default function SignalWorkspace({
     setSessionHydrated(true);
   }, []);
 
+  // Cleanup: clear any pending session saves on unmount
+  useEffect(() => {
+    return () => {
+      if (sessionSaveTimeoutRef.current !== null) {
+        clearTimeout(sessionSaveTimeoutRef.current);
+      }
+    };
+  }, []);
+
+  // Debounced save for session - prevents alternation between browser tabs
   useEffect(() => {
     if (!sessionHydrated || tabs.length === 0) {
       return;
     }
 
-    storeWorkspaceSessionSnapshot({
-      tabs,
+    const sessionSnapshot: WorkspaceSessionSnapshot = {
+      tabs: tabs.map(tab => ({
+        ...tab,
+        widgets: tab.widgets.map(({ menuOpen, ...w }) => ({ ...w, menuOpen: false }))
+      })),
       activeTabId,
       currentConfigId,
       selectedConfigId,
-    });
+    };
+
+    // Skip save if content hasn't changed
+    if (JSON.stringify(sessionSnapshot) === JSON.stringify(lastSavedSessionRef.current)) {
+      return;
+    }
+
+    // Clear pending save
+    if (sessionSaveTimeoutRef.current !== null) {
+      clearTimeout(sessionSaveTimeoutRef.current);
+    }
+
+    // Schedule debounced save
+    sessionSaveTimeoutRef.current = setTimeout(() => {
+      lastSavedSessionRef.current = sessionSnapshot;
+      ConfigManager.set("session", sessionSnapshot);
+      sessionSaveTimeoutRef.current = null;
+    }, 150); // Debounce delay
   }, [sessionHydrated, tabs, activeTabId, currentConfigId, selectedConfigId]);
+
+  // Listen for layout changes from other tabs (cross-tab sync)
+  useEffect(() => {
+    const unsubscribe = ConfigManager.subscribe<SavedWorkspaceConfig[]>("layouts", (newLayouts) => {
+      // Update savedConfigs if different (avoid loops)
+      if (JSON.stringify(newLayouts) !== JSON.stringify(savedConfigs)) {
+        setSavedConfigs(newLayouts);
+      }
+    });
+
+    return () => unsubscribe();
+  }, [savedConfigs]);
+
+  // Listen for session changes from other tabs with debounce (active workspace state)
+  // Note: activeTabId is NOT synced to allow different tabs on different windows
+  useEffect(() => {
+    const unsubscribe = ConfigManager.subscribeDebouncedFull<WorkspaceSessionSnapshot>(
+      "session",
+      (newSnapshot) => {
+        if (!newSnapshot) return;
+
+        // Check if tabs or config changed (but NOT activeTabId)
+        if (JSON.stringify(newSnapshot.tabs) !== JSON.stringify(tabs) ||
+            newSnapshot.currentConfigId !== currentConfigId ||
+            newSnapshot.selectedConfigId !== selectedConfigId) {
+          
+          const clonedTabs = newSnapshot.tabs.map((tab) => sanitizeTabWidgetIds(tab));
+          setTabs(clonedTabs);
+          
+          // Update widgets for current active tab if it exists in the new tabs
+          const currentActiveTab = clonedTabs.find((tab) => tab.id === activeTabIdRef.current);
+          if (currentActiveTab && activeTabIdRef.current !== TRAJECTORY_TAB_ID) {
+            setGridCols(currentActiveTab.gridCols);
+            setGridRows(currentActiveTab.gridRows);
+            setNextId(currentActiveTab.nextId);
+            setWidgets(currentActiveTab.widgets);
+          }
+          
+          setCurrentConfigId(newSnapshot.currentConfigId);
+          setSelectedConfigId(newSnapshot.selectedConfigId);
+        }
+      },
+      150 // Debounce delay matching the save debounce
+    );
+
+    return () => unsubscribe();
+  }, []); // Empty dependencies - debounce is stable internally
+
 
   useEffect(() => {
     if (!resizeState) {
@@ -1423,6 +1450,17 @@ export default function SignalWorkspace({
     );
   }, [datasetMetadata, availableSignals, widgets.length]);
 
+  // Create a stable dependency key based only on widget signals, not on UI state like menuOpen
+  const widgetSignalsKey = useMemo(() => {
+    return JSON.stringify(
+      widgets.map((w) => ({
+        id: w.id,
+        signals: w.signals,
+        xSignal: w.xSignal,
+      }))
+    );
+  }, [widgets]);
+
   useEffect(() => {
     if (!canQuery || !datasetId || !datasetMetadata) {
       return;
@@ -1517,7 +1555,7 @@ export default function SignalWorkspace({
       alive = false;
       controller.abort();
     };
-  }, [canQuery, datasetId, datasetMetadata, widgets, xRange]);
+  }, [canQuery, datasetId, datasetMetadata, widgetSignalsKey, xRange]);
 
   useEffect(() => {
     if (!isTrajectoryActive || !canQuery || !datasetId || !datasetMetadata) {
@@ -1948,7 +1986,7 @@ export default function SignalWorkspace({
       // Add the new configuration to the list
       setSavedConfigs((prev) => {
         const nextConfigs = [...prev, newConfig];
-        storeWorkspaceConfigs(nextConfigs);
+        ConfigManager.set("layouts", nextConfigs);
         return nextConfigs;
       });
     }
@@ -1985,7 +2023,7 @@ export default function SignalWorkspace({
   function deleteConfiguration(configId: string) {
     setSavedConfigs((prev) => {
       const nextConfigs = prev.filter((cfg) => cfg.id !== configId);
-      storeWorkspaceConfigs(nextConfigs);
+      ConfigManager.set("layouts", nextConfigs);
       return nextConfigs;
     });
     if (currentConfigId === configId) {
@@ -2174,22 +2212,18 @@ export default function SignalWorkspace({
   }
 
   function addWidgetWithSignalAtPosition(targetRow: number, targetCol: number, signal: string) {
-    setNextId((prevId) => {
-      const newId = prevId;
-      setWidgets((prev) => {
-        const candidate = {
-          ...createWidget(newId, `G${newId}`, targetRow, targetCol),
-          signals: [signal],
-        };
+    const newId = nextId;
+    const candidate = {
+      ...createWidget(newId, `G${newId}`, targetRow, targetCol),
+      signals: [signal],
+    };
 
-        if (!canPlaceWidget(candidate, targetRow, targetCol, gridRows, gridCols, prev)) {
-          return prev;
-        }
+    if (!canPlaceWidget(candidate, targetRow, targetCol, gridRows, gridCols, widgets)) {
+      return;
+    }
 
-        return [...prev, candidate];
-      });
-      return prevId + 1;
-    });
+    setWidgets((prev) => [...prev, candidate]);
+    setNextId(newId + 1);
   }
 
   function startResize(
@@ -2406,7 +2440,7 @@ export default function SignalWorkspace({
         const hasOpenMenu = widgets.some((widget) => widget.menuOpen);
         if (hasOpenMenu) {
           event.preventDefault();
-          setWidgets((prev) => prev.map((widget) => ({ ...widget, menuOpen: false })));
+          updateWidgetsAndTabs((prev) => prev.map((widget) => ({ ...widget, menuOpen: false })));
           return;
         }
         if (expandedWidgetId !== null) {
@@ -2786,7 +2820,8 @@ export default function SignalWorkspace({
                 <button
                   className="icon-button"
                   draggable
-                  onDragStart={() => {
+                  onDragStart={(e) => {
+                    e.stopPropagation?.();
                     updateSelectedWidgetId(widget.id);
                     setDragFromId(widget.id);
                   }}
@@ -2797,35 +2832,36 @@ export default function SignalWorkspace({
                 </button>
                 <button
                   className="icon-button"
-                  onClick={() =>
-                    {
-                      updateSelectedWidgetId(widget.id);
-                      setWidgets((prev) =>
-                        prev.map((item) =>
-                          item.id === widget.id ? { ...item, menuOpen: !item.menuOpen } : item
-                        )
-                      );
-                    }
-                  }
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    updateSelectedWidgetId(widget.id);
+                    updateWidgetsAndTabs((prev) =>
+                      prev.map((item) =>
+                        item.id === widget.id ? { ...item, menuOpen: !item.menuOpen } : item
+                      )
+                    );
+                  }}
                   title="Paramètres"
                 >
                   ⚙
                 </button>
                 <button
                   className="icon-button icon-button-danger"
-                  onClick={() => removeWidget(widget.id)}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    removeWidget(widget.id);
+                  }}
                   title="Supprimer"
                 >
                   ×
                 </button>
                 <button
                   className="icon-button"
-                  onClick={() =>
-                    {
-                      updateSelectedWidgetId(widget.id);
-                      setExpandedWidgetId((prev) => (prev === widget.id ? null : widget.id));
-                    }
-                  }
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    updateSelectedWidgetId(widget.id);
+                    setExpandedWidgetId((prev) => (prev === widget.id ? null : widget.id));
+                  }}
                   title={expandedWidgetId === widget.id ? "Réduire" : "Plein écran"}
                 >
                   {expandedWidgetId === widget.id ? "⤡" : "⛶"}
@@ -2858,11 +2894,12 @@ export default function SignalWorkspace({
               />
 
               {widget.menuOpen ? (
-                <div className="graph-menu">
+                <div className="graph-menu" onClick={(e) => e.stopPropagation()}>
                   {widgetKind === "xy" ? (
                     <>
-                      <label className="field-label">Signal X</label>
+                      <label className="field-label" htmlFor={`x-signal-${widget.id}`}>Signal X</label>
                       <select
+                        id={`x-signal-${widget.id}`}
                         className="mini-select"
                         value={widget.xSignal ?? ""}
                         onChange={(event) => {
@@ -2884,7 +2921,7 @@ export default function SignalWorkspace({
                     </>
                   ) : null}
 
-                  <label className="field-label">Signaux</label>
+                  <p className="field-label">Signaux</p>
                   <div className="signal-grid">
                     {availableSignals.map((signal, idx) => (
                       <label key={`${widget.id}-${signal}`} className="signal-checkbox">
@@ -2918,6 +2955,7 @@ export default function SignalWorkspace({
                     <>
                       <label className="signal-checkbox" style={{ marginTop: "0.4rem" }}>
                         <input
+                          id={`align-zero-${widget.id}`}
                           type="checkbox"
                           checked={getWidgetAlignZero(widget)}
                           onChange={(event) => {
@@ -2948,8 +2986,9 @@ export default function SignalWorkspace({
 
                       {getWidgetAlignZero(widget) ? (
                         <div className="size-selector" style={{ marginTop: "0.35rem" }}>
-                          <label>Mode Y</label>
+                          <label htmlFor={`mode-y-${widget.id}`}>Mode Y</label>
                           <select
+                            id={`mode-y-${widget.id}`}
                             className="mini-select"
                             value={getWidgetYAxisMatchMode(widget) === "origin-only" ? "origin-only" : "origin-scale"}
                             onChange={(event) => {
@@ -2981,8 +3020,9 @@ export default function SignalWorkspace({
 
                   <p className="menu-help">Taille du graphe</p>
                   <div className="size-selector">
-                    <label>Largeur</label>
+                    <label htmlFor={`width-${widget.id}`}>Largeur</label>
                     <select
+                      id={`width-${widget.id}`}
                       className="mini-select"
                       value={widget.widthSpan}
                       onChange={(event) => changeWidgetSize(widget.id, Number(event.target.value), widget.heightSpan)}
@@ -2995,8 +3035,9 @@ export default function SignalWorkspace({
                   </div>
 
                   <div className="size-selector">
-                    <label>Hauteur</label>
+                    <label htmlFor={`height-${widget.id}`}>Hauteur</label>
                     <select
+                      id={`height-${widget.id}`}
                       className="mini-select"
                       value={widget.heightSpan}
                       onChange={(event) => changeWidgetSize(widget.id, widget.widthSpan, Number(event.target.value))}
@@ -3010,8 +3051,9 @@ export default function SignalWorkspace({
 
                   <p className="menu-help">Position</p>
                   <div className="position-selector">
-                    <label>Ligne</label>
+                    <label htmlFor={`row-${widget.id}`}>Ligne</label>
                     <select
+                      id={`row-${widget.id}`}
                       className="mini-select"
                       value={widget.row}
                       onChange={(event) => moveWidgetToPosition(widget.id, Number(event.target.value), widget.col)}
@@ -3025,8 +3067,9 @@ export default function SignalWorkspace({
                   </div>
 
                   <div className="position-selector">
-                    <label>Colonne</label>
+                    <label htmlFor={`col-${widget.id}`}>Colonne</label>
                     <select
+                      id={`col-${widget.id}`}
                       className="mini-select"
                       value={widget.col}
                       onChange={(event) => moveWidgetToPosition(widget.id, widget.row, Number(event.target.value))}
@@ -3074,6 +3117,10 @@ export default function SignalWorkspace({
                       const hoveredX = evt.points?.[0]?.x;
                       if (typeof hoveredX === "number") {
                         setCursorDistance(hoveredX);
+                        ConfigManager.set("current-hover-slap", {
+                          sLap: hoveredX,
+                          timestamp: Date.now(),
+                        });
                       }
                     }}
                     onRelayout={(eventData) => {

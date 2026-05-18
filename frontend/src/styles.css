@@ -1811,6 +1811,7 @@ body::after {
   border: 1px solid var(--line);
   padding: 0.25rem;
   font-size: 0.65rem;
+  margin: 3px;
 }
 
 .map-tuning-table th {
@@ -1841,6 +1842,21 @@ body::after {
 .map-tuning-heatmap-cell {
   background-color: rgba(30, 10, 14, 0.7);
   transition: background-color 0.2s ease;
+}
+
+/* Cellule exactement active (sLap sur un breakpoint) */
+.map-tuning-heatmap-cell.lut-cell-active {
+  box-shadow: inset 0 0 14px rgba(243, 255, 70, 1);
+  border: solid 1px rgba(243, 255, 70, 0.9);
+  z-index: 1;
+  position: relative;
+}
+
+/* Cellules adjacentes (interpolation autour du point) */
+.map-tuning-heatmap-cell.lut-cell-nearby {
+  box-shadow: inset 0 0 14px rgba(243, 255, 70, 1);
+  z-index: 1;
+  position: relative;
 }
 
 .map-tuning-section {
