@@ -6,6 +6,7 @@
  */
 import React, { useState, useCallback, useMemo, useRef, useEffect } from "react";
 import { analyzeMathExpression } from "../mathChannels";
+import { getFunctionDocumentation, getOperatorDocumentation } from "../mathFunctions";
 import type { SoftBlock, SoftOperation, SoftMathOp, SoftLutOp, MapTuningData } from "../types";
 
 // ── Status ────────────────────────────────────────────────────────────────────
@@ -159,6 +160,44 @@ const LutRefEditor: React.FC<{
   );
 };
 
+// ── Math help panel ─────────────────────────────────────────────────────────
+
+const MathHelpPanel: React.FC = () => {
+  const functions = useMemo(() => getFunctionDocumentation(), []);
+  const operators = useMemo(() => getOperatorDocumentation(), []);
+
+  return (
+    <div className="soft-help-panel">
+      <div className="soft-help-section">
+        <span className="soft-help-section-title">Fonctions</span>
+        <table className="soft-help-table">
+          <tbody>
+            {functions.map(({ name, description }) => (
+              <tr key={name}>
+                <td className="soft-help-name">{name}</td>
+                <td className="soft-help-desc">{description}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      <div className="soft-help-section">
+        <span className="soft-help-section-title">Opérateurs</span>
+        <table className="soft-help-table">
+          <tbody>
+            {operators.map(({ symbol, description }) => (
+              <tr key={symbol}>
+                <td className="soft-help-name">{symbol}</td>
+                <td className="soft-help-desc">{description}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+};
+
 // ── Math operation editor ─────────────────────────────────────────────────────
 
 const MathOpEditor: React.FC<{
@@ -168,6 +207,7 @@ const MathOpEditor: React.FC<{
 }> = ({ op, availableSignals, onUpdate }) => {
   const [exprDraft, setExprDraft] = useState(op.expression);
   const [exprError, setExprError] = useState<string | null>(null);
+  const [showHelp, setShowHelp] = useState(false);
 
   useEffect(() => { setExprDraft(op.expression); }, [op.expression]);
 
@@ -181,7 +221,7 @@ const MathOpEditor: React.FC<{
 
   return (
     <div className="soft-math-editor">
-      <label className="soft-field-row">
+      <div className="soft-field-row">
         <span>Expression</span>
         <input
           type="text"
@@ -193,11 +233,20 @@ const MathOpEditor: React.FC<{
           placeholder="ex: RPM * TPS / 100"
           spellCheck={false}
         />
-      </label>
+        <button
+          className={`soft-help-btn ${showHelp ? "soft-help-btn-active" : ""}`}
+          onClick={() => setShowHelp((p) => !p)}
+          title="Aide — fonctions et opérateurs disponibles"
+          type="button"
+        >
+          ?
+        </button>
+      </div>
       {exprError && <p className="soft-expr-error-msg">{exprError}</p>}
       {op.dependencies.length > 0 && !exprError && (
         <p className="soft-deps">Dépendances: {op.dependencies.join(", ")}</p>
       )}
+      {showHelp && <MathHelpPanel />}
     </div>
   );
 };

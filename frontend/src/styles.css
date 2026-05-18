@@ -2368,6 +2368,80 @@ body::after {
   font-family: 'Fira Code', monospace;
 }
 
+/* ── Help button ── */
+
+.soft-help-btn {
+  flex-shrink: 0;
+  width: 1.4rem;
+  height: 1.4rem;
+  border-radius: 50%;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  background: rgba(255, 255, 255, 0.06);
+  color: #9ca3af;
+  font-size: 0.72rem;
+  font-weight: 600;
+  cursor: pointer;
+  line-height: 1;
+  padding: 0;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+
+.soft-help-btn:hover,
+.soft-help-btn-active {
+  background: rgba(0, 168, 255, 0.15);
+  border-color: rgba(0, 168, 255, 0.45);
+  color: #38bdf8;
+}
+
+/* ── Help panel ── */
+
+.soft-help-panel {
+  margin-top: 0.4rem;
+  padding: 0.55rem 0.7rem;
+  background: rgba(0, 0, 0, 0.25);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 4px;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.soft-help-section {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.soft-help-section-title {
+  font-size: 0.68rem;
+  font-weight: 600;
+  color: #6b7280;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.soft-help-table {
+  border-collapse: collapse;
+  width: 100%;
+}
+
+.soft-help-table td {
+  padding: 0.1rem 0.35rem 0.1rem 0;
+  font-size: 0.72rem;
+  vertical-align: top;
+}
+
+.soft-help-name {
+  font-family: 'Fira Code', monospace;
+  color: #38bdf8;
+  white-space: nowrap;
+  min-width: 6rem;
+}
+
+.soft-help-desc {
+  color: #9ca3af;
+}
+
 /* ── LUT editor ── */
 
 .soft-lut-editor {

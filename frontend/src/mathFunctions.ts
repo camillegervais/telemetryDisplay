@@ -15,7 +15,9 @@ export const FUNCTIONS = {
   min: { arity: 2 as const, description: "Minimum de deux signaux: min(a, b)" },
   max: { arity: 2 as const, description: "Maximum de deux signaux: max(a, b)" },
   sign: { arity: 1 as const, description: "Signe: 1 si positif, -1 si négatif, 0 si zéro: sign(signal)" },
-  norm2: { arity: 2 as const, description: "Norme 2: Fait la norme euclidienne du vecteur" },
+  norm2: { arity: 2 as const, description: "Norme 2: Fait la norme euclidienne du vecteur: norm2(a, b)" },
+  sat: {arity: 3 as const, description: "Saturation: Sature le signal avec une borne sup et inf fixe: sat(signal, max, min)" },
+  satdyn: {arity: 3 as const, description: "Saturation: Sature le signal avec une borne sup et inf dynamique: satdyn(signal, signal_max, signal_min)" },
 
   // Logical operations (treat as 0=false, 1=true)
   and: { arity: 2 as const, description: "ET logique: and(a, b) — 1 si tous deux non-zéro" },
@@ -77,6 +79,10 @@ export function evaluateFunction(
       return 0;
     case "norm2":
       return Math.sqrt(args[0]**2 + args[1]**1);
+    case "sat":
+      return Math.min(Math.max(args[0], args[1]), args[2]);
+      case "satdyn":
+      return Math.min(Math.max(args[0], args[1]), args[2]);
     case "and":
       return args[0] !== 0 && args[1] !== 0 ? 1 : 0;
     case "or":
@@ -149,6 +155,9 @@ Fonctions disponibles:
 - abs(signal): Valeur absolue
 - min(a, b) / max(a, b): Min/Max de deux signaux
 - sign(signal): Retourne 1 (positif), -1 (négatif), 0 (zéro)
+- norm2(a, b): Retourne la norme euclidienne du vecteur constitué des deux signaux
+- sat(signla, max, min): Retourne le signal saturé par les deux bornes indiquées
+- satdyn(signal, max, min):  Retourne le signal saturé par les deux bornes indiquées
 
 Opérateurs:
 - Arithmétiques: + - * /
