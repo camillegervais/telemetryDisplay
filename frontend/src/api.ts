@@ -10,6 +10,18 @@ import type {
   MapTuningCalculateResponse,
 } from "./types";
 
+export type ComputeMathChannelRequest = {
+  datasetId: string;
+  output_name: string;
+  expression: string;
+  dependencies: string[];
+};
+
+export type ComputeMathChannelResponse = {
+  message: string;
+  samplesProcessed: number;
+};
+
 const API_BASE_URL = "http://localhost:8001/api";
 
 export async function fetchAppInfo(): Promise<AppInfo> {
@@ -158,12 +170,30 @@ export async function getSavedMapConfigs(): Promise<{ configs: string[]; count: 
   return (await response.json()) as { configs: string[]; count: number };
 }
 
-export async function loadMapConfig(configKey: string): Promise<any> {
+export async function loadMapConfig(configKey: string): Promise<unknown> {
   const response = await fetch(`${API_BASE_URL}/map-tuning/configs/${configKey}`);
 
   if (!response.ok) {
     throw new Error("Failed to load configuration");
   }
 
-  return (await response.json()) as any;
+  return (await response.json()) as unknown;
+}
+
+export async function computeMathChannel(
+  request: ComputeMathChannelRequest
+): Promise<ComputeMathChannelResponse> {
+  const { datasetId, ...body } = request;
+  const response = await fetch(`${API_BASE_URL}/datasets/${datasetId}/compute-math`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+
+  if (!response.ok) {
+    const payload = await response.json().catch(() => ({ detail: "Compute math failed" }));
+    throw new Error(payload.detail ?? "Compute math failed");
+  }
+
+  return (await response.json()) as ComputeMathChannelResponse;
 }
