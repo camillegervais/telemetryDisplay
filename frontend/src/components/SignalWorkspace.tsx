@@ -826,6 +826,8 @@ export default function SignalWorkspace({
   const queryGenerationRef = useRef(0);
   const tabSwitchGenerationRef = useRef(0);
   const activeTabIdRef = useRef(activeTabId);
+  const sessionSaveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const lastSavedSessionRef = useRef<WorkspaceSessionSnapshot | null>(null);
   
   useEffect(() => {
     activeTabIdRef.current = activeTabId;
@@ -1185,20 +1187,47 @@ export default function SignalWorkspace({
     setSessionHydrated(true);
   }, []);
 
+  // Cleanup: clear any pending session saves on unmount
+  useEffect(() => {
+    return () => {
+      if (sessionSaveTimeoutRef.current !== null) {
+        clearTimeout(sessionSaveTimeoutRef.current);
+      }
+    };
+  }, []);
+
+  // Debounced save for session - prevents alternation between browser tabs
   useEffect(() => {
     if (!sessionHydrated || tabs.length === 0) {
       return;
     }
 
-    ConfigManager.set("session", {
+    const sessionSnapshot: WorkspaceSessionSnapshot = {
       tabs: tabs.map(tab => ({
         ...tab,
-        widgets: tab.widgets.map(({ menuOpen, ...w }) => w)
+        widgets: tab.widgets.map(({ menuOpen, ...w }) => ({ ...w, menuOpen: false }))
       })),
       activeTabId,
       currentConfigId,
       selectedConfigId,
-    });
+    };
+
+    // Skip save if content hasn't changed
+    if (JSON.stringify(sessionSnapshot) === JSON.stringify(lastSavedSessionRef.current)) {
+      return;
+    }
+
+    // Clear pending save
+    if (sessionSaveTimeoutRef.current !== null) {
+      clearTimeout(sessionSaveTimeoutRef.current);
+    }
+
+    // Schedule debounced save
+    sessionSaveTimeoutRef.current = setTimeout(() => {
+      lastSavedSessionRef.current = sessionSnapshot;
+      ConfigManager.set("session", sessionSnapshot);
+      sessionSaveTimeoutRef.current = null;
+    }, 150); // Debounce delay
   }, [sessionHydrated, tabs, activeTabId, currentConfigId, selectedConfigId]);
 
   // Listen for layout changes from other tabs (cross-tab sync)
@@ -1213,36 +1242,40 @@ export default function SignalWorkspace({
     return () => unsubscribe();
   }, [savedConfigs]);
 
-  // Listen for session changes from other tabs (active workspace state)
+  // Listen for session changes from other tabs with debounce (active workspace state)
   // Note: activeTabId is NOT synced to allow different tabs on different windows
   useEffect(() => {
-    const unsubscribe = ConfigManager.subscribe<WorkspaceSessionSnapshot>("session", (newSnapshot) => {
-      if (!newSnapshot) return;
+    const unsubscribe = ConfigManager.subscribeDebouncedFull<WorkspaceSessionSnapshot>(
+      "session",
+      (newSnapshot) => {
+        if (!newSnapshot) return;
 
-      // Check if tabs or config changed (but NOT activeTabId)
-      if (JSON.stringify(newSnapshot.tabs) !== JSON.stringify(tabs) ||
-          newSnapshot.currentConfigId !== currentConfigId ||
-          newSnapshot.selectedConfigId !== selectedConfigId) {
-        
-        const clonedTabs = newSnapshot.tabs.map((tab) => sanitizeTabWidgetIds(tab));
-        setTabs(clonedTabs);
-        
-        // Update widgets for current active tab if it exists in the new tabs
-        const currentActiveTab = clonedTabs.find((tab) => tab.id === activeTabId);
-        if (currentActiveTab && activeTabId !== TRAJECTORY_TAB_ID) {
-          setGridCols(currentActiveTab.gridCols);
-          setGridRows(currentActiveTab.gridRows);
-          setNextId(currentActiveTab.nextId);
-          setWidgets(currentActiveTab.widgets);
+        // Check if tabs or config changed (but NOT activeTabId)
+        if (JSON.stringify(newSnapshot.tabs) !== JSON.stringify(tabs) ||
+            newSnapshot.currentConfigId !== currentConfigId ||
+            newSnapshot.selectedConfigId !== selectedConfigId) {
+          
+          const clonedTabs = newSnapshot.tabs.map((tab) => sanitizeTabWidgetIds(tab));
+          setTabs(clonedTabs);
+          
+          // Update widgets for current active tab if it exists in the new tabs
+          const currentActiveTab = clonedTabs.find((tab) => tab.id === activeTabIdRef.current);
+          if (currentActiveTab && activeTabIdRef.current !== TRAJECTORY_TAB_ID) {
+            setGridCols(currentActiveTab.gridCols);
+            setGridRows(currentActiveTab.gridRows);
+            setNextId(currentActiveTab.nextId);
+            setWidgets(currentActiveTab.widgets);
+          }
+          
+          setCurrentConfigId(newSnapshot.currentConfigId);
+          setSelectedConfigId(newSnapshot.selectedConfigId);
         }
-        
-        setCurrentConfigId(newSnapshot.currentConfigId);
-        setSelectedConfigId(newSnapshot.selectedConfigId);
-      }
-    });
+      },
+      150 // Debounce delay matching the save debounce
+    );
 
     return () => unsubscribe();
-  }, [tabs, activeTabId, currentConfigId, selectedConfigId]);
+  }, []); // Empty dependencies - debounce is stable internally
 
 
   useEffect(() => {
