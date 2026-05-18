@@ -5,7 +5,7 @@
  * Each type represents a specific aspect of the application state that should be persisted to localStorage.
  */
 
-import type { MathChannel, MapTuningData } from "../types";
+import type { MathChannel, MapTuningData, SoftBlock } from "../types";
 
 /**
  * Graph widget in a workspace tab
@@ -115,6 +115,8 @@ export type ConfigStorage = {
   "current-hover-slap": HoverSLap | null;
   /** Highlighted LUT cell(s) computed by useHoverToLutCell */
   "highlight-lut": CellHighlightInfo | null;
+  /** Soft computation blocks (ordered operation pipelines) */
+  "soft-blocks": SoftBlock[];
 };
 
 /**
@@ -132,6 +134,7 @@ export const CONFIG_DEFAULTS: ConfigStorage = {
   "dataset-id": null,
   "current-hover-slap": null,
   "highlight-lut": null,
+  "soft-blocks": [],
 };
 
 /**

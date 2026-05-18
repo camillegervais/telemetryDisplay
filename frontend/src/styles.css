@@ -2038,3 +2038,426 @@ body::after {
   display: none;
 }
 
+
+/* ── SoftTab Component Styles ───────────────────────────────────────────── */
+
+.soft-tab {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  padding: 0.25rem 0;
+}
+
+.soft-tab-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid rgba(255, 93, 120, 0.2);
+}
+
+.soft-tab-title {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.soft-tab-title h3 {
+  margin: 0;
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: #e5e7eb;
+}
+
+.soft-tab-actions {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.soft-no-dataset {
+  font-size: 0.72rem;
+  color: #ff8a33;
+}
+
+.soft-empty-state {
+  padding: 1.5rem 1rem;
+  text-align: center;
+  color: #9ca3af;
+  font-size: 0.82rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.soft-block-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+/* ── Block card ── */
+
+.soft-block-card {
+  border: 1px solid rgba(255, 93, 120, 0.25);
+  border-radius: 6px;
+  background: rgba(255, 45, 79, 0.04);
+  overflow: hidden;
+}
+
+.soft-block-header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.45rem 0.6rem;
+  background: rgba(255, 45, 79, 0.08);
+  border-bottom: 1px solid rgba(255, 93, 120, 0.15);
+}
+
+.soft-block-collapse-btn {
+  background: none;
+  border: none;
+  color: #9ca3af;
+  cursor: pointer;
+  padding: 0;
+  font-size: 0.65rem;
+  line-height: 1;
+  flex-shrink: 0;
+}
+
+.soft-block-name-input {
+  flex: 1;
+  background: transparent;
+  border: none;
+  border-bottom: 1px solid transparent;
+  color: #e5e7eb;
+  font-size: 0.85rem;
+  font-weight: 600;
+  padding: 0 0.25rem;
+  min-width: 0;
+}
+
+.soft-block-name-input:hover,
+.soft-block-name-input:focus {
+  border-bottom-color: rgba(255, 93, 120, 0.5);
+  outline: none;
+}
+
+.soft-block-op-count {
+  font-size: 0.7rem;
+  color: #6b7280;
+  white-space: nowrap;
+}
+
+.soft-block-status {
+  font-size: 0.75rem;
+  font-weight: 700;
+  min-width: 1rem;
+  text-align: center;
+}
+
+.soft-block-status-idle { color: transparent; }
+.soft-block-status-running { color: #ffd447; }
+.soft-block-status-done { color: #34d399; }
+.soft-block-status-error { color: #ff2d4f; cursor: help; }
+
+.soft-run-btn {
+  font-size: 0.72rem;
+  padding: 0.15rem 0.5rem;
+  white-space: nowrap;
+}
+
+.soft-block-body {
+  padding: 0.5rem 0.6rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.soft-empty-msg {
+  font-size: 0.78rem;
+  color: #6b7280;
+  margin: 0;
+  padding: 0.25rem 0;
+}
+
+.soft-block-error {
+  font-size: 0.75rem;
+  color: #ff2d4f;
+  margin: 0;
+  padding: 0.2rem 0;
+}
+
+.soft-add-op-row {
+  display: flex;
+  gap: 0.4rem;
+  padding-top: 0.35rem;
+  border-top: 1px solid rgba(255, 93, 120, 0.1);
+  margin-top: 0.2rem;
+}
+
+/* ── Operation row ── */
+
+.soft-op-row {
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  border-radius: 4px;
+  background: rgba(0, 0, 0, 0.2);
+}
+
+.soft-op-row-expanded {
+  border-color: rgba(255, 93, 120, 0.3);
+}
+
+.soft-op-header {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.3rem 0.5rem;
+}
+
+.soft-op-badge {
+  font-size: 0.62rem;
+  font-weight: 700;
+  padding: 0.1rem 0.3rem;
+  border-radius: 3px;
+  letter-spacing: 0.03em;
+  flex-shrink: 0;
+}
+
+.soft-op-badge-math {
+  background: rgba(0, 168, 255, 0.2);
+  color: #00a8ff;
+  border: 1px solid rgba(0, 168, 255, 0.3);
+}
+
+.soft-op-badge-lut2d {
+  background: rgba(255, 212, 71, 0.15);
+  color: #ffd447;
+  border: 1px solid rgba(255, 212, 71, 0.3);
+}
+
+.soft-op-index {
+  font-size: 0.65rem;
+  color: #6b7280;
+  min-width: 0.8rem;
+  text-align: center;
+  flex-shrink: 0;
+}
+
+.soft-op-name-input {
+  background: transparent;
+  border: none;
+  border-bottom: 1px solid transparent;
+  color: #e5e7eb;
+  font-size: 0.8rem;
+  font-family: 'Fira Code', monospace;
+  padding: 0 0.2rem;
+  min-width: 0;
+  width: 8rem;
+  flex-shrink: 0;
+}
+
+.soft-op-name-input:hover,
+.soft-op-name-input:focus {
+  border-bottom-color: rgba(255, 93, 120, 0.5);
+  outline: none;
+}
+
+.soft-op-preview {
+  flex: 1;
+  font-size: 0.72rem;
+  color: #6b7280;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: 'Fira Code', monospace;
+}
+
+.soft-op-actions {
+  display: flex;
+  gap: 0.2rem;
+  flex-shrink: 0;
+}
+
+.soft-icon-btn {
+  background: none;
+  border: 1px solid transparent;
+  color: #9ca3af;
+  cursor: pointer;
+  padding: 0.1rem 0.3rem;
+  border-radius: 3px;
+  font-size: 0.72rem;
+  line-height: 1.4;
+}
+
+.soft-icon-btn:hover:not(:disabled) {
+  border-color: rgba(255, 93, 120, 0.3);
+  color: #e5e7eb;
+}
+
+.soft-icon-btn:disabled {
+  opacity: 0.3;
+  cursor: default;
+}
+
+.soft-icon-btn-danger:hover:not(:disabled) {
+  border-color: rgba(255, 45, 79, 0.5);
+  color: #ff2d4f;
+}
+
+.soft-op-body {
+  padding: 0.5rem 0.6rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+/* ── Math editor ── */
+
+.soft-math-editor {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.soft-field-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.78rem;
+  color: #9ca3af;
+}
+
+.soft-field-row span {
+  min-width: 5rem;
+  text-align: right;
+  flex-shrink: 0;
+}
+
+.soft-expr-input {
+  flex: 1;
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 3px;
+  color: #e5e7eb;
+  font-size: 0.8rem;
+  font-family: 'Fira Code', monospace;
+  padding: 0.2rem 0.4rem;
+}
+
+.soft-expr-input:focus {
+  outline: none;
+  border-color: rgba(0, 168, 255, 0.5);
+}
+
+.soft-expr-input.soft-expr-error,
+.soft-op-name-input.soft-expr-error {
+  border-bottom-color: #ff2d4f;
+}
+
+.soft-expr-error-msg {
+  font-size: 0.72rem;
+  color: #ff2d4f;
+  margin: 0;
+  padding-left: 5.5rem;
+}
+
+.soft-deps {
+  font-size: 0.7rem;
+  color: #6b7280;
+  margin: 0;
+  padding-left: 5.5rem;
+  font-family: 'Fira Code', monospace;
+}
+
+/* ── LUT editor ── */
+
+.soft-lut-editor {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.soft-lut-channels {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem 1rem;
+}
+
+.soft-select {
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 3px;
+  color: #e5e7eb;
+  font-size: 0.78rem;
+  padding: 0.15rem 0.3rem;
+}
+
+.soft-lut-size-controls {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.soft-dim-label {
+  font-size: 0.72rem;
+  color: #9ca3af;
+  min-width: 3rem;
+}
+
+.soft-lut-table-scroll {
+  overflow-x: auto;
+  max-height: 280px;
+  overflow-y: auto;
+}
+
+.soft-lut-table {
+  border-collapse: collapse;
+  font-size: 0.72rem;
+}
+
+.soft-lut-table th,
+.soft-lut-table td {
+  padding: 1px;
+  border: 1px solid rgba(255, 93, 120, 0.15);
+}
+
+.soft-lut-corner {
+  background: rgba(255, 45, 79, 0.1);
+  color: #6b7280;
+  font-size: 0.62rem;
+  text-align: center;
+}
+
+.soft-lut-table thead th {
+  background: rgba(255, 45, 79, 0.07);
+}
+
+.soft-lut-table tbody td:first-child {
+  background: rgba(255, 45, 79, 0.07);
+}
+
+.soft-lut-table .table-input {
+  width: 3.2rem;
+  font-size: 0.68rem;
+  padding: 1px 2px;
+}
+
+.soft-lut-info {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  padding: 0.3rem 0;
+}
+
+.link-btn {
+  background: none;
+  border: none;
+  color: #00a8ff;
+  cursor: pointer;
+  padding: 0;
+  font-size: inherit;
+  text-decoration: underline;
+}
+
+.link-btn:hover {
+  color: #66ccff;
+}

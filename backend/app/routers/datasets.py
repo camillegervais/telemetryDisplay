@@ -18,7 +18,9 @@ from app.schemas import (
     TrackMapResponse,
     MapTuningRequest,
     MapTuningSaveResponse,
-    MapTuningCalculateResponse
+    MapTuningCalculateResponse,
+    ComputeMathRequest,
+    ComputeMathResponse,
 )
 from app.services.mat_loader import MatLoader, MatValidationError
 from app.services.lut_2D import LUT2D
@@ -358,3 +360,70 @@ async def calculate_map_output(payload: MapTuningRequest):
             status_code=500, detail=f"Failed to calculate map output:{str(e)}"
         )
 
+
+# Allowed math functions for expression evaluation (numpy-backed, no builtins)
+_MATH_NAMESPACE = {
+    "abs": np.abs,
+    "sign": np.sign,
+    "min": np.minimum,   # element-wise 2-arg
+    "max": np.maximum,   # element-wise 2-arg
+    "clamp": np.clip,
+    "sqrt": np.sqrt,
+    "log": np.log,
+    "exp": np.exp,
+    "sin": np.sin,
+    "cos": np.cos,
+    "tan": np.tan,
+    "pow": np.power,
+    "__builtins__": {},  # block all Python builtins
+}
+
+
+@router.post("/{dataset_id}/compute-math", response_model=ComputeMathResponse)
+async def compute_math_channel(dataset_id: str, payload: ComputeMathRequest):
+    """
+    Evaluate a math expression on the full dataset and persist the result as a new channel.
+
+    The expression uses signal names as variables; supports standard arithmetic and
+    the math functions defined in _MATH_NAMESPACE (abs, sqrt, sin, etc.).
+    """
+    dataset = mat_loader.get_dataset(dataset_id)
+    if dataset is None:
+        raise HTTPException(status_code=404, detail="Dataset not found")
+
+    df, metadata = dataset
+
+    missing = [dep for dep in payload.dependencies if dep not in df.columns]
+    if missing:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Signal(s) not found in dataset: {', '.join(missing)}",
+        )
+
+    # Build evaluation namespace: signal arrays + allowed math functions
+    namespace = {dep: df[dep].values for dep in payload.dependencies}
+    namespace.update(_MATH_NAMESPACE)
+
+    try:
+        result = np.asarray(eval(payload.expression, namespace), dtype=np.float64)  # noqa: S307
+    except Exception as exc:
+        raise HTTPException(
+            status_code=400, detail=f"Expression evaluation failed: {exc}"
+        )
+
+    if result.shape == ():
+        # Scalar result — broadcast to dataset length
+        result = np.full(len(df), float(result))
+
+    if len(result) != len(df):
+        raise HTTPException(
+            status_code=400,
+            detail=f"Expression result length ({len(result)}) does not match dataset ({len(df)})",
+        )
+
+    mat_loader.add_new_channel(payload.output_name, result, dataset_id)
+
+    return ComputeMathResponse(
+        message=f"Channel '{payload.output_name}' computed and added to dataset",
+        samplesProcessed=int(len(result)),
+    )

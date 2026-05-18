@@ -9,10 +9,9 @@ import {
   importDatasetFromPath,
 } from "./api";
 import { ImportPanel, SignalWorkspace, ConfigExportImport } from "./components";
-import { analyzeMathExpression } from "./mathChannels";
 import { useTelemetryStore } from "./store/telemetryStore";
 import { ConfigManager } from "./store/ConfigManager";
-import type { AppInfo, DatasetMetadata, MathChannel, TrackMapResponse } from "./types";
+import type { DatasetMetadata, TrackMapResponse } from "./types";
 import type { InspectorCommand, InspectorSnapshot } from "./components/SignalWorkspace";
 
 interface DecimalNumberInputProps {
@@ -93,15 +92,12 @@ function isEditableElement(target: EventTarget | null): boolean {
 }
 
 export default function App() {
-  const [appInfo, setAppInfo] = useState<AppInfo | null>(null);
   const [loadingAppInfo, setLoadingAppInfo] = useState(true);
   const [importing, setImporting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [importMessage, setImportMessage] = useState<string | null>(null);
   const [datasetId, setDatasetId] = useState<string | null>(() => ConfigManager.get<string | null>("dataset-id") ?? null);
   const [datasetMetadata, setDatasetMetadata] = useState<DatasetMetadata | null>(null);
   const [trackMap, setTrackMap] = useState<TrackMapResponse | null>(null);
-  const [mathChannels, setMathChannels] = useState<MathChannel[]>(() => ConfigManager.get<MathChannel[]>("math-channels") ?? []);
   const [graphOnlyMode, setGraphOnlyMode] = useState(false);
   const [userDisplayName, setUserDisplayName] = useState(() => {
     const prefs = ConfigManager.get("user-preferences");
@@ -124,9 +120,8 @@ export default function App() {
   useEffect(() => {
     let active = true;
     fetchAppInfo()
-      .then((data) => {
-        if (!active) return;
-        setAppInfo(data);
+      .then(() => {
+        // app info loaded — no state needed
       })
       .catch((err: unknown) => {
         if (!active) return;
@@ -173,11 +168,6 @@ export default function App() {
     ConfigManager.set("user-preferences", { displayName: userDisplayName.trim() });
   }, [userDisplayName]);
 
-  // Sync math channels to localStorage
-  useEffect(() => {
-    ConfigManager.set("math-channels", mathChannels);
-  }, [mathChannels]);
-
   // Sync dataset ID to localStorage
   useEffect(() => {
     if (datasetId !== null) {
@@ -209,19 +199,6 @@ export default function App() {
 
     return () => unsubscribe();
   }, [datasetId]);
-
-  // Listen for math channels changes from other tabs
-  useEffect(() => {
-    const unsubscribe = ConfigManager.subscribeDebouncedFull<MathChannel[]>(
-      "math-channels",
-      (newChannels) => {
-        setMathChannels(newChannels);
-      },
-      150 // Shorter debounce for state updates
-    );
-
-    return () => unsubscribe();
-  }, []);
 
   useEffect(() => {
     function onGlobalKeyDown(event: Event): void {
@@ -300,9 +277,8 @@ export default function App() {
     }
   }
 
-  async function loadImportedDataset(nextDatasetId: string, message: string) {
+  async function loadImportedDataset(nextDatasetId: string, _message: string) {
     setDatasetId(nextDatasetId);
-    setImportMessage(message);
 
     const [metadata, map] = await Promise.all([
       fetchDatasetMetadata(nextDatasetId),
@@ -313,48 +289,6 @@ export default function App() {
     setTrackMap(map);
     setXRange(null);
     setCursorDistance(null);
-  }
-
-  function handleAddMathChannel(name: string, expression: string): string | null {
-    if (!datasetMetadata) {
-      return "Dataset requis";
-    }
-
-    const trimmedName = name.trim();
-    if (!trimmedName) {
-      return "Nom requis";
-    }
-
-    if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(trimmedName)) {
-      return "Nom invalide (lettres/chiffres/underscore)";
-    }
-
-    const existing = new Set([
-      ...datasetMetadata.signal_names,
-      ...mathChannels.map((channel) => channel.name),
-    ]);
-    if (existing.has(trimmedName)) {
-      return "Nom deja utilise";
-    }
-
-    const { dependencies, error } = analyzeMathExpression(expression, datasetMetadata.signal_names);
-    if (error) {
-      return error;
-    }
-
-    setMathChannels((prev) => [
-      ...prev,
-      {
-        name: trimmedName,
-        expression: expression.trim(),
-        dependencies,
-      },
-    ]);
-    return null;
-  }
-
-  function handleRemoveMathChannel(name: string) {
-    setMathChannels((prev) => prev.filter((channel) => channel.name !== name));
   }
 
   const activeInspectorWidget = useMemo(() => {
@@ -863,18 +797,11 @@ export default function App() {
           </button>
             {panelMode === "data" ? (
                 <ImportPanel
-                  appInfo={appInfo}
-                  loadingAppInfo={loadingAppInfo}
                   importing={importing}
-                  importMessage={importMessage}
                   datasetId={datasetId}
                   datasetMetadata={datasetMetadata}
-                  mathChannels={mathChannels}
                   onImport={handleImport}
                   onImportFromPath={handleImportFromPath}
-                  onAddMathChannel={handleAddMathChannel}
-                  onRemoveMathChannel={handleRemoveMathChannel}
-                  onRefreshMetaData={refreshDatasetMetadata}
                 />
             ) : (
               inspectorPanel
@@ -886,7 +813,6 @@ export default function App() {
             datasetId={datasetId}
             datasetMetadata={datasetMetadata}
             trackMap={trackMap}
-            mathChannels={mathChannels}
             graphOnlyMode={graphOnlyMode}
             inspectorSelectedWidgetId={inspectorSelectedWidgetId}
             onInspectorSelectedWidgetIdChange={setInspectorSelectedWidgetId}
@@ -912,18 +838,11 @@ export default function App() {
                   onImportSuccess={refreshDatasetMetadata}
                 />
                 <ImportPanel
-                  appInfo={appInfo}
-                  loadingAppInfo={loadingAppInfo}
                   importing={importing}
-                  importMessage={importMessage}
                   datasetId={datasetId}
                   datasetMetadata={datasetMetadata}
-                  mathChannels={mathChannels}
                   onImport={handleImport}
                   onImportFromPath={handleImportFromPath}
-                  onAddMathChannel={handleAddMathChannel}
-                  onRemoveMathChannel={handleRemoveMathChannel}
-                  onRefreshMetaData={refreshDatasetMetadata}
                 />
               </>
             ) : (

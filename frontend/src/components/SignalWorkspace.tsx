@@ -2,18 +2,18 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import type { MouseEvent as ReactMouseEvent } from "react";
 import Plot from "react-plotly.js";
 
-import { queryDataset } from "../api";
+import { queryDataset, calculateMapTuning, computeMathChannel } from "../api";
 import { evaluateMathChannel } from "../mathChannels";
 import { useTelemetryStore } from "../store/telemetryStore";
 import { ConfigManager } from "../store/ConfigManager";
-import type { DatasetMetadata, DistanceRange, MathChannel, SignalSeries, TrackMapResponse, MapTuningData } from "../types";
+import type { DatasetMetadata, DistanceRange, SignalSeries, TrackMapResponse, MapTuningData, SoftBlock, SoftLutOp, SoftMathOp } from "../types";
 import MapTuning from "./MapTuning";
+import SoftTab, { type BlockStatus } from "./SoftTab";
 
 type SignalWorkspaceProps = {
   datasetId: string | null;
   datasetMetadata: DatasetMetadata | null;
   trackMap: TrackMapResponse | null;
-  mathChannels: MathChannel[];
   graphOnlyMode: boolean;
   inspectorSelectedWidgetId?: number | null;
   onInspectorSelectedWidgetIdChange?: (widgetId: number | null) => void;
@@ -137,6 +137,7 @@ const COLORS = ["#00a8ff", "#ff2d4f", "#ffd447", "#34d399", "#ff8a33", "#ff9aa8"
 const SIGNAL_DRAG_MIME = "application/x-telemetry-signal";
 const TRAJECTORY_TAB_ID = "tab-trajectory";
 const ANALYSIS_TAB_ID = "tab-analysis";
+const SOFT_TAB_ID = "tab-soft";
 const TRAJECTORY_SIGNALS = ["xCar", "yCar", "xRef", "yRef", "xTrack", "yTrack"] as const;
 const BRAKING_NAME_SIGNAL = 'MBrakeR';
 
@@ -778,7 +779,6 @@ export default function SignalWorkspace({
   datasetId,
   datasetMetadata,
   trackMap,
-  mathChannels,
   graphOnlyMode,
   inspectorSelectedWidgetId,
   onInspectorSelectedWidgetIdChange,
@@ -822,6 +822,12 @@ export default function SignalWorkspace({
   const [focusSignalFilter, setFocusSignalFilter] = useState("");
   const [localSelectedWidgetId, setLocalSelectedWidgetId] = useState<number | null>(null);
   const [mapTuningData, setMapTuningData] = useState<MapTuningData | null>(null);
+  const [mapConfigs, setMapConfigs] = useState<Record<string, MapTuningData>>(
+    () => ConfigManager.get<Record<string, MapTuningData>>("map-configs") ?? {}
+  );
+  const [softBlocks, setSoftBlocks] = useState<SoftBlock[]>(() => ConfigManager.get<SoftBlock[]>("soft-blocks") ?? []);
+  const [softBlockStatuses, setSoftBlockStatuses] = useState<Record<string, BlockStatus>>({});
+  const softBlocksRef = useRef(softBlocks);
   const gridRef = useRef<HTMLDivElement | null>(null);
   const queryGenerationRef = useRef(0);
   const tabSwitchGenerationRef = useRef(0);
@@ -832,6 +838,11 @@ export default function SignalWorkspace({
   useEffect(() => {
     activeTabIdRef.current = activeTabId;
   }, [activeTabId]);
+
+  // Keep ref in sync so async callbacks always see latest blocks
+  useEffect(() => {
+    softBlocksRef.current = softBlocks;
+  }, [softBlocks]);
 
   // Helper function to update widgets and sync to tabs
   function updateWidgetsAndTabs(updater: (prev: GraphWidget[]) => GraphWidget[]): void {
@@ -846,14 +857,25 @@ export default function SignalWorkspace({
     });
   }
 
-  const availableSignals = useMemo(
-    () => [...(datasetMetadata?.signal_names ?? []), ...mathChannels.map((channel) => channel.name)],
-    [datasetMetadata, mathChannels]
+  // Collect all soft block output names
+  const softOutputNames = useMemo(
+    () => softBlocks.flatMap((b) => b.operations.map((op) => op.name)),
+    [softBlocks]
   );
-  const mathChannelByName = useMemo(
-    () => Object.fromEntries(mathChannels.map((channel) => [channel.name, channel])),
-    [mathChannels]
-  );
+
+  const availableSignals = useMemo(() => {
+    // Deduplicate: soft block outputs are persisted to dataset by the backend,
+    // so after calculation they appear in both signal_names AND softOutputNames.
+    const seen = new Set<string>();
+    const result: string[] = [];
+    for (const s of [
+      ...(datasetMetadata?.signal_names ?? []),
+      ...softOutputNames,
+    ]) {
+      if (!seen.has(s)) { seen.add(s); result.push(s); }
+    }
+    return result;
+  }, [datasetMetadata, softOutputNames]);
   const filteredFocusSignals = useMemo(() => {
     const q = focusSignalFilter.trim().toLowerCase();
     if (q.length === 0) {
@@ -864,6 +886,7 @@ export default function SignalWorkspace({
   const canQuery = datasetId !== null && datasetMetadata !== null;
   const isTrajectoryActive = activeTabId === TRAJECTORY_TAB_ID;
   const isAnalysisActive = activeTabId === ANALYSIS_TAB_ID;
+  const isSoftActive = activeTabId === SOFT_TAB_ID;
   const selectedWidgetId = inspectorSelectedWidgetId ?? localSelectedWidgetId;
 
   function updateSelectedWidgetId(next: number | null) {
@@ -1123,32 +1146,48 @@ export default function SignalWorkspace({
     }
   }, [inspectorCommand, gridCols, gridRows]);
 
+  // Build a lookup: soft math op name → dependencies (for on-the-fly evaluation)
+  const softMathOpByName = useMemo(() => {
+    const map: Record<string, SoftMathOp> = {};
+    for (const block of softBlocks) {
+      for (const op of block.operations) {
+        if (op.kind === "math") map[op.name] = op;
+      }
+    }
+    return map;
+  }, [softBlocks]);
+
   function expandSignalsForQuery(signals: string[]): string[] {
     const expanded = new Set<string>();
     signals.forEach((signal) => {
-      const channel = mathChannelByName[signal];
-      if (channel) {
-        channel.dependencies.forEach((dependency) => expanded.add(dependency));
-      } else {
-        expanded.add(signal);
+      const softMath = softMathOpByName[signal];
+      if (softMath) {
+        // Soft math ops are evaluated on-the-fly; expand their dependencies recursively
+        expandSignalsForQuery(softMath.dependencies).forEach((dep) => expanded.add(dep));
+        return;
       }
+      // LUT soft ops and raw dataset signals are already in the dataset — query them directly
+      expanded.add(signal);
     });
     return Array.from(expanded);
   }
 
   function buildComputedSignals(rawSignals: Record<string, number[]>): Record<string, number[]> {
     const merged = { ...rawSignals };
-    mathChannels.forEach((channel) => {
-      const hasDeps = channel.dependencies.every((dependency) => merged[dependency] !== undefined);
-      if (!hasDeps) {
-        return;
+    // Soft block math ops (evaluated in block/operation order for proper chaining)
+    for (const block of softBlocksRef.current) {
+      for (const op of block.operations) {
+        if (op.kind !== "math") continue;
+        if (merged[op.name] !== undefined) continue; // LUT result already in dataset
+        const hasDeps = op.dependencies.every((dep) => merged[dep] !== undefined);
+        if (!hasDeps) continue;
+        try {
+          merged[op.name] = evaluateMathChannel(op, merged);
+        } catch {
+          merged[op.name] = [];
+        }
       }
-      try {
-        merged[channel.name] = evaluateMathChannel(channel, merged);
-      } catch {
-        merged[channel.name] = [];
-      }
-    });
+    }
     return merged;
   }
 
@@ -1168,6 +1207,10 @@ export default function SignalWorkspace({
     const restoredActiveId =
       snapshot.activeTabId === TRAJECTORY_TAB_ID
         ? TRAJECTORY_TAB_ID
+        : snapshot.activeTabId === ANALYSIS_TAB_ID
+        ? ANALYSIS_TAB_ID
+        : snapshot.activeTabId === SOFT_TAB_ID
+        ? SOFT_TAB_ID
         : clonedTabs.some((tab) => tab.id === snapshot.activeTabId)
       ? snapshot.activeTabId
       : clonedTabs[0].id;
@@ -1176,7 +1219,11 @@ export default function SignalWorkspace({
 
     setTabs(clonedTabs);
     setActiveTabId(restoredActiveId);
-    if (restoredActiveId !== TRAJECTORY_TAB_ID) {
+    if (
+      restoredActiveId !== TRAJECTORY_TAB_ID &&
+      restoredActiveId !== ANALYSIS_TAB_ID &&
+      restoredActiveId !== SOFT_TAB_ID
+    ) {
       setGridCols(restoredActiveTab.gridCols);
       setGridRows(restoredActiveTab.gridRows);
       setNextId(restoredActiveTab.nextId);
@@ -1195,6 +1242,123 @@ export default function SignalWorkspace({
       }
     };
   }, []);
+
+  // ── Soft Blocks: persist + cross-tab sync ──────────────────────────────────
+  useEffect(() => {
+    ConfigManager.set("soft-blocks", softBlocks);
+  }, [softBlocks]);
+
+  useEffect(() => {
+    return ConfigManager.subscribeDebouncedFull<SoftBlock[]>(
+      "soft-blocks",
+      (newBlocks) => {
+        // Only update if different (avoids self-triggering)
+        if (JSON.stringify(newBlocks) !== JSON.stringify(softBlocksRef.current)) {
+          setSoftBlocks(newBlocks);
+        }
+      },
+      200
+    );
+  }, []);
+
+  // ── Map Configs: sync from other tabs (MapTuning tab saves here) ────────────
+  useEffect(() => {
+    return ConfigManager.subscribe<Record<string, MapTuningData>>("map-configs", (newConfigs) => {
+      setMapConfigs(newConfigs ?? {});
+    });
+  }, []);
+
+  // ── Soft Blocks: calculation engine ────────────────────────────────────────
+
+  async function calculateSoftBlock(blockId: string, blocksSnapshot?: SoftBlock[]): Promise<void> {
+    const blocks = blocksSnapshot ?? softBlocksRef.current;
+    const block = blocks.find((b) => b.id === blockId);
+    if (!block || !datasetId) return;
+
+    setSoftBlockStatuses((prev) => ({ ...prev, [blockId]: { state: "running" } }));
+
+    try {
+      // Execute operations in order — each persists its output to the dataset
+      // so subsequent ops can reference it (both within the block and across blocks)
+      for (const op of block.operations) {
+        if (op.kind === "lut2d") {
+          const lutOp = op as SoftLutOp;
+          // Look up the referenced map config from the saved maps (Rejeu Cartos tab)
+          const mapCfg = mapConfigs[lutOp.mapConfigKey];
+          if (!mapCfg) {
+            throw new Error(`Map "${lutOp.mapConfigKey}" introuvable. Sauvegardez-la d'abord dans l'onglet Rejeu Cartos.`);
+          }
+          await calculateMapTuning({
+            datasetId,
+            inputChannelX: mapCfg.inputChannelX,
+            inputChannelY: mapCfg.inputChannelY,
+            outputChannelName: lutOp.name,  // use op name as output (not map's outputChannelName)
+            gridData: mapCfg.gridData,
+            rowHeaders: mapCfg.rowHeaders,
+            colHeaders: mapCfg.colHeaders,
+            braking_signal: mapCfg.braking_signal,
+            gainVal: mapCfg.gainVal,
+            offsetVal: mapCfg.offsetVal,
+          });
+        } else if (op.kind === "math") {
+          const mathOp = op as SoftMathOp;
+          if (mathOp.dependencies.length > 0 && mathOp.expression.trim()) {
+            await computeMathChannel({
+              datasetId,
+              output_name: mathOp.name,
+              expression: mathOp.expression,
+              dependencies: mathOp.dependencies,
+            });
+          }
+        }
+      }
+
+      setSoftBlockStatuses((prev) => ({ ...prev, [blockId]: { state: "done" } }));
+      // Refresh metadata so new signals appear in the signal list
+      onRefreshDatasetMetadata?.();
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Erreur calcul";
+      setSoftBlockStatuses((prev) => ({ ...prev, [blockId]: { state: "error", error: msg } }));
+    }
+  }
+
+  async function calculateAllSoftBlocks(blocksSnapshot?: SoftBlock[]): Promise<void> {
+    const blocks = blocksSnapshot ?? softBlocksRef.current;
+    if (!datasetId || blocks.length === 0) return;
+    // Run blocks sequentially so each block can reference outputs of the previous one
+    for (const block of blocks) {
+      await calculateSoftBlock(block.id, blocks);
+    }
+  }
+
+  // Recalculate all soft blocks when dataset changes
+  useEffect(() => {
+    if (datasetId && softBlocksRef.current.length > 0) {
+      calculateAllSoftBlocks(softBlocksRef.current);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [datasetId]);
+
+  // Recalculate blocks whose LUT ops changed (debounced to avoid spamming on rapid edits)
+  const pendingRecalcRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => {
+    if (!datasetId) return;
+    if (pendingRecalcRef.current !== null) clearTimeout(pendingRecalcRef.current);
+    pendingRecalcRef.current = setTimeout(() => {
+      // Only recalculate blocks that have LUT ops (math ops are on-the-fly)
+      const blocksWithLut = softBlocks.filter((b) =>
+        b.operations.some((op) => op.kind === "lut2d")
+      );
+      if (blocksWithLut.length > 0) {
+        calculateAllSoftBlocks(softBlocks);
+      }
+      pendingRecalcRef.current = null;
+    }, 800); // Generous debounce — user may be mid-edit
+    return () => {
+      if (pendingRecalcRef.current !== null) clearTimeout(pendingRecalcRef.current);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [softBlocks, datasetId]);
 
   // Debounced save for session - prevents alternation between browser tabs
   useEffect(() => {
@@ -1260,7 +1424,12 @@ export default function SignalWorkspace({
           
           // Update widgets for current active tab if it exists in the new tabs
           const currentActiveTab = clonedTabs.find((tab) => tab.id === activeTabIdRef.current);
-          if (currentActiveTab && activeTabIdRef.current !== TRAJECTORY_TAB_ID) {
+          if (
+            currentActiveTab &&
+            activeTabIdRef.current !== TRAJECTORY_TAB_ID &&
+            activeTabIdRef.current !== ANALYSIS_TAB_ID &&
+            activeTabIdRef.current !== SOFT_TAB_ID
+          ) {
             setGridCols(currentActiveTab.gridCols);
             setGridRows(currentActiveTab.gridRows);
             setNextId(currentActiveTab.nextId);
@@ -1478,7 +1647,7 @@ export default function SignalWorkspace({
 
     const activeWidgets = widgets.filter((widget) => {
       const selectedSignals = getWidgetQuerySignals(widget).filter(
-        (signal) => !!mathChannelByName[signal] || datasetSignalSet.has(signal)
+        (signal) => datasetSignalSet.has(signal) || softMathOpByName[signal] !== undefined
       );
       const querySignals = expandSignalsForQuery(selectedSignals).filter((signal) =>
         datasetSignalSet.has(signal)
@@ -1497,7 +1666,7 @@ export default function SignalWorkspace({
       setLoadingById((prev) => ({ ...prev, [widget.id]: true }));
 
       const selectedSignals = getWidgetQuerySignals(widget).filter(
-        (signal) => !!mathChannelByName[signal] || datasetSignalSet.has(signal)
+        (signal) => datasetSignalSet.has(signal) || softMathOpByName[signal] !== undefined
       );
       const querySignals = expandSignalsForQuery(selectedSignals).filter((signal) =>
         datasetSignalSet.has(signal)
@@ -1881,6 +2050,26 @@ export default function SignalWorkspace({
     );
     setWidgets((prev) => closeAllWidgetMenus(prev));
     setActiveTabId(ANALYSIS_TAB_ID);
+    setExpandedWidgetId(null);
+    updateSelectedWidgetId(null);
+    setDragFromId(null);
+    setSignalDropCell(null);
+  }
+
+  function switchToSoftTab() {
+    if (isSoftActive) {
+      return;
+    }
+
+    setTabs((prev) =>
+      prev.map((tab) =>
+        tab.id === activeTabId
+          ? { ...tab, widgets: closeAllWidgetMenus(tab.widgets) }
+          : tab
+      )
+    );
+    setWidgets((prev) => closeAllWidgetMenus(prev));
+    setActiveTabId(SOFT_TAB_ID);
     setExpandedWidgetId(null);
     updateSelectedWidgetId(null);
     setDragFromId(null);
@@ -2352,7 +2541,7 @@ export default function SignalWorkspace({
 
       if (hasPrimaryModifier && event.code === "Tab") {
         event.preventDefault();
-        const sequence = [...tabs.map((tab) => tab.id), TRAJECTORY_TAB_ID, ANALYSIS_TAB_ID];
+        const sequence = [...tabs.map((tab) => tab.id), TRAJECTORY_TAB_ID, ANALYSIS_TAB_ID, SOFT_TAB_ID];
         const currentIndex = sequence.indexOf(activeTabId);
         const direction = event.shiftKey ? -1 : 1;
         const nextIndex =
@@ -2364,6 +2553,8 @@ export default function SignalWorkspace({
           switchToTrajectoryTab();
         } else if (nextTabId === ANALYSIS_TAB_ID) {
           switchToAnalysisTab();
+        } else if (nextTabId === SOFT_TAB_ID) {
+          switchToSoftTab();
         } else {
           switchToTab(nextTabId);
         }
@@ -2699,6 +2890,11 @@ export default function SignalWorkspace({
             Rejeu Cartos
           </button>
         </div>
+        <div className={`workspace-tab ${isSoftActive ? "workspace-tab-active" : ""}`}>
+          <button className="workspace-tab-name" onClick={switchToSoftTab}>
+            Soft
+          </button>
+        </div>
         <button className="workspace-tab-add" onClick={addTab} title="Nouvel onglet">
           + Onglet
         </button>
@@ -2742,6 +2938,19 @@ export default function SignalWorkspace({
             onSave={(data) => setMapTuningData(data)}
             onCalculate={(data) => console.log("Map calculated:", data)}
             onSignalsUpdated={onRefreshDatasetMetadata}
+          />
+        </div>
+      ) : isSoftActive ? (
+        <div className="hide-scroll" style={{ overflowY: "auto", padding: "0.5rem" }}>
+          <SoftTab
+            availableSignals={availableSignals}
+            datasetId={datasetId}
+            softBlocks={softBlocks}
+            onChange={(newBlocks) => setSoftBlocks(newBlocks)}
+            onCalculateBlock={(blockId) => calculateSoftBlock(blockId)}
+            blockStatuses={softBlockStatuses}
+            mapConfigs={mapConfigs}
+            onSwitchToMapTuning={switchToAnalysisTab}
           />
         </div>
       ) : isTabSwitching ? (
