@@ -4,3 +4,4 @@ __pycache__
 import_cache
 .venv
 *.mat
+.vscode
