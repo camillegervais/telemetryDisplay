@@ -825,6 +825,7 @@ export default function SignalWorkspace({
   const [mapConfigs, setMapConfigs] = useState<Record<string, MapTuningData>>(
     () => ConfigManager.get<Record<string, MapTuningData>>("map-configs") ?? {}
   );
+  const mapConfigsRef = useRef<Record<string, MapTuningData>>(mapConfigs);
   const [softBlocks, setSoftBlocks] = useState<SoftBlock[]>(() => ConfigManager.get<SoftBlock[]>("soft-blocks") ?? []);
   const [softBlockStatuses, setSoftBlockStatuses] = useState<Record<string, BlockStatus>>({});
   const softBlocksRef = useRef(softBlocks);
@@ -1276,10 +1277,48 @@ export default function SignalWorkspace({
 
   // ── Map Configs: sync from other tabs (MapTuning tab saves here) ────────────
   useEffect(() => {
-    return ConfigManager.subscribe<Record<string, MapTuningData>>("map-configs", (newConfigs) => {
-      setMapConfigs(newConfigs ?? {});
+    let timeoutId: ReturnType<typeof setTimeout> | null = null;
+    const unsubscribe = ConfigManager.subscribe<Record<string, MapTuningData>>("map-configs", (newConfigs) => {
+      const next = newConfigs ?? {};
+      // Detect changed map keys
+      const prev = mapConfigsRef.current ?? {};
+      const changedKeys: string[] = [];
+      const allKeys = new Set<string>([...Object.keys(prev), ...Object.keys(next)]);
+      for (const k of allKeys) {
+        const a = prev[k];
+        const b = next[k];
+        if (JSON.stringify(a) !== JSON.stringify(b)) {
+          changedKeys.push(k);
+        }
+      }
+
+      setMapConfigs(next);
+      mapConfigsRef.current = next;
+
+      if (!datasetId) return;
+      if (changedKeys.length === 0) return;
+
+      // Debounce recalculation to avoid spamming
+      if (timeoutId !== null) clearTimeout(timeoutId);
+      timeoutId = setTimeout(() => {
+        // Find blocks referencing any of the changed map keys
+        const affectedBlocks = softBlocksRef.current.filter((b) =>
+          b.operations.some((op) => op.kind === "lut2d" && changedKeys.includes((op as SoftLutOp).mapConfigKey))
+        );
+        for (const blk of affectedBlocks) {
+          // Fire and forget
+          // eslint-disable-next-line @typescript-eslint/no-floating-promises
+          calculateSoftBlock(blk.id, softBlocksRef.current);
+        }
+        timeoutId = null;
+      }, 250);
     });
+    return () => unsubscribe();
   }, []);
+
+  useEffect(() => {
+    mapConfigsRef.current = mapConfigs;
+  }, [mapConfigs]);
 
   // ── Soft Blocks: calculation engine ────────────────────────────────────────
 
@@ -1296,8 +1335,9 @@ export default function SignalWorkspace({
       for (const op of block.operations) {
         if (op.kind === "lut2d") {
           const lutOp = op as SoftLutOp;
-          // Look up the referenced map config from the saved maps (Rejeu Cartos tab)
-          const mapCfg = mapConfigs[lutOp.mapConfigKey];
+          // Use the latest persisted map configs (ref) to ensure live edits are applied
+          const latestMapCfgs = mapConfigsRef.current ?? mapConfigs;
+          const mapCfg = latestMapCfgs[lutOp.mapConfigKey];
           if (!mapCfg) {
             throw new Error(`Map "${lutOp.mapConfigKey}" introuvable. Sauvegardez-la d'abord dans l'onglet Rejeu Cartos.`);
           }

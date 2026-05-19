@@ -294,6 +294,32 @@ export default function MapTuning({
     }
   };
 
+  // Persist current map config on every change so other tabs/components can react
+  useEffect(() => {
+    if (!outputChannelName) return;
+    const data: MapTuningData = {
+      inputChannelX,
+      inputChannelY,
+      outputChannelName,
+      gridData,
+      rowHeaders,
+      colHeaders,
+      braking_signal,
+      gainVal,
+      offsetVal,
+    };
+    try {
+      const existingConfigs = ConfigManager.get<Record<string, MapTuningData>>("map-configs") ?? {};
+      ConfigManager.set("map-configs", {
+        ...existingConfigs,
+        [outputChannelName]: data,
+      });
+    } catch (e) {
+      // ignore persistence errors for live updates
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [inputChannelX, inputChannelY, outputChannelName, gridData, rowHeaders, colHeaders, braking_signal, gainVal, offsetVal]);
+
   const handleLoadConfig = (name: string) => {
     const configs = ConfigManager.get<Record<string, MapTuningData>>("map-configs") ?? {};
     ConfigManager.set("current-map-config", name);

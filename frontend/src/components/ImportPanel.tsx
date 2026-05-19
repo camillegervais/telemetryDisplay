@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 
 import { queryDataset } from "../api";
 import { useTelemetryStore } from "../store/telemetryStore";
+import { ConfigManager } from "../store/ConfigManager";
 
 import type { DatasetMetadata } from "../types";
 
@@ -19,6 +20,8 @@ type SignalStats = {
   min: number;
   max: number;
 };
+
+import type { MapTuningData } from "../types";
 
 const LAST_MAT_PATH_KEY = "telemetry-display.last-mat-path.v1";
 const LAST_PICKER_PATH_KEY = "telemetry-display.last-picker-path.v1";
@@ -60,6 +63,10 @@ export default function ImportPanel({
   const [signalStats, setSignalStats] = useState<Record<string, SignalStats>>({});
   const [loadingStats, setLoadingStats] = useState(false);
   const [statsError, setStatsError] = useState<string | null>(null);
+  const [mapsSectionOpen, setMapsSectionOpen] = useState(false);
+  const [mapConfigs, setMapConfigs] = useState<Record<string, MapTuningData>>(() =>
+    ConfigManager.get<Record<string, MapTuningData>>("map-configs") ?? {}
+  );
 
 
 
@@ -82,6 +89,14 @@ export default function ImportPanel({
     if (savedPath) {
       setMatPath(savedPath);
     }
+  }, []);
+
+  // Sync map configs and listen for external updates
+  useEffect(() => {
+    const unsubscribe = ConfigManager.subscribe<Record<string, MapTuningData>>("map-configs", (newConfigs) => {
+      setMapConfigs(newConfigs ?? {});
+    });
+    return () => unsubscribe();
   }, []);
 
   useEffect(() => {
@@ -188,6 +203,38 @@ export default function ImportPanel({
     }
     window.localStorage.setItem(LAST_MAT_PATH_KEY, path);
     await onImportFromPath(path);
+  }
+
+  function updateMapGain(name: string, newGain: number) {
+    if (!Number.isFinite(newGain)) return;
+    setMapConfigs((prev) => {
+      const next = { ...prev };
+      const cfg = next[name];
+      if (!cfg) return prev;
+      next[name] = { ...cfg, gainVal: Number(Number(newGain).toFixed(3)) };
+      try {
+        ConfigManager.set("map-configs", next);
+      } catch (e) {
+        console.error("Failed to set map-configs", e);
+      }
+      return next;
+    });
+  }
+
+  function updateMapOffset(name: string, newOffset: number) {
+    if (!Number.isFinite(newOffset)) return;
+    setMapConfigs((prev) => {
+      const next = { ...prev };
+      const cfg = next[name];
+      if (!cfg) return prev;
+      next[name] = { ...cfg, offsetVal: Number(Number(newOffset).toFixed(3)) };
+      try {
+        ConfigManager.set("map-configs", next);
+      } catch (e) {
+        console.error("Failed to set map-configs", e);
+      }
+      return next;
+    });
   }
 
   return (
@@ -426,6 +473,90 @@ export default function ImportPanel({
                 })}
               </div>
             ) : null}
+          </div>
+        ) : null}
+      </div>
+
+      <div className="import-submenu">
+        <button
+          type="button"
+          className="import-submenu-toggle"
+          onClick={() => setMapsSectionOpen((p) => !p)}
+        >
+          <span>{mapsSectionOpen ? "▾" : "▸"}</span>
+          <span>Cartos ({Object.keys(mapConfigs).length})</span>
+        </button>
+
+        {mapsSectionOpen ? (
+          <div className="import-submenu-content">
+            {Object.keys(mapConfigs).length === 0 ? (
+              <p className="panel-text">Aucune carto sauvegardée.</p>
+            ) : (
+              <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
+                {Object.entries(mapConfigs).map(([name, cfg]) => (
+                  <div key={`map-${name}`} style={{ display: "flex", gap: "0.5rem", flexDirection: "column" }}>
+                    <div style={{ minWidth: "160px", overflow: "hidden", textOverflow: "ellipsis" }}>{name}</div>
+                    <div style={{ display: 'flex', flexDirection: "column"}}>
+                      <div style={{ display: "flex", gap: "0.25rem", justifyContent: "space-between", flexDirection: "row", width:"100%", marginBottom: "0.3rem" }}>
+                        <label className="field-label" style={{ margin: 0 }}>Gain</label>
+                        <div style={{ display: "flex", gap: "0.25rem"}}>
+                          <button
+                            className="small-button"
+                            onClick={() => updateMapGain(name, (cfg.gainVal ?? 1) - 0.1)}
+                            type="button"
+                          >
+                            −
+                          </button>
+                          <input
+                            type="number"
+                            step={0.1}
+                            className="table-input"
+                            value={Number.isFinite(cfg.gainVal ?? 0) ? Number((cfg.gainVal ?? 0).toFixed(3)) : 0}
+                            onChange={(e) => updateMapGain(name, parseFloat(e.target.value))}
+                            style={{ width: "80px" }}
+                          />
+                          <button
+                            className="small-button"
+                            onClick={() => updateMapGain(name, (cfg.gainVal ?? 1) + 0.1)}
+                            type="button"
+                          >
+                            +
+                          </button>
+                        </div>
+                      </div>
+
+                      <div style={{ display: "flex", gap: "0.25rem", justifyContent: "space-between" }}>
+                        <label className="field-label" style={{ margin: 0 }}>Offset</label>
+                        <div style={{ display: "flex", gap: "0.25rem"}}>
+                          <button
+                            className="small-button"
+                            onClick={() => updateMapOffset(name, (cfg.offsetVal ?? 0) - 0.1)}
+                            type="button"
+                          >
+                            −
+                          </button>
+                          <input
+                            type="number"
+                            step={0.1}
+                            className="table-input"
+                            value={Number.isFinite(cfg.offsetVal ?? 0) ? Number((cfg.offsetVal ?? 0).toFixed(3)) : 0}
+                            onChange={(e) => updateMapOffset(name, parseFloat(e.target.value))}
+                            style={{ width: "80px" }}
+                          />
+                          <button
+                            className="small-button"
+                            onClick={() => updateMapOffset(name, (cfg.offsetVal ?? 0) + 0.1)}
+                            type="button"
+                          >
+                            +
+                          </button>
+                        </div>
+                      </div>
+                      </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         ) : null}
       </div>
