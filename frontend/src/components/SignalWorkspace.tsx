@@ -1339,7 +1339,7 @@ export default function SignalWorkspace({
           const latestMapCfgs = mapConfigsRef.current ?? mapConfigs;
           const mapCfg = latestMapCfgs[lutOp.mapConfigKey];
           if (!mapCfg) {
-            throw new Error(`Map "${lutOp.mapConfigKey}" introuvable. Sauvegardez-la d'abord dans l'onglet Rejeu Cartos.`);
+            throw new Error(`Map "${lutOp.mapConfigKey}" introuvable. Sauvegardez-la d'abord dans l'onglet Tuning Cartos.`);
           }
           await calculateMapTuning({
             datasetId,
@@ -2940,7 +2940,7 @@ export default function SignalWorkspace({
         </div>
         <div className={`workspace-tab ${isAnalysisActive ? "workspace-tab-active" : ""}`}>
           <button className="workspace-tab-name" onClick={switchToAnalysisTab}>
-            Rejeu Cartos
+            Tuning Cartos
           </button>
         </div>
         <div className={`workspace-tab ${isSoftActive ? "workspace-tab-active" : ""}`}>

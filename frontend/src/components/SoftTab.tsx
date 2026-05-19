@@ -116,7 +116,7 @@ const LutRefEditor: React.FC<{
           Aucune map sauvegardée.{" "}
           {onSwitchToMapTuning && (
             <button className="link-btn" onClick={onSwitchToMapTuning}>
-              Aller à Rejeu Cartos →
+              Aller à Tuning Cartos →
             </button>
           )}
         </p>
