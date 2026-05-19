@@ -67,7 +67,11 @@ class LUT2D:
                 bounds_error=False,
                 fill_value=None,
             )
-            input_points = np.column_stack((x_data, y_data))
+            x_min, x_max = x_vals.min(), x_vals.max()
+            y_min, y_max = y_vals.min(), y_vals.max()
+            x_data_clipped = np.clip(x_data, x_min, x_max)
+            y_data_clipped = np.clip(y_data, y_min, y_max)
+            input_points = np.column_stack((x_data_clipped, y_data_clipped))
             output_channel = np.array(lut_function(input_points))
 
         # Case: LUT has single row (lx == 1) — treat as 1D over y (use y axis values)
