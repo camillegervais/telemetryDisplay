@@ -2252,7 +2252,7 @@ body::after {
   font-size: 0.8rem;
   font-family: 'Fira Code', monospace;
   padding: 0 0.2rem;
-  min-width: 0;
+  min-width: 30%;
   width: 8rem;
   flex-shrink: 0;
 }
