@@ -1,6 +1,8 @@
 import { useRef, useState } from "react";
 import { ConfigManager } from "../store/ConfigManager";
+import { ImportSelectionModal } from "./ImportSelectionModal";
 import type { CSSProperties } from "react";
+import type { ParsedTomlData, ImportSelection } from "../types/ConfigTypes";
 
 type ExportImportProps = {
   onImportSuccess?: () => void;
@@ -8,6 +10,9 @@ type ExportImportProps = {
 
 export function ConfigExportImport({ onImportSuccess }: ExportImportProps) {
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
+  const [showImportModal, setShowImportModal] = useState(false);
+  const [parsedData, setParsedData] = useState<ParsedTomlData | null>(null);
+  const [isImporting, setIsImporting] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleExport = () => {
@@ -43,8 +48,31 @@ export function ConfigExportImport({ onImportSuccess }: ExportImportProps) {
 
     try {
       const content = await file.text();
-      ConfigManager.importFromToml(content);
+      const parsed = ConfigManager.parseTomlForImport(content);
+      setParsedData(parsed);
+      setShowImportModal(true);
+    } catch (error) {
+      setMessage({
+        type: "error",
+        text: `Erreur de lecture: ${error instanceof Error ? error.message : String(error)}`,
+      });
+    } finally {
+      // Reset file input
+      if (fileInputRef.current) {
+        fileInputRef.current.value = "";
+      }
+    }
+  };
+
+  const handleImportConfirm = async (selection: ImportSelection) => {
+    if (!parsedData) return;
+
+    setIsImporting(true);
+    try {
+      ConfigManager.importFromTomlPartial(parsedData, selection);
       setMessage({ type: "success", text: "✓ Configuration importée et appliquée" });
+      setShowImportModal(false);
+      setParsedData(null);
       onImportSuccess?.();
       setTimeout(() => setMessage(null), 3000);
     } catch (error) {
@@ -53,11 +81,13 @@ export function ConfigExportImport({ onImportSuccess }: ExportImportProps) {
         text: `Erreur d'import: ${error instanceof Error ? error.message : String(error)}`,
       });
     } finally {
-      // Reset file input
-      if (fileInputRef.current) {
-        fileInputRef.current.value = "";
-      }
+      setIsImporting(false);
     }
+  };
+
+  const handleImportCancel = () => {
+    setShowImportModal(false);
+    setParsedData(null);
   };
 
   const buttonStyle: CSSProperties = {
@@ -104,50 +134,60 @@ export function ConfigExportImport({ onImportSuccess }: ExportImportProps) {
   };
 
   return (
-    <div style={containerStyle}>
-      <div style={{ fontSize: "0.9rem", fontWeight: "bold", marginRight: "0.5rem" }}>
-        Configuration
+    <>
+      {showImportModal && parsedData && (
+        <ImportSelectionModal
+          data={parsedData}
+          onConfirm={handleImportConfirm}
+          onCancel={handleImportCancel}
+          isLoading={isImporting}
+        />
+      )}
+      <div style={containerStyle}>
+        <div style={{ fontSize: "0.9rem", fontWeight: "bold", marginRight: "0.5rem" }}>
+          Configuration
+        </div>
+        <button
+          onClick={handleExport}
+          style={buttonStyle}
+          onMouseEnter={(e) => {
+            const btn = e.currentTarget;
+            btn.style.background = "rgba(52, 211, 153, 0.15)";
+            btn.style.borderColor = "rgba(52, 211, 153, 0.8)";
+          }}
+          onMouseLeave={(e) => {
+            const btn = e.currentTarget;
+            btn.style.background = "rgba(22, 8, 12, 0.8)";
+            btn.style.borderColor = "rgba(255, 70, 93, 0.6)";
+          }}
+        >
+          📥 Exporter
+        </button>
+        <button
+          onClick={handleImportClick}
+          style={buttonStyle}
+          onMouseEnter={(e) => {
+            const btn = e.currentTarget;
+            btn.style.background = "rgba(0, 168, 255, 0.15)";
+            btn.style.borderColor = "rgba(0, 168, 255, 0.8)";
+          }}
+          onMouseLeave={(e) => {
+            const btn = e.currentTarget;
+            btn.style.background = "rgba(22, 8, 12, 0.8)";
+            btn.style.borderColor = "rgba(255, 70, 93, 0.6)";
+          }}
+        >
+          📤 Importer
+        </button>
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept=".toml"
+          onChange={handleFileSelected}
+          style={{ display: "none" }}
+        />
+        {message && <div style={messageStyle}>{message.text}</div>}
       </div>
-      <button
-        onClick={handleExport}
-        style={buttonStyle}
-        onMouseEnter={(e) => {
-          const btn = e.currentTarget;
-          btn.style.background = "rgba(52, 211, 153, 0.15)";
-          btn.style.borderColor = "rgba(52, 211, 153, 0.8)";
-        }}
-        onMouseLeave={(e) => {
-          const btn = e.currentTarget;
-          btn.style.background = "rgba(22, 8, 12, 0.8)";
-          btn.style.borderColor = "rgba(255, 70, 93, 0.6)";
-        }}
-      >
-        📥 Exporter
-      </button>
-      <button
-        onClick={handleImportClick}
-        style={buttonStyle}
-        onMouseEnter={(e) => {
-          const btn = e.currentTarget;
-          btn.style.background = "rgba(0, 168, 255, 0.15)";
-          btn.style.borderColor = "rgba(0, 168, 255, 0.8)";
-        }}
-        onMouseLeave={(e) => {
-          const btn = e.currentTarget;
-          btn.style.background = "rgba(22, 8, 12, 0.8)";
-          btn.style.borderColor = "rgba(255, 70, 93, 0.6)";
-        }}
-      >
-        📤 Importer
-      </button>
-      <input
-        ref={fileInputRef}
-        type="file"
-        accept=".toml"
-        onChange={handleFileSelected}
-        style={{ display: "none" }}
-      />
-      {message && <div style={messageStyle}>{message.text}</div>}
-    </div>
+    </>
   );
 }

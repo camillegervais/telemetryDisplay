@@ -223,3 +223,60 @@ export function setNestedValue<T extends Record<string, unknown>>(obj: T, path: 
 
   return result;
 }
+
+/**
+ * Import mode options for partial imports
+ */
+export type ImportMode = "replace" | "add";
+
+/**
+ * Selection state for each import category
+ */
+export type ImportSelection = {
+  layouts?: {
+    enabled: boolean;
+    mode: ImportMode;
+    selectedIds?: string[];
+  };
+  mathChannels?: {
+    enabled: boolean;
+    mode: ImportMode;
+  };
+  mapConfigs?: {
+    enabled: boolean;
+    mode: ImportMode;
+    selectedKeys?: string[];
+  };
+  softBlocks?: {
+    enabled: boolean;
+    mode: ImportMode;
+    selectedIds?: string[];
+  };
+};
+
+/**
+ * Parsed TOML data with metadata for import preview
+ */
+export type ParsedTomlData = {
+  layouts: {
+    items: SavedWorkspaceConfig[];
+    count: number;
+  };
+  mathChannels: {
+    items: MathChannel[];
+    count: number;
+  };
+  mapConfigs: {
+    items: Record<string, MapTuningData>;
+    keys: string[];
+    count: number;
+  };
+  softBlocks: {
+    items: SoftBlock[];
+    count: number;
+  };
+  meta?: {
+    version: string;
+    exportDate: string;
+  };
+};
