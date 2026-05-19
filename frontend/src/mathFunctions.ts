@@ -81,7 +81,7 @@ export function evaluateFunction(
       if (args[0] < 0) return -1;
       return 0;
     case "norm2":
-      return Math.sqrt(args[0]**2 + args[1]**1);
+      return Math.sqrt(args[0]**2 + args[1]**2);
     case "sat":
       return Math.min(Math.max(args[0], args[1]), args[2]);
       case "satdyn":

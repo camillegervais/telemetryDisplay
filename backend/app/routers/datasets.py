@@ -376,6 +376,12 @@ _MATH_NAMESPACE = {
     "tan": np.tan,
     "pow": np.power,
     "where": np.where,   # ternary: where(cond, val_true, val_false)
+    "sat":    lambda s, lo, hi: np.minimum(np.maximum(s, lo), hi),   # sat(signal, lower, upper)
+    "satdyn": lambda s, lo, hi: np.minimum(np.maximum(s, lo), hi),   # satdyn(signal, lower_signal, upper_signal)
+    "gain":   lambda s, f: s * f,
+    "norm2":  lambda a, b: np.sqrt(a**2 + b**2),
+    "and_":   lambda a, b: np.where((a != 0) & (b != 0), 1.0, 0.0),
+    "or_":    lambda a, b: np.where((a != 0) | (b != 0), 1.0, 0.0),
     "__builtins__": {},  # block all Python builtins
 }
 
