@@ -496,7 +496,6 @@ function buildChartConfig(
     useTimeAxis
       ? (series.lapTime as number[])
       : series.lapDistance;
-  const alignZero = yAxisMatchMode !== "off";
   const useSharedYAxis = yAxisMatchMode === "origin-scale" && selectedSignals.length > 1;
   const originOnlyRanges =
     yAxisMatchMode === "origin-only"
@@ -560,7 +559,6 @@ function buildChartConfig(
       gridcolor: "rgba(255, 93, 120, 0.22)",
       zeroline: true,
       zerolinecolor: "rgba(255, 255, 255, 0.45)",
-      ...(alignZero ? { rangemode: "tozero" } : {}),
       ...(yAxisMatchMode === "origin-only" && originOnlyRanges[selectedSignals[0]]
         ? {
             range: originOnlyRanges[selectedSignals[0]],
@@ -595,7 +593,6 @@ function buildChartConfig(
         gridcolor: "rgba(0,0,0,0)",
         zeroline: true,
         zerolinecolor: "rgba(255, 255, 255, 0.45)",
-        ...(alignZero ? { rangemode: "tozero" } : {}),
         ...(yAxisMatchMode === "origin-only" && originOnlyRanges[signal]
           ? {
               range: originOnlyRanges[signal],
