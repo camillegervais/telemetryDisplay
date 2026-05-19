@@ -118,6 +118,7 @@ export function ConfigExportImport({ onImportSuccess }: ExportImportProps) {
     padding: "0.5rem",
     borderRadius: "4px",
     fontSize: "0.85rem",
+    marginLeft: "0.5rem",
     background:
       message?.type === "success"
         ? "rgba(52, 211, 153, 0.1)"

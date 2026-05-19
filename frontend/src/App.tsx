@@ -674,27 +674,8 @@ export default function App() {
           <ConfigExportImport
                   onImportSuccess={refreshDatasetMetadata}
                 />
-          <details className="topbar-user-menu">
-            <summary className="small-button topbar-icon-button" title="Profil" aria-label="Profil">
-              <span aria-hidden="true">◉</span>
-            </summary>
-            <div className="topbar-user-menu-content">
-              <label className="field-label" htmlFor="topbar-user-input">
-                Prenom
-              </label>
-              <input
-                id="topbar-user-input"
-                type="text"
-                className="topbar-user-input"
-                value={userDisplayName}
-                onChange={(event) => setUserDisplayName(event.target.value)}
-                placeholder="Votre prenom"
-                aria-label="Prenom utilisateur"
-              />
-            </div>
-          </details>
           <button className="small-button topbar-icon-button" onClick={resetAllGraphsToHome} title="Home (H)" aria-label="Home">
-            <span aria-hidden="true">⌂</span>
+            <span aria-hidden="true">HOME</span>
           </button>
           <button
             className="small-button topbar-icon-button"
@@ -702,7 +683,7 @@ export default function App() {
             title={`Changer cote panneau (P) - ${panelSide === "left" ? "Gauche" : "Droite"}`}
             aria-label="Changer cote panneau"
           >
-            <span aria-hidden="true">⇆</span>
+            <span aria-hidden="true">SWITCH</span>
           </button>
           <button
             className="small-button topbar-icon-button"
@@ -710,7 +691,7 @@ export default function App() {
             title={graphOnlyMode ? "Mode UI (G)" : "Mode Graphes (G)"}
             aria-label="Basculer mode Graphes"
           >
-            <span aria-hidden="true">▣</span>
+            <span aria-hidden="true">GRAPHE</span>
           </button>
           <button
             className="small-button topbar-icon-button"
@@ -718,7 +699,7 @@ export default function App() {
             title={panelMode === "data" ? "Ouvrir Graphe Perso (I)" : "Ouvrir Data Hub (I)"}
             aria-label="Basculer Data Hub Graphe Perso"
           >
-            <span aria-hidden="true">⌘</span>
+            <span aria-hidden="true">PANEL MODE</span>
           </button>
           <button
             className="small-button topbar-icon-button"
@@ -726,7 +707,7 @@ export default function App() {
             title="Aide raccourcis clavier"
             aria-label="Aide raccourcis clavier"
           >
-            <span aria-hidden="true">?</span>
+            <span aria-hidden="true">SHORTcut</span>
           </button>
           <div className="status-box">
             <span>Backend</span>
@@ -855,10 +836,10 @@ export default function App() {
       {graphOnlyMode ? (
         <div className="graph-only-overlay-controls">
           <button className="small-button" onClick={resetAllGraphsToHome}>
-            <span aria-hidden="true">⌂</span>
+            <span aria-hidden="true">HOME</span>
           </button>
           <button className="small-button" onClick={() => setGraphOnlyMode(false)}>
-            <span aria-hidden="true">▣</span>
+            <span aria-hidden="true">FULL</span>
           </button>
         </div>
       ) : null}
