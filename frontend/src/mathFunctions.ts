@@ -23,10 +23,10 @@ export const FUNCTIONS = {
   where: { arity: 3 as const, description: "Ternaire: where(condition, val_si_vrai, val_si_faux) — retourne val_si_vrai si condition != 0, sinon val_si_faux" },
 
   // Logical operations (treat as 0=false, 1=true)
-  and: { arity: 2 as const, description: "ET logique: and(a, b) — 1 si tous deux non-zéro" },
-  or: { arity: 2 as const, description: "OU logique: or(a, b) — 1 si au moins un non-zéro" },
-  xor: { arity: 2 as const, description: "OU exclusif: xor(a, b) — 1 si exactement un non-zéro" },
-  not: { arity: 1 as const, description: "NON logique: not(a) — 1 si zéro, 0 sinon" },
+  and_: { arity: 2 as const, description: "ET logique: and_(a, b) — 1 si tous deux non-zéro" },
+  or_: { arity: 2 as const, description: "OU logique: or_(a, b) — 1 si au moins un non-zéro" },
+  xor_: { arity: 2 as const, description: "OU exclusif: xor_(a, b) — 1 si exactement un non-zéro" },
+  not_: { arity: 1 as const, description: "NON logique: not_(a) — 1 si zéro, 0 sinon" },
 } as const;
 
 export type FunctionName = keyof typeof FUNCTIONS;
@@ -86,13 +86,13 @@ export function evaluateFunction(
       return Math.min(Math.max(args[0], args[1]), args[2]);
       case "satdyn":
       return Math.min(Math.max(args[0], args[1]), args[2]);
-    case "and":
+    case "and_":
       return args[0] !== 0 && args[1] !== 0 ? 1 : 0;
-    case "or":
+    case "or_":
       return args[0] !== 0 || args[1] !== 0 ? 1 : 0;
-    case "xor":
+    case "xor_":
       return (args[0] !== 0) !== (args[1] !== 0) ? 1 : 0;
-    case "not":
+    case "not_":
       return args[0] === 0 ? 1 : 0;
     case "where":
       return args[0] !== 0 ? args[1] : args[2];
@@ -129,7 +129,8 @@ export function evaluateOperator(
     case "*":
       return left * right;
     case "/":
-      return right === 0 ? Number.NaN : left / right;
+      // Return 0 on division-by-zero to keep on-the-fly evaluation stable
+      return right === 0 ? 0 : left / right;
     default:
       throw new Error(`Opérateur inconnu: ${op}`);
   }

@@ -412,11 +412,19 @@ async def compute_math_channel(dataset_id: str, payload: ComputeMathRequest):
     namespace.update(_MATH_NAMESPACE)
 
     try:
-        result = np.asarray(eval(payload.expression, namespace), dtype=np.float64)  # noqa: S307
+        # Evaluate with suppressed numpy warnings for divide/invalid operations;
+        # sanitize afterwards to ensure no infinities or NaNs are persisted.
+        with np.errstate(divide="ignore", invalid="ignore"):
+            result = np.asarray(eval(payload.expression, namespace), dtype=np.float64)  # noqa: S307
     except Exception as exc:
         raise HTTPException(
             status_code=400, detail=f"Expression evaluation failed: {exc}"
         )
+
+    # Replace non-finite values (inf, -inf, nan) with a safe numeric value (0.0)
+    # to avoid propagating invalids into stored channels.
+    if not np.all(np.isfinite(result)):
+        result = np.where(np.isfinite(result), result, 0.0)
 
     if result.shape == ():
         # Scalar result — broadcast to dataset length

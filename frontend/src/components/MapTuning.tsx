@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect, useCallback } from "react";
-import { calculateMapTuning } from "../api";
+
 import { ConfigManager } from "../store/ConfigManager";
 import { useHoverToLutCell } from "../hooks/useHoverToLutCell";
 
@@ -12,7 +12,6 @@ interface MapTuningProps {
   availableSignals?: string[];
   datasetId?: string | null;
   onSave?: (data: MapTuningData) => void;
-  onCalculate?: (data: MapTuningData) => void;
   onSignalsUpdated?: () => void;
 }
 
@@ -76,7 +75,6 @@ export default function MapTuning({
   availableSignals = ["RPM", "TPS", "MAP", "Lambda"],
   datasetId = "demo-dataset-123",
   onSave,
-  onCalculate,
   onSignalsUpdated,
 }: MapTuningProps) {
   // State: Configuration
@@ -98,7 +96,6 @@ export default function MapTuning({
 
   // State: UI feedback
   const [isSaving, setIsSaving] = useState(false);
-  const [isCalculating, setIsCalculating] = useState(false);
   const [saveMessage, setSaveMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
   const [savedConfigs, setSavedConfigs] = useState<string[]>([]);
   const [showConfigMenu, setShowConfigMenu] = useState(false);
@@ -294,46 +291,6 @@ export default function MapTuning({
       setSaveMessage({ type: "error", text: "Erreur lors de la sauvegarde." });
     } finally {
       setIsSaving(false);
-    }
-  };
-
-  const handleCalculate = async () => {
-    if (!datasetId) return;
-    setIsCalculating(true);
-    setSaveMessage(null);
-    const data: MapTuningData = { 
-      inputChannelX, 
-      inputChannelY, 
-      outputChannelName, 
-      gridData, 
-      rowHeaders, 
-      colHeaders,
-      braking_signal,
-      gainVal,
-      offsetVal
-    };
-    try {
-      const result: any = await calculateMapTuning({ datasetId, ...data });
-      // Update ConfigManager for cross-tab sync
-      const existingConfigs = ConfigManager.get<Record<string, MapTuningData>>("map-configs") ?? {};
-      ConfigManager.set("map-configs", {
-        ...existingConfigs,
-        [outputChannelName]: data,
-      });
-      setSaveMessage({ 
-        type: "success", 
-        text: `Calcul terminé avec succès (${result.samplesProcessed} points).` 
-      });
-      onCalculate?.(data);
-      // Recalculer tous les maths channels une fois le channel de cartographie calculé
-      onSignalsUpdated?.();
-    } catch (error) {
-      setSaveMessage({ 
-        type: "error", 
-        text: `Erreur lors du calcul: ${error instanceof Error ? error.message : "Inconnue"}` 
-      });
-    } finally {
-      setIsCalculating(false);
     }
   };
 
@@ -597,16 +554,8 @@ export default function MapTuning({
         </div>
 
         <div style={{ display: "flex", gap: "1rem", justifyContent: "flex-end" }}>
-          <button className="small-button" onClick={handleSave} disabled={isSaving || isCalculating}>
+          <button className="small-button" onClick={handleSave} disabled={isSaving}>
             {isSaving ? "⏳ En cours..." : "💾 Sauvegarder"}
-          </button>
-          <button 
-            className="small-button" 
-            style={{ borderColor: "var(--cyan)", background: "rgba(255, 70, 93, 0.3)" }} 
-            onClick={handleCalculate} 
-            disabled={isCalculating || !datasetId}
-          >
-            {isCalculating ? "⏳ Calcul..." : "🔄 Calculer"}
           </button>
         </div>
       </footer>

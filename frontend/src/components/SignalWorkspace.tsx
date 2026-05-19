@@ -1159,16 +1159,29 @@ export default function SignalWorkspace({
 
   function expandSignalsForQuery(signals: string[]): string[] {
     const expanded = new Set<string>();
-    signals.forEach((signal) => {
-      const softMath = softMathOpByName[signal];
+    const visited = new Set<string>();
+
+    function visit(name: string) {
+      if (visited.has(name)) return; // already processed — prevents cycles
+      visited.add(name);
+
+      const softMath = softMathOpByName[name];
       if (softMath) {
-        // Soft math ops are evaluated on-the-fly; expand their dependencies recursively
-        expandSignalsForQuery(softMath.dependencies).forEach((dep) => expanded.add(dep));
+        // Expand dependencies first
+        for (const dep of softMath.dependencies) {
+          visit(dep);
+        }
         return;
       }
+
       // LUT soft ops and raw dataset signals are already in the dataset — query them directly
-      expanded.add(signal);
-    });
+      expanded.add(name);
+    }
+
+    for (const s of signals) {
+      visit(s);
+    }
+
     return Array.from(expanded);
   }
 
