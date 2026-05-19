@@ -331,7 +331,8 @@ async def calculate_map_output(payload: MapTuningRequest):
             payload.outputChannelName,
             payload.braking_signal,
             payload.gainVal,
-            payload.offsetVal
+            payload.offsetVal,
+            payload.interpolation,
         )
 
         # Compute the output channel (assuming LUT2D is callable on the DataFrame directly)

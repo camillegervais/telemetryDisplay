@@ -15,8 +15,9 @@ class LUT2D:
     braking_signal: bool
     gainVal: float
     offsetVal: float
+    interpolation: str
 
-    def __init__(self, x_axis_label, y_axis_label, x_axis_values, y_axis_values, lut_values, output_channel, braking_signal, gainVal, offsetVal):
+    def __init__(self, x_axis_label, y_axis_label, x_axis_values, y_axis_values, lut_values, output_channel, braking_signal, gainVal, offsetVal, interpolation='linear'):
         # Allow 2D LUTs as well as degenerate 1D shapes where one dimension may be 1.
         if lut_values.ndim != 2:
             raise AssertionError('lut_values must be 2D')
@@ -34,6 +35,37 @@ class LUT2D:
         self.braking_signal = braking_signal
         self.gainVal = gainVal
         self.offsetVal = offsetVal
+        self.interpolation = interpolation
+
+    def _clamp_axis_indices(self, values: np.ndarray, axis: np.ndarray, mode: str) -> np.ndarray:
+        if axis.size == 1:
+            return np.zeros(values.shape, dtype=int)
+
+        clipped = np.clip(values, axis[0], axis[-1])
+        if mode == 'floor':
+            indices = np.searchsorted(axis, clipped, side='right') - 1
+        else:
+            right_indices = np.searchsorted(axis, clipped, side='left')
+            right_indices = np.clip(right_indices, 0, axis.size - 1)
+            left_indices = np.clip(right_indices - 1, 0, axis.size - 1)
+            left_delta = np.abs(clipped - axis[left_indices])
+            right_delta = np.abs(axis[right_indices] - clipped)
+            indices = np.where(left_delta <= right_delta, left_indices, right_indices)
+
+        return np.clip(indices, 0, axis.size - 1).astype(int)
+
+    def _apply_discrete_2d(self, x_data: np.ndarray, y_data: np.ndarray, x_vals: np.ndarray, y_vals: np.ndarray, lut: np.ndarray, mode: str) -> np.ndarray:
+        x_indices = self._clamp_axis_indices(x_data, x_vals, mode)
+        y_indices = self._clamp_axis_indices(y_data, y_vals, mode)
+        return lut[x_indices, y_indices]
+
+    def _apply_1d(self, data: np.ndarray, axis: np.ndarray, values: np.ndarray, mode: str) -> np.ndarray:
+        normalized_mode = mode if mode in {'floor', 'nearest', 'linear', 'round'} else 'linear'
+        if normalized_mode == 'linear':
+            return np.interp(data, axis, values, left=values[0], right=values[-1])
+
+        indices = self._clamp_axis_indices(data, axis, 'floor' if normalized_mode == 'floor' else 'round')
+        return values[indices]
 
     def apply2DLUT(self, dataset: dict):
         """ Apply a 2D LUT on dataset's channels with the 2DLUT defined in lut_data """
@@ -60,43 +92,36 @@ class LUT2D:
 
         # Case: full 2D LUT
         if lx == nx and ly == ny:
-            lut_function = RegularGridInterpolator(
-                (x_vals, y_vals),
-                lut,
-                method='linear',
-                bounds_error=False,
-                fill_value=None,
-            )
             x_min, x_max = x_vals.min(), x_vals.max()
             y_min, y_max = y_vals.min(), y_vals.max()
             x_data_clipped = np.clip(x_data, x_min, x_max)
             y_data_clipped = np.clip(y_data, y_min, y_max)
-            input_points = np.column_stack((x_data_clipped, y_data_clipped))
-            output_channel = np.array(lut_function(input_points))
+            mode = self.interpolation if self.interpolation in {'floor', 'nearest', 'linear', 'round'} else 'linear'
+
+            if mode in {'linear', 'nearest'}:
+                lut_function = RegularGridInterpolator(
+                    (x_vals, y_vals),
+                    lut,
+                    method=mode,
+                    bounds_error=False,
+                    fill_value=None,
+                )
+                input_points = np.column_stack((x_data_clipped, y_data_clipped))
+                output_channel = np.array(lut_function(input_points))
+            else:
+                discrete_mode = 'floor' if mode == 'floor' else 'round'
+                output_channel = self._apply_discrete_2d(x_data_clipped, y_data_clipped, x_vals, y_vals, lut, discrete_mode)
 
         # Case: LUT has single row (lx == 1) — treat as 1D over y (use y axis values)
         elif lx == 1 and ly >= 1:
             # Use the single row lut[0, :] indexed by y_vals
             row = lut[0, :]
-            # Interpolate over y axis; clamp outside to border values
-            output_channel = np.interp(
-                y_data,
-                y_vals,
-                row,
-                left=row[0],
-                right=row[-1],
-            )
+            output_channel = self._apply_1d(y_data, y_vals, row, self.interpolation)
 
         # Case: LUT has single column (ly == 1) — treat as 1D over x (use x axis values)
         elif ly == 1 and lx >= 1:
             col = lut[:, 0]
-            output_channel = np.interp(
-                x_data,
-                x_vals,
-                col,
-                left=col[0],
-                right=col[-1],
-            )
+            output_channel = self._apply_1d(x_data, x_vals, col, self.interpolation)
 
         # Fallback: degenerate constant
         else:

@@ -82,6 +82,7 @@ class MapTuningRequest(BaseModel):
     braking_signal: bool
     gainVal: float
     offsetVal: float
+    interpolation: str = "linear"
 
 
 class MapTuningSaveResponse(BaseModel):

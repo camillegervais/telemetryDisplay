@@ -151,7 +151,8 @@ const emptyMapTuningData = {
   colHeaders: [0],
   braking_signal: false,
   gainVal: 1,
-  offsetVal: 0
+  offsetVal: 0,
+  interpolation: "linear" as const,
 };
 
 function isEditableElement(target: EventTarget | null): boolean {
@@ -1284,11 +1285,21 @@ export default function SignalWorkspace({
       const prev = mapConfigsRef.current ?? {};
       const changedKeys: string[] = [];
       const allKeys = new Set<string>([...Object.keys(prev), ...Object.keys(next)]);
+      const fieldsToCheck = ["gridData", "rowHeaders", "colHeaders", "gainVal", "offsetVal", "braking_signal", "interpolation"];
       for (const k of allKeys) {
         const a = prev[k];
         const b = next[k];
-        if (JSON.stringify(a) !== JSON.stringify(b)) {
-          changedKeys.push(k);
+        // Only trigger recalculation when the table values or breakpoints/gain/offset/braking changed.
+        // Ignore changes to axes (inputChannelX/inputChannelY) or outputChannelName.
+        if (a && b) {
+          for (const f of fieldsToCheck) {
+            // Use JSON.stringify for deep comparison
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            if (JSON.stringify((a as any)[f]) !== JSON.stringify((b as any)[f])) {
+              changedKeys.push(k);
+              break;
+            }
+          }
         }
       }
 
@@ -1339,7 +1350,7 @@ export default function SignalWorkspace({
           const latestMapCfgs = mapConfigsRef.current ?? mapConfigs;
           const mapCfg = latestMapCfgs[lutOp.mapConfigKey];
           if (!mapCfg) {
-            throw new Error(`Map "${lutOp.mapConfigKey}" introuvable. Sauvegardez-la d'abord dans l'onglet Tuning Cartos.`);
+            throw new Error(`Map "${lutOp.mapConfigKey}" introuvable. Sauvegardez-la d'abord dans l'onglet Rejeu Cartos.`);
           }
           await calculateMapTuning({
             datasetId,
@@ -1352,6 +1363,7 @@ export default function SignalWorkspace({
             braking_signal: mapCfg.braking_signal,
             gainVal: mapCfg.gainVal,
             offsetVal: mapCfg.offsetVal,
+            interpolation: mapCfg.interpolation ?? "linear",
           });
         } else if (op.kind === "math") {
           const mathOp = op as SoftMathOp;
@@ -2940,7 +2952,7 @@ export default function SignalWorkspace({
         </div>
         <div className={`workspace-tab ${isAnalysisActive ? "workspace-tab-active" : ""}`}>
           <button className="workspace-tab-name" onClick={switchToAnalysisTab}>
-            Tuning Cartos
+            Rejeu Cartos
           </button>
         </div>
         <div className={`workspace-tab ${isSoftActive ? "workspace-tab-active" : ""}`}>
@@ -2988,7 +3000,6 @@ export default function SignalWorkspace({
             availableSignals={availableSignals}
             datasetId={datasetId}
             onSave={(data) => setMapTuningData(data)}
-            onCalculate={(data) => console.log("Map calculated:", data)}
             onSignalsUpdated={onRefreshDatasetMetadata}
           />
         </div>

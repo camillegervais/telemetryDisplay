@@ -90,6 +90,7 @@ export type MapTuningData = {
   braking_signal: boolean;
   gainVal: number;
   offsetVal: number;
+  interpolation: "floor" | "nearest" | "linear" | "round";
 };
 
 export type MapTuningSaveRequest = {
