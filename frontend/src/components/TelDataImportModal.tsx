@@ -262,21 +262,30 @@ export function TelDataImportModal({ configs, onImportFromPath, onCancel }: TelD
               Sélectionner un run ({runs.length})
             </label>
             <div style={{ display: "flex", flexDirection: "column", gap: "0.25rem", maxHeight: "50vh", overflowY: "auto" }}>
-              {runs.map((run) => (
-                <button
-                  key={run.id}
-                  style={{ ...(selectedRunId === run.id ? listItemSelected : listItemBase), paddingLeft: `${0.75 + run.level * 1.2}rem` }}
-                  onClick={() => void handleSelectRun(run.id)}
-                  disabled={loading}
-                >
-                  <span>{run.label}</span>
-                  {run.lap_count > 0 && (
-                    <span style={{ marginLeft: "0.5rem", opacity: 0.5, fontSize: "0.76rem" }}>
-                      {run.lap_count} tour{run.lap_count !== 1 ? "s" : ""}
-                    </span>
-                  )}
-                </button>
-              ))}
+              {loading ? (
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "0.5rem", padding: "1rem", color: "var(--accent)" }}>
+                  <span className="loading-spinner" aria-hidden="true" />
+                  Chargement des runs...
+                </div>
+              ) : runs.length === 0 ? (
+                <div style={{ color: "rgba(255,255,255,0.7)", padding: "1rem" }}>Aucun run trouvé.</div>
+              ) : (
+                runs.map((run) => (
+                  <button
+                    key={run.id}
+                    style={{ ...(selectedRunId === run.id ? listItemSelected : listItemBase), paddingLeft: `${0.75 + run.level * 1.2}rem` }}
+                    onClick={() => void handleSelectRun(run.id)}
+                    disabled={loading}
+                  >
+                    <span>{run.label}</span>
+                    {run.lap_count > 0 && (
+                      <span style={{ marginLeft: "0.5rem", opacity: 0.5, fontSize: "0.76rem" }}>
+                        {run.lap_count} tour{run.lap_count !== 1 ? "s" : ""}
+                      </span>
+                    )}
+                  </button>
+                ))
+              )}
             </div>
             <div style={rowStyle}>
               <button className="small-button" onClick={handleBack} disabled={loading}>Retour</button>
@@ -291,28 +300,37 @@ export function TelDataImportModal({ configs, onImportFromPath, onCancel }: TelD
               Sélectionner un lap ({laps.length})
             </label>
             <div style={{ display: "flex", flexDirection: "column", gap: "0.25rem", maxHeight: "50vh", overflowY: "auto" }}>
-              {laps.map((lap) => (
-                <button
-                  key={lap.id}
-                  style={selectedLapId === lap.id ? listItemSelected : listItemBase}
-                  onClick={() => void handleSelectLap(lap.id)}
-                  disabled={loading}
-                >
-                  <span style={{ display: "flex", justifyContent: "space-between", width: "100%", alignItems: "center" }}>
-                    <span>
-                      <span style={{ opacity: 0.45, marginRight: "0.4rem", fontSize: "0.76rem" }}>#{lap.id}</span>
-                      {lap.driver_name ? (
-                        <strong>{lap.driver_name}</strong>
-                      ) : (
-                        <span style={{ opacity: 0.55 }}>Inconnu</span>
-                      )}
+              {loading ? (
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "0.5rem", padding: "1rem", color: "var(--accent)" }}>
+                  <span className="loading-spinner" aria-hidden="true" />
+                  Chargement des tours...
+                </div>
+              ) : laps.length === 0 ? (
+                <div style={{ color: "rgba(255,255,255,0.7)", padding: "1rem" }}>Aucun tour trouvé.</div>
+              ) : (
+                laps.map((lap) => (
+                  <button
+                    key={lap.id}
+                    style={selectedLapId === lap.id ? listItemSelected : listItemBase}
+                    onClick={() => void handleSelectLap(lap.id)}
+                    disabled={loading}
+                  >
+                    <span style={{ display: "flex", justifyContent: "space-between", width: "100%", alignItems: "center" }}>
+                      <span>
+                        <span style={{ opacity: 0.45, marginRight: "0.4rem", fontSize: "0.76rem" }}>#{lap.id}</span>
+                        {lap.driver_name ? (
+                          <strong>{lap.driver_name}</strong>
+                        ) : (
+                          <span style={{ opacity: 0.55 }}>Inconnu</span>
+                        )}
+                      </span>
+                      <span style={{ opacity: 0.65, fontSize: "0.8rem", fontVariantNumeric: "tabular-nums" }}>
+                        {formatLapTime(lap.lap_time_ms)}
+                      </span>
                     </span>
-                    <span style={{ opacity: 0.65, fontSize: "0.8rem", fontVariantNumeric: "tabular-nums" }}>
-                      {formatLapTime(lap.lap_time_ms)}
-                    </span>
-                  </span>
-                </button>
-              ))}
+                  </button>
+                ))
+              )}
             </div>
             <div style={rowStyle}>
               <button className="small-button" onClick={handleBack} disabled={loading}>Retour</button>
@@ -348,12 +366,18 @@ export function TelDataImportModal({ configs, onImportFromPath, onCancel }: TelD
                 </div>
 
                 {selectedConfig ? (
-                  <div style={{ fontSize: "0.78rem", color: "rgba(255,255,255,0.45)", lineHeight: 1.6 }}>
-                    Canaux: {selectedConfig.channels.join(", ")}
-                  </div>
-                ) : null}
-              </>
-            )}
+              <div style={{ fontSize: "0.78rem", color: "rgba(255,255,255,0.45)", lineHeight: 1.6 }}>
+                Canaux: {selectedConfig.channels.join(", ")}
+              </div>
+            ) : null}
+            {loading ? (
+              <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", padding: "0.75rem 0", color: "var(--accent)" }}>
+                <span className="loading-spinner" aria-hidden="true" />
+                Création du fichier .mat en cours...
+              </div>
+            ) : null}
+          </>
+        )}
 
             <div style={rowStyle}>
               <button className="small-button" onClick={handleBack} disabled={loading}>Retour</button>
