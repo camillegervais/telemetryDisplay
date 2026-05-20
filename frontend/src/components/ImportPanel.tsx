@@ -1,11 +1,11 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type CSSProperties, type KeyboardEvent } from "react";
 
 import { queryDataset } from "../api";
 import { useTelemetryStore } from "../store/telemetryStore";
 import { ConfigManager } from "../store/ConfigManager";
 import { TelDataImportModal } from "./TelDataImportModal";
 
-import type { DatasetMetadata } from "../types";
+import type { DatasetMetadata, MapTuningData } from "../types";
 import type { TelDataImportConfig } from "../types/ConfigTypes";
 
 type ImportPanelProps = {
@@ -23,7 +23,56 @@ type SignalStats = {
   max: number;
 };
 
-import type { MapTuningData } from "../types";
+interface NumberInputProps {
+  value: number;
+  onChange: (val: number) => void;
+  style?: CSSProperties;
+}
+
+function NumberInput({ value, onChange, style }: NumberInputProps) {
+  const [localVal, setLocalVal] = useState<string>(String(value));
+  const [isFocused, setIsFocused] = useState(false);
+
+  useEffect(() => {
+    if (!isFocused) {
+      setLocalVal(String(value));
+    }
+  }, [value, isFocused]);
+
+  const handleBlur = () => {
+    setIsFocused(false);
+    const parsed = parseFloat(localVal.replace(",", "."));
+    if (!isNaN(parsed)) {
+      onChange(parsed);
+      setLocalVal(String(parsed));
+    } else {
+      setLocalVal(String(value));
+    }
+  };
+
+  const handleKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "Enter") {
+      e.currentTarget.blur();
+    }
+  };
+
+  return (
+    <input
+      type="text"
+      inputMode="decimal"
+      value={localVal}
+      onChange={(e) => setLocalVal(e.target.value)}
+      onFocus={(e) => {
+        setIsFocused(true);
+        e.target.select();
+      }}
+      onBlur={handleBlur}
+      onKeyDown={handleKeyDown}
+      className="table-input"
+      style={style}
+    />
+  );
+}
 
 const LAST_MAT_PATH_KEY = "telemetry-display.last-mat-path.v1";
 const LAST_PICKER_PATH_KEY = "telemetry-display.last-picker-path.v1";
@@ -527,12 +576,9 @@ export default function ImportPanel({
                           >
                             −
                           </button>
-                          <input
-                            type="number"
-                            step={0.1}
-                            className="table-input"
+                          <NumberInput
                             value={Number.isFinite(cfg.gainVal ?? 0) ? Number((cfg.gainVal ?? 0).toFixed(3)) : 0}
-                            onChange={(e) => updateMapGain(name, parseFloat(e.target.value))}
+                            onChange={(val) => updateMapGain(name, val)}
                             style={{ width: "80px" }}
                           />
                           <button
@@ -555,12 +601,9 @@ export default function ImportPanel({
                           >
                             −
                           </button>
-                          <input
-                            type="number"
-                            step={0.1}
-                            className="table-input"
+                          <NumberInput
                             value={Number.isFinite(cfg.offsetVal ?? 0) ? Number((cfg.offsetVal ?? 0).toFixed(3)) : 0}
-                            onChange={(e) => updateMapOffset(name, parseFloat(e.target.value))}
+                            onChange={(val) => updateMapOffset(name, val)}
                             style={{ width: "80px" }}
                           />
                           <button
