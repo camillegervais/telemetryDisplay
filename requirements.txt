@@ -8,3 +8,4 @@ pydantic
 python-multipart
 fastf1
 matplotlib
+pywin32

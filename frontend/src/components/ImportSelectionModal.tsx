@@ -29,6 +29,11 @@ export function ImportSelectionModal({ data, onConfirm, onCancel, isLoading = fa
       mode: "add",
       selectedIds: [],
     },
+    telDataConfigs: {
+      enabled: false,
+      mode: "add",
+      selectedIds: [],
+    },
   });
 
   const modalOverlayStyle: CSSProperties = {
@@ -200,6 +205,18 @@ export function ImportSelectionModal({ data, onConfirm, onCancel, isLoading = fa
     }));
   };
 
+  const handleTelDataConfigSelect = (configId: string, checked: boolean) => {
+    setSelection((prev) => ({
+      ...prev,
+      telDataConfigs: {
+        ...prev.telDataConfigs!,
+        selectedIds: checked
+          ? [...(prev.telDataConfigs?.selectedIds || []), configId]
+          : (prev.telDataConfigs?.selectedIds || []).filter((id) => id !== configId),
+      },
+    }));
+  };
+
   const handleConfirm = () => {
     onConfirm(selection);
   };
@@ -274,6 +291,9 @@ export function ImportSelectionModal({ data, onConfirm, onCancel, isLoading = fa
             {data.softBlocks.count > 0 && (
               <div>✓ {data.softBlocks.count} Soft Block{data.softBlocks.count !== 1 ? "s" : ""}</div>
             )}
+            {data.telDataConfigs.count > 0 && (
+              <div>✓ {data.telDataConfigs.count} Config TelData{data.telDataConfigs.count !== 1 ? "s" : ""}</div>
+            )}
           </div>
         </div>
 
@@ -323,6 +343,27 @@ export function ImportSelectionModal({ data, onConfirm, onCancel, isLoading = fa
                   onChange={(e) => handleSoftBlockSelect(block.id, e.target.checked)}
                 />
                 <span>{block.name}</span>
+              </label>
+            ))}
+          </div>
+        ))}
+
+        {/* TelData Configs Section */}
+        {renderSection("Configs TelData", "telDataConfigs", data.telDataConfigs.count, (
+          <div style={itemsListStyle}>
+            {data.telDataConfigs.items.map((cfg) => (
+              <label key={cfg.id} style={itemCheckboxStyle}>
+                <input
+                  type="checkbox"
+                  checked={(selection.telDataConfigs?.selectedIds || []).includes(cfg.id)}
+                  onChange={(e) => handleTelDataConfigSelect(cfg.id, e.target.checked)}
+                />
+                <span>
+                  {cfg.name}
+                  <span style={{ opacity: 0.55, marginLeft: "0.4rem" }}>
+                    ({cfg.channels.length} canaux — {cfg.targetFrequencyHz} Hz)
+                  </span>
+                </span>
               </label>
             ))}
           </div>

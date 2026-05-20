@@ -105,3 +105,47 @@ class ComputeMathRequest(BaseModel):
 class ComputeMathResponse(BaseModel):
     message: str
     samplesProcessed: int
+
+
+# === TelData COM import ===
+
+class TelDataRunInfo(BaseModel):
+    id: int
+    label: str
+    level: int
+    lap_count: int = 0
+
+
+class TelDataLapInfo(BaseModel):
+    id: int
+    label: str
+    driver_name: str = ""
+    lap_time_ms: Optional[int] = None
+
+
+class TelDataOpenRequest(BaseModel):
+    archive_path: str = Field(..., min_length=1)
+
+
+class TelDataOpenResponse(BaseModel):
+    session_id: str
+    runs: List[TelDataRunInfo]
+
+
+class TelDataLapsRequest(BaseModel):
+    run_id: int
+
+
+class TelDataLapsResponse(BaseModel):
+    laps: List[TelDataLapInfo]
+
+
+class TelDataExportRequest(BaseModel):
+    run_id: int
+    lap_id: int
+    channels: List[str] = Field(..., min_length=1)
+    target_frequency_hz: float = Field(default=100.0, gt=0)
+
+
+class TelDataExportResponse(BaseModel):
+    mat_path: str
