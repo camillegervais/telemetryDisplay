@@ -4,7 +4,7 @@
  * Each SoftBlock is an ordered pipeline of operations (math expressions or 2D LUTs).
  * Operations in a block run sequentially; the output of op N is available as input to op N+1.
  */
-import React, { useState, useCallback, useMemo, useRef, useEffect } from "react";
+import React, { useState, useCallback, useMemo, useEffect } from "react";
 import { analyzeMathExpression } from "../mathChannels";
 import { getFunctionDocumentation, getOperatorDocumentation } from "../mathFunctions";
 import type { SoftBlock, SoftOperation, SoftMathOp, SoftLutOp, MapTuningData } from "../types";
@@ -65,38 +65,38 @@ function signalsBeforeOp(
 
 // ── Compact number input ──────────────────────────────────────────────────────
 
-const NumInput: React.FC<{
-  value: number;
-  onChange: (v: number) => void;
-  style?: React.CSSProperties;
-  onPaste?: (e: React.ClipboardEvent<HTMLInputElement>) => void;
-}> = ({ value, onChange, style, onPaste }) => {
-  const [local, setLocal] = useState(String(value));
-  const [focused, setFocused] = useState(false);
+// const NumInput: React.FC<{
+//   value: number;
+//   onChange: (v: number) => void;
+//   style?: React.CSSProperties;
+//   onPaste?: (e: React.ClipboardEvent<HTMLInputElement>) => void;
+// }> = ({ value, onChange, style, onPaste }) => {
+//   const [local, setLocal] = useState(String(value));
+//   const [focused, setFocused] = useState(false);
 
-  useEffect(() => {
-    if (!focused) setLocal(String(value));
-  }, [value, focused]);
+//   useEffect(() => {
+//     if (!focused) setLocal(String(value));
+//   }, [value, focused]);
 
-  return (
-    <input
-      type="text"
-      value={local}
-      style={style}
-      className="table-input"
-      onChange={(e) => setLocal(e.target.value)}
-      onFocus={(e) => { setFocused(true); e.target.select(); }}
-      onBlur={() => {
-        setFocused(false);
-        const v = parseFloat(local.replace(",", "."));
-        if (!isNaN(v)) { onChange(v); setLocal(String(v)); }
-        else setLocal(String(value));
-      }}
-      onKeyDown={(e) => { if (e.key === "Enter") e.currentTarget.blur(); }}
-      onPaste={onPaste}
-    />
-  );
-};
+//   return (
+//     <input
+//       type="text"
+//       value={local}
+//       style={style}
+//       className="table-input"
+//       onChange={(e) => setLocal(e.target.value)}
+//       onFocus={(e) => { setFocused(true); e.target.select(); }}
+//       onBlur={() => {
+//         setFocused(false);
+//         const v = parseFloat(local.replace(",", "."));
+//         if (!isNaN(v)) { onChange(v); setLocal(String(v)); }
+//         else setLocal(String(value));
+//       }}
+//       onKeyDown={(e) => { if (e.key === "Enter") e.currentTarget.blur(); }}
+//       onPaste={onPaste}
+//     />
+//   );
+// };
 
 // ── LUT map reference editor ──────────────────────────────────────────────────
 
@@ -356,7 +356,7 @@ const BlockCard: React.FC<{
   mapConfigs: Record<string, MapTuningData>;
   onSwitchToMapTuning?: () => void;
 }> = ({ block, blockIndex, allBlocks, baseSignals, status, onUpdate, onDelete, onCalculate, mapConfigs, onSwitchToMapTuning }) => {
-  const [collapsed, setCollapsed] = useState(false);
+  const [collapsed, setCollapsed] = useState(true);
   const [nameEdit, setNameEdit] = useState(block.name);
 
   useEffect(() => { setNameEdit(block.name); }, [block.name]);
@@ -391,9 +391,18 @@ const BlockCard: React.FC<{
 
   const statusClass = `soft-block-status-${status.state}`;
 
+  const enabled = block.enabled !== false;
+
   return (
-    <div className="soft-block-card">
+    <div className={`soft-block-card${enabled ? "" : " soft-block-card-disabled"}`}>
       <div className="soft-block-header">
+        <input
+          type="checkbox"
+          className="soft-block-enable-checkbox"
+          checked={enabled}
+          onChange={(e) => onUpdate({ enabled: e.target.checked })}
+          title={enabled ? "Désactiver ce bloc" : "Activer ce bloc"}
+        />
         <button
           className="soft-block-collapse-btn"
           onClick={() => setCollapsed((p) => !p)}
@@ -420,8 +429,8 @@ const BlockCard: React.FC<{
         <button
           className="small-button soft-run-btn"
           onClick={onCalculate}
-          disabled={status.state === "running" || block.operations.length === 0}
-          title="Calculer ce bloc"
+          disabled={!enabled || status.state === "running" || block.operations.length === 0}
+          title={enabled ? "Calculer ce bloc" : "Bloc désactivé"}
         >
           {status.state === "running" ? "…" : "▶ Run"}
         </button>
@@ -485,6 +494,7 @@ export default function SoftTab({
       {
         id: makeId("blk"),
         name: `Bloc ${softBlocks.length + 1}`,
+        enabled: true,
         operations: [],
       },
     ]);

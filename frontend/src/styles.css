@@ -1744,6 +1744,53 @@ body::after {
   }
 }
 
+/* Side panel overflow fixes: ensure content fits and scrolls vertically */
+.global-side-panel {
+  overflow-y: auto;
+  overflow-x: hidden;
+  box-sizing: border-box;
+}
+
+.global-side-panel::-webkit-scrollbar{
+  display: none;
+}
+
+.global-side-panel .panel,
+.global-side-panel .import-submenu-content,
+.global-side-panel .inspector-panel,
+.global-side-panel .inspector-layout,
+.global-side-panel .inspector-grid,
+.global-side-panel .inspector-widget-list {
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+/* Prevent long labels or names from forcing horizontal scroll */
+.global-side-panel .inspector-widget-item span {
+  display: inline-block;
+  max-width: calc(100% - 64px);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Ensure form controls and buttons respect available width */
+.global-side-panel input,
+.global-side-panel select,
+.global-side-panel .mini-select,
+.global-side-panel button {
+  max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+}
+
+/* Allow inner lists/grids to scroll vertically if content is large */
+.global-side-panel .inspector-grid-info,
+.global-side-panel .inspector-widget-list {
+  overflow-y: auto;
+  padding-right: 0.2rem;
+}
+
 @media (prefers-reduced-motion: reduce) {
   body::before,
   body::after,
@@ -2103,6 +2150,25 @@ body::after {
   border-radius: 6px;
   background: rgba(255, 45, 79, 0.04);
   overflow: hidden;
+}
+
+.soft-block-card-disabled {
+  border-color: rgba(255, 255, 255, 0.08);
+  background: rgba(0, 0, 0, 0.05);
+  opacity: 0.5;
+}
+
+.soft-block-card-disabled .soft-block-header {
+  background: rgba(255, 255, 255, 0.03);
+  border-bottom-color: rgba(255, 255, 255, 0.06);
+}
+
+.soft-block-enable-checkbox {
+  flex-shrink: 0;
+  cursor: pointer;
+  accent-color: #ff2d4f;
+  width: 0.9rem;
+  height: 0.9rem;
 }
 
 .soft-block-header {

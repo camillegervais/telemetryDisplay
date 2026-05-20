@@ -1334,6 +1334,7 @@ export default function SignalWorkspace({
     const blocks = blocksSnapshot ?? softBlocksRef.current;
     const block = blocks.find((b) => b.id === blockId);
     if (!block || !datasetId) return;
+    if (block.enabled === false) return;
 
     setSoftBlockStatuses((prev) => ({ ...prev, [blockId]: { state: "running" } }));
 
@@ -1389,6 +1390,7 @@ export default function SignalWorkspace({
     if (!datasetId || blocks.length === 0) return;
     // Run blocks sequentially so each block can reference outputs of the previous one
     for (const block of blocks) {
+      if (block.enabled === false) continue;
       await calculateSoftBlock(block.id, blocks);
     }
   }
@@ -2949,7 +2951,7 @@ export default function SignalWorkspace({
         </div>
         <div className={`workspace-tab ${isAnalysisActive ? "workspace-tab-active" : ""}`}>
           <button className="workspace-tab-name" onClick={switchToAnalysisTab}>
-            Rejeu Cartos
+            Tuning Cartos
           </button>
         </div>
         <div className={`workspace-tab ${isSoftActive ? "workspace-tab-active" : ""}`}>

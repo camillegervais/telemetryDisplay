@@ -77,6 +77,7 @@ export type SoftOperation = SoftMathOp | SoftLutOp;
 export type SoftBlock = {
   id: string;
   name: string;
+  enabled: boolean;
   operations: SoftOperation[];
 };
 
