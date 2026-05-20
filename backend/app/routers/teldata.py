@@ -36,7 +36,7 @@ def open_teldata_session(request: TelDataOpenRequest) -> TelDataOpenResponse:
         session_id, runs = teldata_bridge.open_session(request.archive_path)
         return TelDataOpenResponse(
             session_id=session_id,
-            runs=[TelDataRunInfo(id=r.id, label=r.label, level=r.level) for r in runs],
+            runs=[TelDataRunInfo(id=r.id, label=r.label, level=r.level, lap_count=r.lap_count) for r in runs],
         )
     except RuntimeError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
@@ -50,7 +50,7 @@ def get_laps(session_id: str, request: TelDataLapsRequest) -> TelDataLapsRespons
     try:
         laps = teldata_bridge.get_laps(session_id, request.run_id)
         return TelDataLapsResponse(
-            laps=[TelDataLapInfo(id=lap.id, label=lap.label) for lap in laps],
+            laps=[TelDataLapInfo(id=lap.id, label=lap.label, driver_name=getattr(lap, 'driver_name', ''), lap_time_ms=getattr(lap, 'lap_time_ms', None)) for lap in laps],
         )
     except KeyError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
