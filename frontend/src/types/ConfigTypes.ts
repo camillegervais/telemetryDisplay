@@ -100,6 +100,17 @@ export type UserPreferences = {
 };
 
 /**
+ * Named channel selection config for TelData COM imports.
+ * Several configs can be saved and reused across sessions.
+ */
+export type TelDataImportConfig = {
+  id: string;
+  name: string;
+  channels: string[];
+  targetFrequencyHz: number;
+};
+
+/**
  * All configuration types unified under one structure
  * Keys correspond to localStorage keys (e.g., "telemetry-display.config.layouts")
  */
@@ -117,6 +128,8 @@ export type ConfigStorage = {
   "highlight-lut": CellHighlightInfo | null;
   /** Soft computation blocks (ordered operation pipelines) */
   "soft-blocks": SoftBlock[];
+  /** Named channel configs for TelData COM imports */
+  "teldata-configs": TelDataImportConfig[];
 };
 
 /**
@@ -135,6 +148,7 @@ export const CONFIG_DEFAULTS: ConfigStorage = {
   "current-hover-slap": null,
   "highlight-lut": null,
   "soft-blocks": [],
+  "teldata-configs": [],
 };
 
 /**
@@ -252,6 +266,11 @@ export type ImportSelection = {
     mode: ImportMode;
     selectedIds?: string[];
   };
+  telDataConfigs?: {
+    enabled: boolean;
+    mode: ImportMode;
+    selectedIds?: string[];
+  };
 };
 
 /**
@@ -273,6 +292,10 @@ export type ParsedTomlData = {
   };
   softBlocks: {
     items: SoftBlock[];
+    count: number;
+  };
+  telDataConfigs: {
+    items: TelDataImportConfig[];
     count: number;
   };
   meta?: {

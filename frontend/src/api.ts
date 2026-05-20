@@ -197,3 +197,88 @@ export async function computeMathChannel(
 
   return (await response.json()) as ComputeMathChannelResponse;
 }
+
+// ---------------------------------------------------------------------------
+// TelData COM import
+// ---------------------------------------------------------------------------
+
+export type TelDataRunInfo = {
+  id: number;
+  label: string;
+  level: number;
+  lap_count: number;
+};
+
+export type TelDataLapInfo = {
+  id: number;
+  label: string;
+  driver_name: string;
+  lap_time_ms: number | null;
+};
+
+export type TelDataOpenResponse = {
+  session_id: string;
+  runs: TelDataRunInfo[];
+};
+
+export type TelDataLapsResponse = {
+  laps: TelDataLapInfo[];
+};
+
+export type TelDataExportResponse = {
+  mat_path: string;
+};
+
+export async function openTelDataSession(archivePath: string): Promise<TelDataOpenResponse> {
+  const response = await fetch(`${API_BASE_URL}/teldata/open`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ archive_path: archivePath }),
+  });
+  if (!response.ok) {
+    const payload = await response.json().catch(() => ({ detail: "Failed to open archive" }));
+    throw new Error(payload.detail ?? "Failed to open archive");
+  }
+  return (await response.json()) as TelDataOpenResponse;
+}
+
+export async function getTelDataLaps(sessionId: string, runId: number): Promise<TelDataLapsResponse> {
+  const response = await fetch(`${API_BASE_URL}/teldata/${sessionId}/laps`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ run_id: runId }),
+  });
+  if (!response.ok) {
+    const payload = await response.json().catch(() => ({ detail: "Failed to get laps" }));
+    throw new Error(payload.detail ?? "Failed to get laps");
+  }
+  return (await response.json()) as TelDataLapsResponse;
+}
+
+export async function exportTelData(
+  sessionId: string,
+  runId: number,
+  lapId: number,
+  channels: string[],
+  targetFrequencyHz: number,
+): Promise<TelDataExportResponse> {
+  const response = await fetch(`${API_BASE_URL}/teldata/${sessionId}/export`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      run_id: runId,
+      lap_id: lapId,
+      channels,
+      target_frequency_hz: targetFrequencyHz,
+    }),
+  });
+  if (!response.ok) {
+    const payload = await response.json().catch(() => ({ detail: "Export failed" }));
+    throw new Error(payload.detail ?? "Export failed");
+  }
+  return (await response.json()) as TelDataExportResponse;
+}
+
+export async function closeTelDataSession(sessionId: string): Promise<void> {
+  await fetch(`${API_BASE_URL}/teldata/${sessionId}`, { method: "DELETE" });
+}

@@ -3,8 +3,10 @@ import { useEffect, useMemo, useState } from "react";
 import { queryDataset } from "../api";
 import { useTelemetryStore } from "../store/telemetryStore";
 import { ConfigManager } from "../store/ConfigManager";
+import { TelDataImportModal } from "./TelDataImportModal";
 
 import type { DatasetMetadata } from "../types";
+import type { TelDataImportConfig } from "../types/ConfigTypes";
 
 type ImportPanelProps = {
   importing: boolean;
@@ -67,6 +69,16 @@ export default function ImportPanel({
   const [mapConfigs, setMapConfigs] = useState<Record<string, MapTuningData>>(() =>
     ConfigManager.get<Record<string, MapTuningData>>("map-configs") ?? {}
   );
+  const [telDataSectionOpen, setTelDataSectionOpen] = useState(false);
+  const [telDataConfigsSectionOpen, setTelDataConfigsSectionOpen] = useState(false);
+  const [telDataModalOpen, setTelDataModalOpen] = useState(false);
+  const [telDataConfigs, setTelDataConfigs] = useState<TelDataImportConfig[]>(
+    () => ConfigManager.get<TelDataImportConfig[]>("teldata-configs") ?? []
+  );
+  // Form state for creating a new TelData config
+  const [newConfigName, setNewConfigName] = useState("");
+  const [newConfigChannels, setNewConfigChannels] = useState("");
+  const [newConfigFreq, setNewConfigFreq] = useState("100");
 
 
 
@@ -95,6 +107,14 @@ export default function ImportPanel({
   useEffect(() => {
     const unsubscribe = ConfigManager.subscribe<Record<string, MapTuningData>>("map-configs", (newConfigs) => {
       setMapConfigs(newConfigs ?? {});
+    });
+    return () => unsubscribe();
+  }, []);
+
+  // Sync teldata configs
+  useEffect(() => {
+    const unsubscribe = ConfigManager.subscribe<TelDataImportConfig[]>("teldata-configs", (updated) => {
+      setTelDataConfigs(updated ?? []);
     });
     return () => unsubscribe();
   }, []);
@@ -557,6 +577,139 @@ export default function ImportPanel({
                 ))}
               </div>
             )}
+          </div>
+        ) : null}
+      </div>
+
+      {/* ---- Import TelData ---- */}
+      <div className="import-submenu">
+        <button
+          type="button"
+          className="import-submenu-toggle"
+          onClick={() => setTelDataSectionOpen((p) => !p)}
+        >
+          <span>{telDataSectionOpen ? "▾" : "▸"}</span>
+          <span>Import TelData</span>
+        </button>
+
+        {telDataSectionOpen ? (
+          <div className="import-submenu-content">
+            <button
+              className="import-button"
+              type="button"
+              onClick={() => setTelDataModalOpen(true)}
+            >
+              Ouvrir archive TelData…
+            </button>
+          </div>
+        ) : null}
+      </div>
+
+      {telDataModalOpen ? (
+        <TelDataImportModal
+          configs={telDataConfigs}
+          onImportFromPath={async (matPath) => {
+            setTelDataModalOpen(false);
+            await onImportFromPath(matPath);
+          }}
+          onCancel={() => setTelDataModalOpen(false)}
+        />
+      ) : null}
+
+      {/* ---- Configs TelData ---- */}
+      <div className="import-submenu">
+        <button
+          type="button"
+          className="import-submenu-toggle"
+          onClick={() => setTelDataConfigsSectionOpen((p) => !p)}
+        >
+          <span>{telDataConfigsSectionOpen ? "▾" : "▸"}</span>
+          <span>Configs TelData ({telDataConfigs.length})</span>
+        </button>
+
+        {telDataConfigsSectionOpen ? (
+          <div className="import-submenu-content">
+            {/* Existing configs */}
+            {telDataConfigs.length > 0 ? (
+              <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem", marginBottom: "0.75rem" }}>
+                {telDataConfigs.map((cfg) => (
+                  <div key={cfg.id} style={{ display: "flex", flexDirection: "column", gap: "0.2rem", padding: "0.4rem 0.5rem", border: "1px solid rgba(255,70,93,0.25)", borderRadius: "3px" }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                      <strong style={{ fontSize: "0.82rem" }}>{cfg.name}</strong>
+                      <button
+                        className="small-button"
+                        type="button"
+                        onClick={() => {
+                          const updated = telDataConfigs.filter((c) => c.id !== cfg.id);
+                          ConfigManager.set("teldata-configs", updated);
+                        }}
+                      >
+                        ✕
+                      </button>
+                    </div>
+                    <div style={{ fontSize: "0.76rem", opacity: 0.55 }}>
+                      {cfg.channels.length} canaux — {cfg.targetFrequencyHz} Hz
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="panel-text">Aucune config sauvegardée.</p>
+            )}
+
+            {/* Add new config form */}
+            <div style={{ display: "flex", flexDirection: "column", gap: "0.4rem", borderTop: "1px solid rgba(255,70,93,0.2)", paddingTop: "0.6rem" }}>
+              <label className="field-label">Nom</label>
+              <input
+                className="table-input"
+                type="text"
+                value={newConfigName}
+                onChange={(e) => setNewConfigName(e.target.value)}
+                placeholder="ex: ABS channels"
+                style={{ width: "100%" }}
+              />
+              <label className="field-label">Canaux (un par ligne)</label>
+              <textarea
+                className="table-input"
+                value={newConfigChannels}
+                onChange={(e) => setNewConfigChannels(e.target.value)}
+                placeholder={"cChannel1\ncChannel2\n..."}
+                rows={4}
+                style={{ width: "100%", resize: "vertical", fontFamily: "monospace", fontSize: "0.8rem" }}
+              />
+              <label className="field-label">Fréquence cible (Hz)</label>
+              <input
+                className="table-input"
+                type="number"
+                min={1}
+                max={10000}
+                value={newConfigFreq}
+                onChange={(e) => setNewConfigFreq(e.target.value)}
+                style={{ width: "100%" }}
+              />
+              <button
+                className="import-button"
+                type="button"
+                disabled={!newConfigName.trim() || !newConfigChannels.trim()}
+                onClick={() => {
+                  const channels = newConfigChannels
+                    .split("\n")
+                    .map((s) => s.trim())
+                    .filter(Boolean);
+                  const freq = parseFloat(newConfigFreq);
+                  const updated: TelDataImportConfig[] = [
+                    ...telDataConfigs,
+                    { id: crypto.randomUUID(), name: newConfigName.trim(), channels, targetFrequencyHz: Number.isFinite(freq) ? freq : 100 },
+                  ];
+                  ConfigManager.set("teldata-configs", updated);
+                  setNewConfigName("");
+                  setNewConfigChannels("");
+                  setNewConfigFreq("100");
+                }}
+              >
+                Sauvegarder config
+              </button>
+            </div>
           </div>
         ) : null}
       </div>
