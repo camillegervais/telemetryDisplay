@@ -2579,6 +2579,30 @@ body::after {
   background: rgba(255, 45, 79, 0.07);
 }
 
+/* Export table styling (read-only) */
+.map-tuning-export-table {
+  border-collapse: collapse;
+  width: 100%;
+  background: linear-gradient(160deg, rgba(22, 8, 12, 0.95), rgba(15, 6, 9, 0.86));
+  color: var(--fg-1);
+  font-size: 0.85rem;
+}
+.map-tuning-export-table th,
+.map-tuning-export-table td {
+  border: 1px solid var(--line);
+  padding: 0.25rem 0.4rem;
+  text-align: right;
+}
+.map-tuning-export-table th:first-child,
+.map-tuning-export-table td:first-child {
+  text-align: left;
+  background: var(--bg-3);
+  font-weight: 600;
+}
+.map-tuning-export-table .export-row-header {
+  white-space: nowrap;
+}
+
 .soft-lut-table .table-input {
   width: 3.2rem;
   font-size: 0.68rem;

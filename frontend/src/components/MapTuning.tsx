@@ -102,6 +102,7 @@ export default function MapTuning({
   const [saveMessage, setSaveMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
   const [savedConfigs, setSavedConfigs] = useState<string[]>([]);
   const [showConfigMenu, setShowConfigMenu] = useState(false);
+  const [showExportPanel, setShowExportPanel] = useState<boolean>(false);
 
   // Calcul min/max pour la heatmap
   const { minValue, maxValue } = useMemo(() => {
@@ -160,6 +161,46 @@ export default function MapTuning({
       return newGrid;
     });
   };
+
+  // Export grid with gain & offset applied (readonly view for Excel copy)
+  const exportGrid: number[][] = useMemo(() => {
+    return gridData.map((row) => row.map((v) => (Number.isFinite(v) ? v * gainVal + offsetVal : NaN)));
+  }, [gridData, gainVal, offsetVal]);
+
+  const exportDataToTsv = useCallback(() => {
+    const lines: string[] = [];
+    // header: empty corner + column headers
+    for (let r = 0; r < exportGrid.length; r++) {
+      const row = exportGrid[r];
+      const cells = row.map((v) => (Number.isFinite(v) ? v.toFixed(6) : ""));
+      lines.push(cells.join("\t"));
+    }
+    return lines.join("\n");
+  }, [exportGrid, colHeaders, rowHeaders]);
+
+  const copyXBreakpoints = useCallback(async () => {
+    try {
+      const text = rowHeaders.map((h) => String(h)).join("\n");
+      await navigator.clipboard.writeText(text);
+      setSaveMessage({ type: "success", text: "Breakpoints X copiés." });
+      setTimeout(() => setSaveMessage(null), 1500);
+    } catch {
+      setSaveMessage({ type: "error", text: "Impossible de copier les breakpoints X." });
+      setTimeout(() => setSaveMessage(null), 1500);
+    }
+  }, [inputChannelX, rowHeaders]);
+
+  const copyYBreakpoints = useCallback(async () => {
+    try {
+      const text = colHeaders.map((h) => String(h)).join("\t");
+      await navigator.clipboard.writeText(text);
+      setSaveMessage({ type: "success", text: "Breakpoints Y copiés." });
+      setTimeout(() => setSaveMessage(null), 1500);
+    } catch {
+      setSaveMessage({ type: "error", text: "Impossible de copier les breakpoints Y." });
+      setTimeout(() => setSaveMessage(null), 1500);
+    }
+  }, [inputChannelY, colHeaders]);
 
   // ============================================================================
   // LOGIQUE DE COPIER-COLLER EXCEL
@@ -430,6 +471,8 @@ export default function MapTuning({
         </div>
       </section>
 
+      
+
       {/* Bibliothèque Locale */}
       <section className="map-tuning-section" style={{ position: "relative" }}>
         <h3>Bibliothèque de Sauvegardes (LocalStorage)</h3>
@@ -603,11 +646,70 @@ export default function MapTuning({
           <span style={{ marginLeft: "auto", fontStyle: "italic", fontSize: "0.7rem" }}>Astuce: Ctrl+V pour coller depuis Excel sur une cellule ou un en-tête.</span>
         </div>
 
-        <div style={{ display: "flex", gap: "1rem", justifyContent: "flex-end" }}>
-          <button className="small-button" onClick={handleSave} disabled={isSaving}>
-            {isSaving ? "⏳ En cours..." : "💾 Sauvegarder"}
-          </button>
+        <div style={{ display: "flex", gap: "1rem", justifyContent: "flex-end", alignItems: "center" }}>
+          <div style={{ display: "flex", gap: "0.5rem", alignItems: "center" }}>
+            <button className="small-button" onClick={handleSave} disabled={isSaving}>
+              {isSaving ? "⏳ En cours..." : "💾 Sauvegarder"}
+            </button>
+            <button
+              className="small-button"
+              onClick={() => setShowExportPanel((s) => !s)}
+              aria-expanded={showExportPanel}
+            >
+              {showExportPanel ? "Masquer export" : "Afficher export"}
+            </button>
+          </div>
         </div>
+
+        {showExportPanel && (
+          <div style={{ marginTop: "0.5rem" }}>
+            <div style={{ display: "flex", gap: "0.5rem", marginBottom: "0.5rem", alignItems: "center" }}>
+              <button
+                className="small-button"
+                onClick={async () => {
+                  try {
+                    const tsv = exportDataToTsv();
+                    await navigator.clipboard.writeText(tsv);
+                    setSaveMessage({ type: "success", text: "Table copiée dans le presse-papiers." });
+                    setTimeout(() => setSaveMessage(null), 1500);
+                  } catch {
+                    setSaveMessage({ type: "error", text: "Impossible de copier la table." });
+                    setTimeout(() => setSaveMessage(null), 1500);
+                  }
+                }}
+              >
+                Copier valeurs
+              </button>
+
+              <button className="small-button" onClick={copyXBreakpoints}>Copier breakpoints X</button>
+              <button className="small-button" onClick={copyYBreakpoints}>Copier breakpoints Y</button>
+              <span style={{ marginLeft: "auto", fontSize: "0.85rem", color: "var(--fg-2)" }}>Valeurs = cell * gain + offset</span>
+            </div>
+
+            <div style={{ overflowX: "auto" }}>
+              <table className="map-tuning-export-table">
+                <thead>
+                  <tr>
+                    <th>{inputChannelX} \ {inputChannelY}</th>
+                    {colHeaders.map((h, i) => (
+                      <th key={i}>{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {exportGrid.map((rowVals, rIdx) => (
+                    <tr key={rIdx}>
+                      <td className="export-row-header">{rowHeaders[rIdx]}</td>
+                      {rowVals.map((v, cIdx) => (
+                        <td key={cIdx}>{Number.isFinite(v) ? v.toFixed(6) : ""}</td>
+                      ))}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
       </footer>
     </div>
   );
