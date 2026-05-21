@@ -8,7 +8,7 @@ import {
   importDataset,
   importDatasetFromPath,
 } from "./api";
-import { ImportPanel, SignalWorkspace, ConfigExportImport } from "./components";
+import { ImportPanel, SignalWorkspace, ConfigExportImport, SignalColorManager } from "./components";
 import { useTelemetryStore } from "./store/telemetryStore";
 import { ConfigManager } from "./store/ConfigManager";
 import type { DatasetMetadata, TrackMapResponse } from "./types";
@@ -777,6 +777,7 @@ export default function App() {
             {panelMode === "data" ? "Graphe Perso" : "Data Hub"}
           </button>
             {panelMode === "data" ? (
+              <>
                 <ImportPanel
                   importing={importing}
                   datasetId={datasetId}
@@ -784,6 +785,8 @@ export default function App() {
                   onImport={handleImport}
                   onImportFromPath={handleImportFromPath}
                 />
+                <SignalColorManager />
+              </>
             ) : (
               inspectorPanel
             )}
@@ -813,11 +816,14 @@ export default function App() {
         )}
         {!graphOnlyMode && panelSide === "right" ? (
           <div className="global-side-panel">
+            <button
+            className="panel-button"
+            onClick={() => setPanelMode((prev) => (prev === "data" ? "inspector" : "data"))}
+          >
+            {panelMode === "data" ? "Graphe Perso" : "Data Hub"}
+          </button>
             {panelMode === "data" ? (
               <>
-                <ConfigExportImport
-                  onImportSuccess={refreshDatasetMetadata}
-                />
                 <ImportPanel
                   importing={importing}
                   datasetId={datasetId}
@@ -825,6 +831,7 @@ export default function App() {
                   onImport={handleImport}
                   onImportFromPath={handleImportFromPath}
                 />
+                <SignalColorManager />
               </>
             ) : (
               inspectorPanel

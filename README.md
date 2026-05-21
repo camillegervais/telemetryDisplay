@@ -124,3 +124,16 @@ Lors du développement de l'application, des mises à jour régulières seront d
 6. `git checkout {nom de la branche}` avec le nom de la branche donné dans le message indiquant la mise à jour (étape souvent optionnelle)
 7. `git pull` 
 8. Relancez l'application avec le script `Telemetry Display.sh`
+
+Si besoin de mettre à jour les bibliothèques Python:
+
+1. `source .venv/Scripts/activate`
+2. `python -m pip install -r requirements.txt`
+3. `deactivate`
+
+Si besoin de mettre à jours les dépendances Node:
+
+1. `npm install`
+2. `cd frontend`
+3. `npm install`
+4. `cd ..`

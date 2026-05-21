@@ -373,6 +373,7 @@ class ConfigManagerClass {
       "current-map-config": this.storage["current-map-config"],
       "user-preferences": this.storage["user-preferences"],
       "soft-blocks": this.storage["soft-blocks"],
+      "signal-colors": this.storage["signal-colors"],
     };
 
     return TOML.stringify(exportData);
@@ -390,6 +391,7 @@ class ConfigManagerClass {
       const mathChannels = (parsed["math-channels"] as ConfigStorage["math-channels"]) || [];
       const mapConfigs = (parsed["map-configs"] as ConfigStorage["map-configs"]) || {};
       const softBlocks = (parsed["soft-blocks"] as ConfigStorage["soft-blocks"]) || [];
+      const signalColors = (parsed["signal-colors"] as ConfigStorage["signal-colors"]) || {};
       const meta = parsed._meta as { version?: string; exportDate?: string } | undefined;
 
       return {
@@ -409,6 +411,10 @@ class ConfigManagerClass {
         softBlocks: {
           items: softBlocks,
           count: softBlocks.length,
+        },
+        signalColors: {
+          items: signalColors,
+          count: Object.keys(signalColors).length,
         },
         meta: {
           version: meta?.version || "1.0",
@@ -505,6 +511,18 @@ class ConfigManagerClass {
         }
       }
 
+      // Handle signal colors
+      if (selection.signalColors?.enabled) {
+        if (selection.signalColors.mode === "replace") {
+          updates["signal-colors"] = data.signalColors.items;
+        } else {
+          updates["signal-colors"] = {
+            ...this.storage["signal-colors"],
+            ...data.signalColors.items,
+          };
+        }
+      }
+
       // Apply all updates
       for (const [key, value] of Object.entries(updates)) {
         if (value !== undefined) {
@@ -538,6 +556,7 @@ class ConfigManagerClass {
         "current-map-config": (parsed["current-map-config"] as ConfigStorage["current-map-config"]) || this.storage["current-map-config"],
         "user-preferences": (parsed["user-preferences"] as ConfigStorage["user-preferences"]) || this.storage["user-preferences"],
         "soft-blocks": (parsed["soft-blocks"] as ConfigStorage["soft-blocks"]) || this.storage["soft-blocks"],
+        "signal-colors": (parsed["signal-colors"] as ConfigStorage["signal-colors"]) || this.storage["signal-colors"],
         "dataset-id": this.storage["dataset-id"], // Keep current dataset
       };
 

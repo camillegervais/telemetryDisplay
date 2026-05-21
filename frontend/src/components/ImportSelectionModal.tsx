@@ -29,6 +29,10 @@ export function ImportSelectionModal({ data, onConfirm, onCancel, isLoading = fa
       mode: "add",
       selectedIds: [],
     },
+    signalColors: {
+      enabled: false,
+      mode: "add",
+    },
   });
 
   const modalOverlayStyle: CSSProperties = {
@@ -274,6 +278,9 @@ export function ImportSelectionModal({ data, onConfirm, onCancel, isLoading = fa
             {data.softBlocks.count > 0 && (
               <div>✓ {data.softBlocks.count} Soft Block{data.softBlocks.count !== 1 ? "s" : ""}</div>
             )}
+            {data.signalColors.count > 0 && (
+              <div>✓ {data.signalColors.count} Couleur{data.signalColors.count !== 1 ? "s" : ""} Signal</div>
+            )}
           </div>
         </div>
 
@@ -327,6 +334,9 @@ export function ImportSelectionModal({ data, onConfirm, onCancel, isLoading = fa
             ))}
           </div>
         ))}
+
+        {/* Signal Colors Section */}
+        {renderSection("Couleurs Signaux", "signalColors", data.signalColors.count)}
 
         {/* Footer */}
         <div style={footerStyle}>

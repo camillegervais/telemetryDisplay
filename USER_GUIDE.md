@@ -90,6 +90,12 @@ Once imported:
 **XY Plot**: One signal vs. another (scatter/trajectory)
 - X-axis = first signal, Y-axis = second signal
 
+### Signal color
+
+If nothing is set up, the usual color sequence is used and the order is the order in which you drop the signals in the graph.
+
+At the bottom of the `Import Panel` you can associate a color with a signal's name so that each time youdrop a signal with that name on a graph, the signal trace has the selected color.
+
 ## 3. Interactive Controls & Navigation
 
 ### Zooming & Panning

@@ -117,6 +117,8 @@ export type ConfigStorage = {
   "highlight-lut": CellHighlightInfo | null;
   /** Soft computation blocks (ordered operation pipelines) */
   "soft-blocks": SoftBlock[];
+  /** Signal name to color mapping (hex format) */
+  "signal-colors": Record<string, string>;
 };
 
 /**
@@ -135,6 +137,7 @@ export const CONFIG_DEFAULTS: ConfigStorage = {
   "current-hover-slap": null,
   "highlight-lut": null,
   "soft-blocks": [],
+  "signal-colors": {},
 };
 
 /**
@@ -252,6 +255,10 @@ export type ImportSelection = {
     mode: ImportMode;
     selectedIds?: string[];
   };
+  signalColors?: {
+    enabled: boolean;
+    mode: ImportMode;
+  };
 };
 
 /**
@@ -273,6 +280,10 @@ export type ParsedTomlData = {
   };
   softBlocks: {
     items: SoftBlock[];
+    count: number;
+  };
+  signalColors: {
+    items: Record<string, string>;
     count: number;
   };
   meta?: {

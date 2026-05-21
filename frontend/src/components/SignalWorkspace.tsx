@@ -476,7 +476,8 @@ function buildChartConfig(
   homeRevision: number,
   yAxisMatchMode: "off" | YAxisMatchMode,
   xAxisMode: "distance" | "time",
-  options?: WidgetOptions
+  options?: WidgetOptions,
+  signalColors?: Record<string, string>
 ) {
   if (!series || selectedSignals.length === 0) {
     return {
@@ -519,6 +520,16 @@ function buildChartConfig(
       yValues = yValues.map((v, i) => brakeValues[i] !== 0 ? v : NaN);
     }
 
+    // Determine color: use signal-specific color if available, else use default palette
+    let color: string;
+    if (signalColors && signalColors[signal]) {
+      color = signalColors[signal];
+    } else {
+      // Count how many signals without custom color come before this one
+      const colorIndex = selectedSignals.slice(0, index).filter(s => !signalColors || !signalColors[s]).length;
+      color = COLORS[colorIndex % COLORS.length];
+    }
+
     return {
       type: "scatter" as const,
       mode: "lines" as const,
@@ -526,7 +537,7 @@ function buildChartConfig(
       x: xValues,
       y: yValues,
       line: {
-        color: COLORS[index % COLORS.length],
+        color: color,
         width: 2,
       },
       yaxis: useSharedYAxis ? "y" : index === 0 ? "y" : `y${index + 1}`,
@@ -637,7 +648,8 @@ function buildXYChartConfig(
   ySignals: string[],
   graphOnlyMode: boolean,
   homeRevision: number,
-  options?: WidgetOptions
+  options?: WidgetOptions,
+  signalColors?: Record<string, string>
 ) {
   if (!series || !xSignal || ySignals.length === 0) {
     return {
@@ -667,6 +679,16 @@ function buildXYChartConfig(
       yValues = yValues.map((v, i) => brakeValues[i] !== 0 ? v : NaN);
     }
 
+    // Determine color: use signal-specific color if available, else use default palette
+    let color: string;
+    if (signalColors && signalColors[signal]) {
+      color = signalColors[signal];
+    } else {
+      // Count how many signals without custom color come before this one
+      const colorIndex = ySignals.slice(0, index).filter(s => !signalColors || !signalColors[s]).length;
+      color = COLORS[colorIndex % COLORS.length];
+    }
+
     return {
       type: "scatter" as const,
       mode: "markers" as const,
@@ -674,7 +696,7 @@ function buildXYChartConfig(
       x: xValues,
       y: yValues,
       marker: {
-        color: COLORS[index % COLORS.length],
+        color: color,
         size: 5,
         opacity: 0.8,
       },
@@ -827,6 +849,7 @@ export default function SignalWorkspace({
   const [softBlocks, setSoftBlocks] = useState<SoftBlock[]>(() => ConfigManager.get<SoftBlock[]>("soft-blocks") ?? []);
   const [softBlockStatuses, setSoftBlockStatuses] = useState<Record<string, BlockStatus>>({});
   const softBlocksRef = useRef(softBlocks);
+  const [signalColors, setSignalColors] = useState<Record<string, string>>(() => ConfigManager.get<Record<string, string>>("signal-colors") ?? {});
   const gridRef = useRef<HTMLDivElement | null>(null);
   const queryGenerationRef = useRef(0);
   const tabSwitchGenerationRef = useRef(0);
@@ -842,6 +865,13 @@ export default function SignalWorkspace({
   useEffect(() => {
     softBlocksRef.current = softBlocks;
   }, [softBlocks]);
+
+  // Subscribe to signal-colors changes from ConfigManager
+  useEffect(() => {
+    return ConfigManager.subscribe("signal-colors", (updatedColors) => {
+      setSignalColors(updatedColors as Record<string, string>);
+    });
+  }, []);
 
   // Helper function to update widgets and sync to tabs
   function updateWidgetsAndTabs(updater: (prev: GraphWidget[]) => GraphWidget[]): void {
@@ -3041,7 +3071,8 @@ export default function SignalWorkspace({
                   widget.signals,
                   graphOnlyMode,
                   homeRevision,
-                  widget.options
+                  widget.options,
+                  signalColors
                 )
               : buildChartConfig(
                   widget.title,
@@ -3053,7 +3084,8 @@ export default function SignalWorkspace({
                   homeRevision,
                   getWidgetYAxisMatchMode(widget),
                   xAxisMode,
-                  widget.options
+                  widget.options,
+                  signalColors
                 );
 
           return (
