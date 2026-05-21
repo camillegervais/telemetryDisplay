@@ -3003,7 +3003,7 @@ export default function SignalWorkspace({
                 Chargement...
               </div>
             ) : null}
-            {trajectoryError ? <p className="panel-text">{trajectoryError}</p> : null}
+            {trajectoryError ? <p className="panel-text" style={{height: '100%', alignContent: 'center'}}>{trajectoryError}</p> : null}
             {!trajectoryLoading && !trajectoryError && !trajectoryChart.hasCar ? (
               <div className="placeholder-graph" aria-label="Trajectoire indisponible">
                 <div className="placeholder-graph-mark">!</div>
