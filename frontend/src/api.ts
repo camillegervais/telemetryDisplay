@@ -229,6 +229,23 @@ export type TelDataExportResponse = {
   mat_path: string;
 };
 
+export type TelDataChannelsResponse = {
+  channels: string[];
+};
+
+export async function getTelDataChannels(sessionId: string, runId: number, lapId: number): Promise<TelDataChannelsResponse> {
+  const response = await fetch(`${API_BASE_URL}/teldata/${sessionId}/channels`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ run_id: runId, lap_id: lapId }),
+  });
+  if (!response.ok) {
+    const payload = await response.json().catch(() => ({ detail: "Failed to get channels" }));
+    throw new Error(payload.detail ?? "Failed to get channels");
+  }
+  return (await response.json()) as TelDataChannelsResponse;
+}
+
 export async function openTelDataSession(archivePath: string): Promise<TelDataOpenResponse> {
   const response = await fetch(`${API_BASE_URL}/teldata/open`, {
     method: "POST",

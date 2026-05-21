@@ -20,6 +20,8 @@ from app.schemas import (
     TelDataOpenRequest,
     TelDataOpenResponse,
     TelDataRunInfo,
+    TelDataChannelsRequest,
+    TelDataChannelsResponse,
 )
 from app.services import teldata_bridge
 
@@ -58,6 +60,19 @@ def get_laps(session_id: str, request: TelDataLapsRequest) -> TelDataLapsRespons
         raise HTTPException(status_code=422, detail=str(exc)) from exc
     except Exception as exc:
         raise HTTPException(status_code=500, detail=f"Failed to get laps: {exc}") from exc
+
+
+@router.post("/{session_id}/channels", response_model=TelDataChannelsResponse)
+def get_channels_route(session_id: str, request: TelDataChannelsRequest) -> TelDataChannelsResponse:
+    try:
+        channels = teldata_bridge.get_channels(session_id, request.run_id, request.lap_id)
+        return TelDataChannelsResponse(channels=channels)
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Failed to get channels: {exc}") from exc
 
 
 @router.post("/{session_id}/export", response_model=TelDataExportResponse)

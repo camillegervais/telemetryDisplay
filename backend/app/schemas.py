@@ -140,6 +140,15 @@ class TelDataLapsResponse(BaseModel):
     laps: List[TelDataLapInfo]
 
 
+class TelDataChannelsRequest(BaseModel):
+    run_id: int
+    lap_id: int
+
+
+class TelDataChannelsResponse(BaseModel):
+    channels: List[str]
+
+
 class TelDataExportRequest(BaseModel):
     run_id: int
     lap_id: int

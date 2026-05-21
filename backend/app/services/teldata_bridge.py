@@ -221,6 +221,50 @@ def get_laps(session_id: str, run_id: int) -> List[LapInfo]:
         pythoncom.CoUninitialize()
 
 
+def get_channels(session_id: str, run_id: int, lap_id: int) -> List[str]:
+    """Return available channel names (original casing) for the specified run/lap."""
+    _require_com()
+    session = _sessions.get(session_id)
+    if session is None:
+        raise KeyError(f"Session not found: {session_id}")
+
+    pythoncom.CoInitialize()
+    try:
+        main_obj = _open_archive(session.archive_path)
+        run = _navigate_to_run(main_obj, run_id)
+        if run is None:
+            raise ValueError(f"Run id {run_id} not found in archive")
+
+        lap_count = run.GetLapCount()
+        if lap_id < 0 or lap_id >= lap_count:
+            raise ValueError(f"Lap id {lap_id} out of range [0, {lap_count - 1}]")
+
+        lap = run.GetLap(lap_id)
+        lap = win32com.client.Dispatch(lap.QueryInterface(pythoncom.IID_IDispatch))
+
+        chan_count = lap.GetChanCount()
+        channels: List[str] = []
+        for c in range(chan_count):
+            chan = lap.GetChan(c)
+            chan = win32com.client.Dispatch(chan.QueryInterface(pythoncom.IID_IDispatch))
+            # prefer .Name property when available
+            try:
+                name = getattr(chan, "Name", None)
+            except Exception:
+                name = None
+            if not name:
+                # fallback to reading a property if Name missing
+                try:
+                    name = chan.GetPropertyName(0)
+                except Exception:
+                    name = f"chan_{c}"
+            channels.append(str(name))
+
+        return channels
+    finally:
+        pythoncom.CoUninitialize()
+
+
 def export_lap(
     session_id: str,
     run_id: int,
