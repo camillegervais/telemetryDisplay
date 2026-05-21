@@ -22,10 +22,10 @@ type RpnToken =
   | { type: "number"; value: number }
   | { type: "identifier"; value: string }
   | { type: "operator"; value: OperatorName }
-  | { type: "function"; name: FunctionName; arity: 1 | 2 };
+  | { type: "function"; name: FunctionName; arity: 1 | 2 | 3 };
 
-function getSupportedFunctions(): Record<string, 1 | 2> {
-  const result: Record<string, 1 | 2> = {};
+function getSupportedFunctions(): Record<string, 1 | 2 | 3> {
+  const result: Record<string, 1 | 2 | 3> = {};
   Object.entries(FUNCTIONS).forEach(([name, def]) => {
     result[name] = def.arity;
   });

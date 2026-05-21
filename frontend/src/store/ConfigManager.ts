@@ -18,10 +18,13 @@ import * as TOML from "smol-toml";
 import {
   CONFIG_DEFAULTS,
   type ConfigStorage,
+  type ImportSelection,
+  type ParsedTomlData,
   getNestedValue,
   isValidConfigKey,
   setNestedValue,
 } from "../types/ConfigTypes";
+import type { MapTuningData } from "../types";
 
 type SubscriberCallback<T = unknown> = (newValue: T) => void;
 type Subscribers = Map<string, Set<SubscriberCallback>>;
@@ -369,9 +372,154 @@ class ConfigManagerClass {
       "map-configs": this.storage["map-configs"],
       "current-map-config": this.storage["current-map-config"],
       "user-preferences": this.storage["user-preferences"],
+      "soft-blocks": this.storage["soft-blocks"],
     };
 
     return TOML.stringify(exportData);
+  }
+
+  /**
+   * Parse TOML for import preview without applying changes
+   * Returns structured data with metadata for selective import UI
+   */
+  public parseTomlForImport(tomlString: string): ParsedTomlData {
+    try {
+      const parsed = TOML.parse(tomlString) as Record<string, unknown>;
+
+      const layouts = (parsed.layouts as ConfigStorage["layouts"]) || [];
+      const mathChannels = (parsed["math-channels"] as ConfigStorage["math-channels"]) || [];
+      const mapConfigs = (parsed["map-configs"] as ConfigStorage["map-configs"]) || {};
+      const softBlocks = (parsed["soft-blocks"] as ConfigStorage["soft-blocks"]) || [];
+      const meta = parsed._meta as { version?: string; exportDate?: string } | undefined;
+
+      return {
+        layouts: {
+          items: layouts,
+          count: layouts.length,
+        },
+        mathChannels: {
+          items: mathChannels,
+          count: mathChannels.length,
+        },
+        mapConfigs: {
+          items: mapConfigs,
+          keys: Object.keys(mapConfigs),
+          count: Object.keys(mapConfigs).length,
+        },
+        softBlocks: {
+          items: softBlocks,
+          count: softBlocks.length,
+        },
+        meta: {
+          version: meta?.version || "1.0",
+          exportDate: meta?.exportDate || new Date().toISOString(),
+        },
+      };
+    } catch (error) {
+      throw new Error(
+        `Failed to parse TOML configuration: ${error instanceof Error ? error.message : String(error)}`
+      );
+    }
+  }
+
+  /**
+   * Import configurations from TOML with selective options
+   * Allows partial imports with merge or replace modes
+   */
+  public importFromTomlPartial(data: ParsedTomlData, selection: ImportSelection): void {
+    try {
+      // Helper function to merge arrays by deduplicating on a key
+      const mergeArrays = <T extends Record<string, unknown>>(
+        existing: T[],
+        imported: T[],
+        keyField: keyof T = "id" as keyof T
+      ): T[] => {
+        const existingMap = new Map(existing.map((item) => [item[keyField], item]));
+        imported.forEach((item) => {
+          existingMap.set(item[keyField], item);
+        });
+        return Array.from(existingMap.values());
+      };
+
+      const updates: Partial<ConfigStorage> = {};
+
+      // Handle layouts
+      if (selection.layouts?.enabled) {
+        const selectedLayouts = selection.layouts.selectedIds
+          ? data.layouts.items.filter((l) => selection.layouts?.selectedIds?.includes(l.id))
+          : data.layouts.items;
+
+        if (selection.layouts.mode === "replace") {
+          updates.layouts = selectedLayouts;
+        } else {
+          updates.layouts = mergeArrays(this.storage.layouts, selectedLayouts, "id");
+        }
+      }
+
+      // Handle math channels
+      if (selection.mathChannels?.enabled) {
+        if (selection.mathChannels.mode === "replace") {
+          updates["math-channels"] = data.mathChannels.items;
+        } else {
+          updates["math-channels"] = mergeArrays(
+            this.storage["math-channels"],
+            data.mathChannels.items,
+            "name"
+          );
+        }
+      }
+
+      // Handle map configs
+      if (selection.mapConfigs?.enabled) {
+        const selectedKeys = selection.mapConfigs.selectedKeys && selection.mapConfigs.selectedKeys.length > 0
+          ? selection.mapConfigs.selectedKeys
+          : data.mapConfigs.keys;
+        const selectedConfigs = Object.fromEntries(
+          selectedKeys.map((key) => [key, data.mapConfigs.items[key]]).filter(([, v]) => v)
+        );
+
+        if (selection.mapConfigs.mode === "replace") {
+          updates["map-configs"] = selectedConfigs as Record<string, MapTuningData>;
+        } else {
+          updates["map-configs"] = {
+            ...this.storage["map-configs"],
+            ...selectedConfigs,
+          };
+        }
+      }
+
+      // Handle soft blocks
+      if (selection.softBlocks?.enabled) {
+        const selectedBlocks = selection.softBlocks.selectedIds && selection.softBlocks.selectedIds.length > 0
+          ? data.softBlocks.items.filter((block) => selection.softBlocks?.selectedIds?.includes(block.id))
+          : data.softBlocks.items;
+
+        if (selection.softBlocks.mode === "replace") {
+          updates["soft-blocks"] = selectedBlocks;
+        } else {
+          updates["soft-blocks"] = mergeArrays(
+            this.storage["soft-blocks"],
+            selectedBlocks,
+            "id"
+          );
+        }
+      }
+
+      // Apply all updates
+      for (const [key, value] of Object.entries(updates)) {
+        if (value !== undefined) {
+          const storageKey = key as keyof ConfigStorage;
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          (this.storage as any)[storageKey] = value;
+          this.saveToLocalStorage(storageKey, value as ConfigStorage[typeof storageKey]);
+          this.notifySubscribers(key, value);
+        }
+      }
+    } catch (error) {
+      throw new Error(
+        `Failed to import TOML configuration: ${error instanceof Error ? error.message : String(error)}`
+      );
+    }
   }
 
   /**
@@ -389,6 +537,7 @@ class ConfigManagerClass {
         "map-configs": (parsed["map-configs"] as ConfigStorage["map-configs"]) || this.storage["map-configs"],
         "current-map-config": (parsed["current-map-config"] as ConfigStorage["current-map-config"]) || this.storage["current-map-config"],
         "user-preferences": (parsed["user-preferences"] as ConfigStorage["user-preferences"]) || this.storage["user-preferences"],
+        "soft-blocks": (parsed["soft-blocks"] as ConfigStorage["soft-blocks"]) || this.storage["soft-blocks"],
         "dataset-id": this.storage["dataset-id"], // Keep current dataset
       };
 

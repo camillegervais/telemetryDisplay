@@ -3,7 +3,7 @@ from pydantic import BaseModel
 
 class AppConfig(BaseModel):
     # Spatial sampling reference in meters between two points.
-    reference_distance_step_m: float = 1.0
+    reference_distance_step_m: float = 0.3
     min_distance_step_m: float = 0.01
     max_distance_step_m: float = 20.0
 

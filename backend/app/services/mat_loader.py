@@ -41,7 +41,7 @@ class DatasetMetadata:
 class MatLoader:
     """Load, validate, and normalize .mat files with spatial resampling."""
 
-    def __init__(self, reference_step_m: float = 1.0):
+    def __init__(self, reference_step_m: float = 0.3):
         self.reference_step_m = reference_step_m
         self.loaded_datasets: Dict[str, Tuple[pd.DataFrame, DatasetMetadata]] = {}
 

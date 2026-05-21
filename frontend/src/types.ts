@@ -55,6 +55,32 @@ export type MathChannel = {
   dependencies: string[];
 };
 
+// ── Soft Blocks ─────────────────────────────────────────────────────────────
+
+export type SoftMathOp = {
+  id: string;
+  kind: "math";
+  name: string;          // output signal name
+  expression: string;
+  dependencies: string[]; // parsed from expression
+};
+
+export type SoftLutOp = {
+  id: string;
+  kind: "lut2d";
+  name: string;          // output signal name (overrides map's outputChannelName)
+  mapConfigKey: string;  // key in ConfigManager "map-configs" Record<string, MapTuningData>
+};
+
+export type SoftOperation = SoftMathOp | SoftLutOp;
+
+export type SoftBlock = {
+  id: string;
+  name: string;
+  enabled: boolean;
+  operations: SoftOperation[];
+};
+
 export type MapTuningData = {
   inputChannelX: string;
   inputChannelY: string;
@@ -65,6 +91,7 @@ export type MapTuningData = {
   braking_signal: boolean;
   gainVal: number;
   offsetVal: number;
+  interpolation: "floor" | "nearest" | "linear" | "round";
 };
 
 export type MapTuningSaveRequest = {

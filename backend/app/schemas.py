@@ -82,6 +82,7 @@ class MapTuningRequest(BaseModel):
     braking_signal: bool
     gainVal: float
     offsetVal: float
+    interpolation: str = "linear"
 
 
 class MapTuningSaveResponse(BaseModel):
@@ -93,3 +94,14 @@ class MapTuningCalculateResponse(BaseModel):
     message: str
     samplesProcessed: int
     outputSignal: List[float]
+
+
+class ComputeMathRequest(BaseModel):
+    output_name: str = Field(..., description="Name for the output signal")
+    expression: str = Field(..., description="Math expression using signal names")
+    dependencies: List[str] = Field(..., description="Signal names referenced in the expression")
+
+
+class ComputeMathResponse(BaseModel):
+    message: str
+    samplesProcessed: int

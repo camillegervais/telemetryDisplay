@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect, useCallback } from "react";
-import { calculateMapTuning } from "../api";
+
 import { ConfigManager } from "../store/ConfigManager";
 import { useHoverToLutCell } from "../hooks/useHoverToLutCell";
 
@@ -8,12 +8,12 @@ import { useHoverToLutCell } from "../hooks/useHoverToLutCell";
 // ============================================================================
 import { MapTuningData } from "../types";
 
+const INTERPOLATION_OPTIONS: Array<MapTuningData["interpolation"]> = ["floor", "nearest", "linear", "round"];
+
 interface MapTuningProps {
   availableSignals?: string[];
   datasetId?: string | null;
-  currentData?: MapTuningData | null;
   onSave?: (data: MapTuningData) => void;
-  onCalculate?: (data: MapTuningData) => void;
   onSignalsUpdated?: () => void;
 }
 
@@ -76,9 +76,7 @@ const NumberInput: React.FC<NumberInputProps> = ({ value, onChange, onPaste, sty
 export default function MapTuning({
   availableSignals = ["RPM", "TPS", "MAP", "Lambda"],
   datasetId = "demo-dataset-123",
-  currentData = null,
   onSave,
-  onCalculate,
   onSignalsUpdated,
 }: MapTuningProps) {
   // State: Configuration
@@ -86,6 +84,7 @@ export default function MapTuning({
   const [inputChannelY, setInputChannelY] = useState<string>(availableSignals[1] || availableSignals[0] || "");
   const [outputChannelName, setOutputChannelName] = useState<string>("Ma_Nouvelle_Map");
   const [braking_signal, setBraking_signal] = useState<boolean>(false);
+  const [interpolation, setInterpolation] = useState<MapTuningData["interpolation"]>("linear");
 
   // State: Grid
   const [numRows, setNumRows] = useState<number>(5);
@@ -100,7 +99,6 @@ export default function MapTuning({
 
   // State: UI feedback
   const [isSaving, setIsSaving] = useState(false);
-  const [isCalculating, setIsCalculating] = useState(false);
   const [saveMessage, setSaveMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
   const [savedConfigs, setSavedConfigs] = useState<string[]>([]);
   const [showConfigMenu, setShowConfigMenu] = useState(false);
@@ -277,7 +275,8 @@ export default function MapTuning({
       colHeaders,
       braking_signal,
       gainVal,
-      offsetVal
+      offsetVal,
+      interpolation,
     };
     try {
       // Save to ConfigManager (persists to localStorage with cross-tab sync)
@@ -299,45 +298,37 @@ export default function MapTuning({
     }
   };
 
-  const handleCalculate = async () => {
-    if (!datasetId) return;
-    setIsCalculating(true);
-    setSaveMessage(null);
-    const data: MapTuningData = { 
-      inputChannelX, 
-      inputChannelY, 
-      outputChannelName, 
-      gridData, 
-      rowHeaders, 
+  // Persist current map config on every change so other tabs/components can react
+  useEffect(() => {
+    if (!outputChannelName) return;
+    const data: MapTuningData = {
+      inputChannelX,
+      inputChannelY,
+      outputChannelName,
+      gridData,
+      rowHeaders,
       colHeaders,
       braking_signal,
       gainVal,
-      offsetVal
+      offsetVal,
+      interpolation,
     };
     try {
-      const result: any = await calculateMapTuning({ datasetId, ...data });
-      // Update ConfigManager for cross-tab sync
       const existingConfigs = ConfigManager.get<Record<string, MapTuningData>>("map-configs") ?? {};
-      ConfigManager.set("map-configs", {
-        ...existingConfigs,
-        [outputChannelName]: data,
-      });
-      setSaveMessage({ 
-        type: "success", 
-        text: `Calcul terminé avec succès (${result.samplesProcessed} points).` 
-      });
-      onCalculate?.(data);
-      // Recalculer tous les maths channels une fois le channel de cartographie calculé
-      onSignalsUpdated?.();
-    } catch (error) {
-      setSaveMessage({ 
-        type: "error", 
-        text: `Erreur lors du calcul: ${error instanceof Error ? error.message : "Inconnue"}` 
-      });
-    } finally {
-      setIsCalculating(false);
+      // Only auto-update an existing saved config to avoid creating new partial entries
+      // while the user is typing the name. Creation of a new config must be explicit
+      // via the Save button (`handleSave`).
+      if (existingConfigs[outputChannelName]) {
+        ConfigManager.set("map-configs", {
+          ...existingConfigs,
+          [outputChannelName]: data,
+        });
+      }
+    } catch (e) {
+      // ignore persistence errors for live updates
     }
-  };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [inputChannelX, inputChannelY, outputChannelName, gridData, rowHeaders, colHeaders, braking_signal, gainVal, offsetVal, interpolation]);
 
   const handleLoadConfig = (name: string) => {
     const configs = ConfigManager.get<Record<string, MapTuningData>>("map-configs") ?? {};
@@ -355,6 +346,7 @@ export default function MapTuning({
       setBraking_signal(config.braking_signal || false);
       setGainVal(config.gainVal ?? 1);
       setOffsetVal(config.offsetVal ?? 0);
+      setInterpolation(config.interpolation ?? "linear");
       setShowConfigMenu(false);
       setSaveMessage({ type: "success", text: `Configuration "${name}" chargée.` });
     }
@@ -408,6 +400,19 @@ export default function MapTuning({
             <div>
               <label className="field-label">Nom de Sortie</label>
               <input className="topbar-user-input" style={{ width: "100%" }} type="text" value={outputChannelName} onChange={(e) => setOutputChannelName(e.target.value)} />
+            </div>
+            <div>
+              <label className="field-label">Interpolation</label>
+              <select
+                className="mini-select"
+                style={{ width: "100%" }}
+                value={interpolation}
+                onChange={(e) => setInterpolation(e.target.value as MapTuningData["interpolation"])}
+              >
+                {INTERPOLATION_OPTIONS.map((option) => (
+                  <option key={option} value={option}>{option}</option>
+                ))}
+              </select>
             </div>
             <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
               <input 
@@ -599,16 +604,8 @@ export default function MapTuning({
         </div>
 
         <div style={{ display: "flex", gap: "1rem", justifyContent: "flex-end" }}>
-          <button className="small-button" onClick={handleSave} disabled={isSaving || isCalculating}>
+          <button className="small-button" onClick={handleSave} disabled={isSaving}>
             {isSaving ? "⏳ En cours..." : "💾 Sauvegarder"}
-          </button>
-          <button 
-            className="small-button" 
-            style={{ borderColor: "var(--cyan)", background: "rgba(255, 70, 93, 0.3)" }} 
-            onClick={handleCalculate} 
-            disabled={isCalculating || !datasetId}
-          >
-            {isCalculating ? "⏳ Calcul..." : "🔄 Calculer"}
           </button>
         </div>
       </footer>

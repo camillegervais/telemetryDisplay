@@ -18,7 +18,9 @@ from app.schemas import (
     TrackMapResponse,
     MapTuningRequest,
     MapTuningSaveResponse,
-    MapTuningCalculateResponse
+    MapTuningCalculateResponse,
+    ComputeMathRequest,
+    ComputeMathResponse,
 )
 from app.services.mat_loader import MatLoader, MatValidationError
 from app.services.lut_2D import LUT2D
@@ -329,7 +331,8 @@ async def calculate_map_output(payload: MapTuningRequest):
             payload.outputChannelName,
             payload.braking_signal,
             payload.gainVal,
-            payload.offsetVal
+            payload.offsetVal,
+            payload.interpolation,
         )
 
         # Compute the output channel (assuming LUT2D is callable on the DataFrame directly)
@@ -358,3 +361,85 @@ async def calculate_map_output(payload: MapTuningRequest):
             status_code=500, detail=f"Failed to calculate map output:{str(e)}"
         )
 
+
+# Allowed math functions for expression evaluation (numpy-backed, no builtins)
+_MATH_NAMESPACE = {
+    "abs": np.abs,
+    "sign": np.sign,
+    "min": np.minimum,   # element-wise 2-arg
+    "max": np.maximum,   # element-wise 2-arg
+    "clamp": np.clip,
+    "sqrt": np.sqrt,
+    "log": np.log,
+    "exp": np.exp,
+    "sin": np.sin,
+    "cos": np.cos,
+    "tan": np.tan,
+    "pow": np.power,
+    "where": np.where,   # ternary: where(cond, val_true, val_false)
+    "sat":    lambda s, lo, hi: np.minimum(np.maximum(s, lo), hi),   # sat(signal, lower, upper)
+    "satdyn": lambda s, lo, hi: np.minimum(np.maximum(s, lo), hi),   # satdyn(signal, lower_signal, upper_signal)
+    "gain":   lambda s, f: s * f,
+    "norm2":  lambda a, b: np.sqrt(a**2 + b**2),
+    "and_":   lambda a, b: np.where((a != 0) & (b != 0), 1.0, 0.0),
+    "or_":    lambda a, b: np.where((a != 0) | (b != 0), 1.0, 0.0),
+    "__builtins__": {},  # block all Python builtins
+}
+
+
+@router.post("/{dataset_id}/compute-math", response_model=ComputeMathResponse)
+async def compute_math_channel(dataset_id: str, payload: ComputeMathRequest):
+    """
+    Evaluate a math expression on the full dataset and persist the result as a new channel.
+
+    The expression uses signal names as variables; supports standard arithmetic and
+    the math functions defined in _MATH_NAMESPACE (abs, sqrt, sin, etc.).
+    """
+    dataset = mat_loader.get_dataset(dataset_id)
+    if dataset is None:
+        raise HTTPException(status_code=404, detail="Dataset not found")
+
+    df, metadata = dataset
+
+    missing = [dep for dep in payload.dependencies if dep not in df.columns]
+    if missing:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Signal(s) not found in dataset: {', '.join(missing)}",
+        )
+
+    # Build evaluation namespace: signal arrays + allowed math functions
+    namespace = {dep: df[dep].values for dep in payload.dependencies}
+    namespace.update(_MATH_NAMESPACE)
+
+    try:
+        # Evaluate with suppressed numpy warnings for divide/invalid operations;
+        # sanitize afterwards to ensure no infinities or NaNs are persisted.
+        with np.errstate(divide="ignore", invalid="ignore"):
+            result = np.asarray(eval(payload.expression, namespace), dtype=np.float64)  # noqa: S307
+    except Exception as exc:
+        raise HTTPException(
+            status_code=400, detail=f"Expression evaluation failed: {exc}"
+        )
+
+    # Replace non-finite values (inf, -inf, nan) with a safe numeric value (0.0)
+    # to avoid propagating invalids into stored channels.
+    if not np.all(np.isfinite(result)):
+        result = np.where(np.isfinite(result), result, 0.0)
+
+    if result.shape == ():
+        # Scalar result — broadcast to dataset length
+        result = np.full(len(df), float(result))
+
+    if len(result) != len(df):
+        raise HTTPException(
+            status_code=400,
+            detail=f"Expression result length ({len(result)}) does not match dataset ({len(df)})",
+        )
+
+    mat_loader.add_new_channel(payload.output_name, result, dataset_id)
+
+    return ComputeMathResponse(
+        message=f"Channel '{payload.output_name}' computed and added to dataset",
+        samplesProcessed=int(len(result)),
+    )

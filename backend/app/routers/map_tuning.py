@@ -43,7 +43,8 @@ async def save_map(payload: MapTuningRequest):
             "datasetId": payload.datasetId,
             "braking_signal": payload.braking_signal,
             "gainVal": payload.gainVal,
-            "offsetVal": payload.offsetVal
+            "offsetVal": payload.offsetVal,
+            "interpolation": payload.interpolation,
         }
 
         return {

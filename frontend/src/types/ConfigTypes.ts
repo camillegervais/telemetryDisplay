@@ -5,7 +5,7 @@
  * Each type represents a specific aspect of the application state that should be persisted to localStorage.
  */
 
-import type { MathChannel, MapTuningData } from "../types";
+import type { MathChannel, MapTuningData, SoftBlock } from "../types";
 
 /**
  * Graph widget in a workspace tab
@@ -115,6 +115,8 @@ export type ConfigStorage = {
   "current-hover-slap": HoverSLap | null;
   /** Highlighted LUT cell(s) computed by useHoverToLutCell */
   "highlight-lut": CellHighlightInfo | null;
+  /** Soft computation blocks (ordered operation pipelines) */
+  "soft-blocks": SoftBlock[];
 };
 
 /**
@@ -132,6 +134,7 @@ export const CONFIG_DEFAULTS: ConfigStorage = {
   "dataset-id": null,
   "current-hover-slap": null,
   "highlight-lut": null,
+  "soft-blocks": [],
 };
 
 /**
@@ -220,3 +223,60 @@ export function setNestedValue<T extends Record<string, unknown>>(obj: T, path: 
 
   return result;
 }
+
+/**
+ * Import mode options for partial imports
+ */
+export type ImportMode = "replace" | "add";
+
+/**
+ * Selection state for each import category
+ */
+export type ImportSelection = {
+  layouts?: {
+    enabled: boolean;
+    mode: ImportMode;
+    selectedIds?: string[];
+  };
+  mathChannels?: {
+    enabled: boolean;
+    mode: ImportMode;
+  };
+  mapConfigs?: {
+    enabled: boolean;
+    mode: ImportMode;
+    selectedKeys?: string[];
+  };
+  softBlocks?: {
+    enabled: boolean;
+    mode: ImportMode;
+    selectedIds?: string[];
+  };
+};
+
+/**
+ * Parsed TOML data with metadata for import preview
+ */
+export type ParsedTomlData = {
+  layouts: {
+    items: SavedWorkspaceConfig[];
+    count: number;
+  };
+  mathChannels: {
+    items: MathChannel[];
+    count: number;
+  };
+  mapConfigs: {
+    items: Record<string, MapTuningData>;
+    keys: string[];
+    count: number;
+  };
+  softBlocks: {
+    items: SoftBlock[];
+    count: number;
+  };
+  meta?: {
+    version: string;
+    exportDate: string;
+  };
+};
