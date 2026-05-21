@@ -233,6 +233,11 @@ export function TelDataImportModal({ configs, onImportFromPath, onCancel }: TelD
             <label style={{ fontSize: "0.8rem", color: "rgba(255,255,255,0.6)" }}>
               Chemin de l'archive TelDataX4
             </label>
+            {loading ? (<div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "0.5rem", padding: "1rem", color: "var(--accent)" }}>
+                  <span className="loading-spinner" aria-hidden="true" />
+                  Chargement des runs...
+                </div>
+              ) : (
             <input
               style={inputStyle}
               type="text"
@@ -242,6 +247,7 @@ export function TelDataImportModal({ configs, onImportFromPath, onCancel }: TelD
               placeholder="\\server\share\run ou C:\WinTAX4\Data\..."
               autoFocus
             />
+              )}
             <div style={rowStyle}>
               <button className="small-button" onClick={onCancel} disabled={loading}>Annuler</button>
               <button
@@ -265,7 +271,7 @@ export function TelDataImportModal({ configs, onImportFromPath, onCancel }: TelD
               {loading ? (
                 <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "0.5rem", padding: "1rem", color: "var(--accent)" }}>
                   <span className="loading-spinner" aria-hidden="true" />
-                  Chargement des runs...
+                  Chargement des tours...
                 </div>
               ) : runs.length === 0 ? (
                 <div style={{ color: "rgba(255,255,255,0.7)", padding: "1rem" }}>Aucun run trouvé.</div>
@@ -303,7 +309,7 @@ export function TelDataImportModal({ configs, onImportFromPath, onCancel }: TelD
               {loading ? (
                 <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "0.5rem", padding: "1rem", color: "var(--accent)" }}>
                   <span className="loading-spinner" aria-hidden="true" />
-                  Chargement des tours...
+                  Chargement des channels...
                 </div>
               ) : laps.length === 0 ? (
                 <div style={{ color: "rgba(255,255,255,0.7)", padding: "1rem" }}>Aucun tour trouvé.</div>
