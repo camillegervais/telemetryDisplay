@@ -52,6 +52,8 @@ export function SignalColorManager() {
     borderRadius: "4px",
     background: "rgba(22, 8, 12, 0.3)",
     marginBottom: "1rem",
+    marginTop: '1rem',
+    transition: "",
   };
 
   const headerStyle: CSSProperties = {
@@ -150,7 +152,7 @@ export function SignalColorManager() {
   };
 
   return (
-    <div style={containerStyle}>
+    <div style={containerStyle} className="hover-border">
       <div style={headerStyle}>🎨 Couleurs Signaux</div>
 
       {/* List of existing colors */}
