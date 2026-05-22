@@ -63,6 +63,7 @@ export type SoftMathOp = {
   name: string;          // output signal name
   expression: string;
   dependencies: string[]; // parsed from expression
+  expressionMode?: "scalar" | "temporal"; // detected from expression; scalar by default
 };
 
 export type SoftLutOp = {

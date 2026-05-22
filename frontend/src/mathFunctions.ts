@@ -29,7 +29,16 @@ export const FUNCTIONS = {
   not_: { arity: 1 as const, description: "NON logique: not_(a) — 1 si zéro, 0 sinon" },
 } as const;
 
+// Temporal (stateful) functions that operate on entire signals
+export const TEMPORAL_FUNCTIONS = {
+  lowpass: { arity: 2 as const, description: "Filtre passe-bas (Butterworth 2e ordre): lowpass(signal, freq_hz)" },
+  highpass: { arity: 2 as const, description: "Filtre passe-haut (Butterworth 2e ordre): highpass(signal, freq_hz)" },
+  derivative: { arity: 1 as const, description: "Dérivée numérique du signal: derivative(signal)" },
+  integral: { arity: 1 as const, description: "Intégrale numérique du signal: integral(signal)" },
+} as const;
+
 export type FunctionName = keyof typeof FUNCTIONS;
+export type TemporalFunctionName = keyof typeof TEMPORAL_FUNCTIONS;
 
 // ============================================================================
 // OPERATOR DEFINITIONS (precedence from lowest to highest)
@@ -56,6 +65,23 @@ export type OperatorName = keyof typeof OPERATORS;
 export const COMPARISON_OPERATORS = new Set([">", "<", ">=", "<=", "==", "!="]);
 export const ARITHMETIC_OPERATORS = new Set(["+", "-", "*", "/"]);
 export const ALL_OPERATORS = new Set(Object.keys(OPERATORS));
+
+// ============================================================================
+// FUNCTION MODE DETECTION
+// ============================================================================
+
+export function getFunctionMode(name: string): "scalar" | "temporal" | null {
+  if (name in FUNCTIONS) return "scalar";
+  if (name in TEMPORAL_FUNCTIONS) return "temporal";
+  return null;
+}
+
+export function getExpressionMode(expression: string): "scalar" | "temporal" {
+  // If expression contains any temporal function, the whole expression is temporal
+  const temporalNames = Object.keys(TEMPORAL_FUNCTIONS).join("|");
+  const temporalRegex = new RegExp(`\\b(${temporalNames})\\s*\\(`);
+  return temporalRegex.test(expression) ? "temporal" : "scalar";
+}
 
 // ============================================================================
 // FUNCTION IMPLEMENTATIONS
@@ -140,11 +166,18 @@ export function evaluateOperator(
 // DOCUMENTATION & HELP
 // ============================================================================
 
-export function getFunctionDocumentation(): Array<{ name: string; description: string }> {
-  return Object.entries(FUNCTIONS).map(([name, def]) => ({
+export function getFunctionDocumentation(): Array<{ name: string; description: string; mode: "scalar" | "temporal" }> {
+  const scalars = Object.entries(FUNCTIONS).map(([name, def]) => ({
     name,
     description: def.description,
+    mode: "scalar" as const,
   }));
+  const temporals = Object.entries(TEMPORAL_FUNCTIONS).map(([name, def]) => ({
+    name,
+    description: def.description,
+    mode: "temporal" as const,
+  }));
+  return [...scalars, ...temporals];
 }
 
 export function getOperatorDocumentation(): Array<{ symbol: string; description: string }> {

@@ -1,12 +1,14 @@
 import type { MathChannel } from "./types";
 import {
   FUNCTIONS,
+  TEMPORAL_FUNCTIONS,
   OPERATORS,
   COMPARISON_OPERATORS,
   ARITHMETIC_OPERATORS,
   ALL_OPERATORS,
   evaluateFunction,
   evaluateOperator,
+  getExpressionMode,
   type FunctionName,
   type OperatorName,
 } from "./mathFunctions";
@@ -27,6 +29,9 @@ type RpnToken =
 function getSupportedFunctions(): Record<string, 1 | 2 | 3> {
   const result: Record<string, 1 | 2 | 3> = {};
   Object.entries(FUNCTIONS).forEach(([name, def]) => {
+    result[name] = def.arity;
+  });
+  Object.entries(TEMPORAL_FUNCTIONS).forEach(([name, def]) => {
     result[name] = def.arity;
   });
   return result;
@@ -334,6 +339,10 @@ export function analyzeMathExpression(
     const message = error instanceof Error ? error.message : "Expression invalide";
     return { dependencies: [], error: message };
   }
+}
+
+export function detectMathExpressionMode(expression: string): "scalar" | "temporal" {
+  return getExpressionMode(expression);
 }
 
 export function evaluateMathChannel(channel: MathChannel, signalValues: Record<string, number[]>): number[] {

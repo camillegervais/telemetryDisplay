@@ -3,7 +3,7 @@ import type { MouseEvent as ReactMouseEvent } from "react";
 import Plot from "react-plotly.js";
 
 import { queryDataset, calculateMapTuning, computeMathChannel } from "../api";
-import { evaluateMathChannel } from "../mathChannels";
+import { evaluateMathChannel, detectMathExpressionMode } from "../mathChannels";
 import { useTelemetryStore } from "../store/telemetryStore";
 import { ConfigManager } from "../store/ConfigManager";
 import type { DatasetMetadata, DistanceRange, SignalSeries, TrackMapResponse, MapTuningData, SoftBlock, SoftLutOp, SoftMathOp } from "../types";
@@ -1216,20 +1216,38 @@ export default function SignalWorkspace({
 
   function buildComputedSignals(rawSignals: Record<string, number[]>): Record<string, number[]> {
     const merged = { ...rawSignals };
+    console.log("[buildComputedSignals] Input raw signals:", Object.keys(rawSignals));
+    
     // Soft block math ops (evaluated in block/operation order for proper chaining)
     for (const block of softBlocksRef.current) {
       for (const op of block.operations) {
         if (op.kind !== "math") continue;
-        if (merged[op.name] !== undefined) continue; // LUT result already in dataset
+        if (merged[op.name] !== undefined) continue; // Already in dataset or computed
+        
+        // Skip temporal functions — they must be computed by backend, not frontend
+        const mode = detectMathExpressionMode(op.expression);
+        if (mode === "temporal") {
+          console.log(`[buildComputedSignals] Skipping temporal expression for ${op.name}: ${op.expression}`);
+          // Temporal functions are computed server-side; if not in merged yet, it's missing from backend
+          continue;
+        }
+        
         const hasDeps = op.dependencies.every((dep) => merged[dep] !== undefined);
-        if (!hasDeps) continue;
+        if (!hasDeps) {
+          console.log(`[buildComputedSignals] Missing dependencies for ${op.name}: need ${op.dependencies}`);
+          continue;
+        }
+        
         try {
           merged[op.name] = evaluateMathChannel(op, merged);
-        } catch {
+          console.log(`[buildComputedSignals] Computed ${op.name}: ${merged[op.name].length} points`);
+        } catch (err) {
+          console.error(`[buildComputedSignals] Error computing ${op.name}:`, err);
           merged[op.name] = [];
         }
       }
     }
+    console.log("[buildComputedSignals] Output signals:", Object.keys(merged));
     return merged;
   }
 

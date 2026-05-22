@@ -3,10 +3,15 @@
 from pathlib import Path
 from typing import List, Dict, Optional, Tuple
 import uuid
+import re
+import logging
 
 import numpy as np
 import pandas as pd
+from scipy import signal
 from fastapi import APIRouter, HTTPException, UploadFile
+
+logger = logging.getLogger(__name__)
 
 from app.config import config
 from app.schemas import (
@@ -32,6 +37,138 @@ mat_loader = MatLoader(reference_step_m=config.reference_distance_step_m)
 
 # Track maps cache (dataset_id -> dataframe)
 track_maps: Dict[str, pd.DataFrame] = {}
+
+
+def _detect_temporal_functions(expression: str) -> bool:
+    """Check if expression contains any temporal function."""
+    temporal_funcs = r"\b(lowpass|highpass|derivative|integral)\s*\("
+    return bool(re.search(temporal_funcs, expression))
+
+
+def _get_time_axis_column(df: pd.DataFrame) -> str:
+    """
+    Find the time axis column in dataset.
+    
+    Checks for (in priority order): "__time_s__", "tLap", "tout"
+    Raises ValueError if none found.
+    """
+    for col in ["__time_s__", "tLap", "tout"]:
+        if col in df.columns:
+            return col
+    raise ValueError(
+        "Time axis required for temporal functions. "
+        "Dataset must contain one of: __time_s__, tLap, tout"
+    )
+
+
+def _get_sampling_rate_hz(df: pd.DataFrame) -> Tuple[float, str]:
+    """
+    Calculate sampling rate from time axis.
+    
+    Returns: (sampling_rate_hz, time_column_name)
+    """
+    time_col = _get_time_axis_column(df)
+    t = df[time_col].values
+    
+    if len(t) < 2:
+        raise ValueError("Need at least 2 time samples for temporal functions")
+    
+    dt = np.diff(t)
+    if np.any(dt <= 0):
+        raise ValueError(f"Time axis ({time_col}) must be strictly monotonically increasing")
+    
+    # Return samples/second (Hz)
+    return 1.0 / np.median(dt), time_col
+
+
+def _create_temporal_namespace(
+    df: pd.DataFrame, dependencies: List[str], fs_hz: float, time_col: str
+) -> Dict:
+    """
+    Create evaluation namespace with temporal function wrappers.
+    
+    Args:
+        df: Full dataset (indexed by lap_distance)
+        dependencies: List of signal names used in expression
+        fs_hz: Sampling rate in Hz
+        time_col: Name of time column ("__time_s__", "tLap", or "tout")
+    
+    Returns:
+        Dict with signal arrays, scalar functions, and temporal function wrappers
+    """
+    # Start with signal arrays
+    namespace = {dep: df[dep].values for dep in dependencies}
+    t = df[time_col].values
+    
+    # Validate minimum length for temporal operations
+    if len(t) < 2:
+        raise ValueError("Temporal functions require at least 2 time samples")
+    
+    def lowpass_filter(signal_array, freq_hz):
+        """2nd-order Butterworth low-pass filter."""
+        if freq_hz <= 0 or freq_hz >= fs_hz / 2:
+            raise ValueError(f"Cutoff freq must be in (0, {fs_hz/2:.1f}) Hz")
+        
+        # Design filter
+        sos = signal.butter(2, freq_hz, fs=fs_hz, output="sos")
+        # Apply forward-backward (zero-phase)
+        return signal.sosfiltfilt(sos, signal_array)
+    
+    def highpass_filter(signal_array, freq_hz):
+        """2nd-order Butterworth high-pass filter."""
+        if freq_hz <= 0 or freq_hz >= fs_hz / 2:
+            raise ValueError(f"Cutoff freq must be in (0, {fs_hz/2:.1f}) Hz")
+        
+        sos = signal.butter(2, freq_hz, fs=fs_hz, btype="high", output="sos")
+        return signal.sosfiltfilt(sos, signal_array)
+    
+    def derivative_func(signal_array):
+        """Numerical derivative using centered differences where possible."""
+        if len(signal_array) < 2:
+            raise ValueError("Derivative requires at least 2 samples")
+        
+        if len(signal_array) == 2:
+            # Simple forward difference
+            dt_first = t[1] - t[0]
+            deriv = np.zeros_like(signal_array, dtype=np.float64)
+            deriv[0] = (signal_array[1] - signal_array[0]) / dt_first
+            deriv[1] = deriv[0]  # Repeat for second point
+            return deriv
+        
+        # General case: centered differences
+        dt = np.diff(t)
+        deriv = np.zeros_like(signal_array, dtype=np.float64)
+        
+        # Centered differences for interior points
+        for i in range(1, len(signal_array) - 1):
+            deriv[i] = (signal_array[i + 1] - signal_array[i - 1]) / (t[i + 1] - t[i - 1])
+        
+        # Forward difference for first point
+        deriv[0] = (signal_array[1] - signal_array[0]) / dt[0]
+        # Backward difference for last point
+        deriv[-1] = (signal_array[-1] - signal_array[-2]) / dt[-1]
+        
+        return deriv
+    
+    def integral_func(signal_array):
+        """Cumulative trapezoidal integration."""
+        if len(signal_array) < 1:
+            raise ValueError("Integral requires at least 1 sample")
+        
+        from scipy.integrate import cumtrapz
+        integral = cumtrapz(signal_array, t, initial=0)
+        return integral
+    
+    # Add temporal functions
+    namespace["lowpass"] = lowpass_filter
+    namespace["highpass"] = highpass_filter
+    namespace["derivative"] = derivative_func
+    namespace["integral"] = integral_func
+    
+    # IMPORTANT: Include scalar functions so expressions can mix temporal + scalar
+    namespace.update(_MATH_NAMESPACE)
+    
+    return namespace
 
 
 def _track_csv_path_from_metadata(source_path: str) -> Optional[Path]:
@@ -218,6 +355,10 @@ def query_dataset(dataset_id: str, request: DatasetQueryRequest) -> DatasetQuery
         raise HTTPException(status_code=404, detail="Dataset not found")
 
     df, metadata = dataset
+    
+    print(f"[query] Requested signals: {request.signals}", flush=True)
+    print(f"[query] Available signals in metadata: {metadata.signal_names}", flush=True)
+    print(f"[query] Available columns in DataFrame: {list(df.columns)}", flush=True)
 
     # Validate signals exist
     missing = set(request.signals) - set(metadata.signal_names)
@@ -229,8 +370,10 @@ def query_dataset(dataset_id: str, request: DatasetQueryRequest) -> DatasetQuery
     # Slice by distance range
     start_dist = request.start_distance
     end_dist = request.end_distance or metadata.lap_distance_range[1]
+    print(f"[query] Distance range: {start_dist} to {end_dist}", flush=True)
 
     df_slice = df.loc[(df.index >= start_dist) & (df.index <= end_dist)]
+    print(f"[query] Slice shape: {df_slice.shape}", flush=True)
 
     if df_slice.empty:
         raise HTTPException(status_code=400, detail="No data in distance range")
@@ -244,10 +387,15 @@ def query_dataset(dataset_id: str, request: DatasetQueryRequest) -> DatasetQuery
     else:
         df_decimated = df_slice
 
+    print(f"[query] Decimation: factor={decimation_factor}, final shape={df_decimated.shape}", flush=True)
+
     # Build response
     lap_distance = df_decimated.index.tolist()
     lap_time = df_decimated["__time_s__"].tolist() if "__time_s__" in df_decimated.columns else None
     signals = {signal: df_decimated[signal].tolist() for signal in request.signals}
+    
+    for signal_name, signal_data in signals.items():
+        print(f"[query] Signal '{signal_name}': {len(signal_data)} points, range=[{min(signal_data) if signal_data else 'empty'}, {max(signal_data) if signal_data else 'empty'}]", flush=True)
 
     return DatasetQueryResponse(
         lap_distance=lap_distance,
@@ -392,8 +540,11 @@ async def compute_math_channel(dataset_id: str, payload: ComputeMathRequest):
     """
     Evaluate a math expression on the full dataset and persist the result as a new channel.
 
-    The expression uses signal names as variables; supports standard arithmetic and
-    the math functions defined in _MATH_NAMESPACE (abs, sqrt, sin, etc.).
+    Supports two evaluation modes:
+    - Scalar (element-wise): standard math functions (abs, sqrt, sin, etc.)
+    - Temporal (global): functions that operate on entire signals (lowpass, derivative, integral)
+    
+    Mode is auto-detected from the expression.
     """
     dataset = mat_loader.get_dataset(dataset_id)
     if dataset is None:
@@ -408,16 +559,49 @@ async def compute_math_channel(dataset_id: str, payload: ComputeMathRequest):
             detail=f"Signal(s) not found in dataset: {', '.join(missing)}",
         )
 
-    # Build evaluation namespace: signal arrays + allowed math functions
-    namespace = {dep: df[dep].values for dep in payload.dependencies}
-    namespace.update(_MATH_NAMESPACE)
+    # Auto-detect expression mode
+    is_temporal = _detect_temporal_functions(payload.expression)
+    msg = f"[compute-math] Expression mode: {'TEMPORAL' if is_temporal else 'SCALAR'}"
+    print(msg, flush=True)
+    logger.info(msg)
+    
+    print(f"[compute-math] Expression: {payload.expression}", flush=True)
+    logger.info(f"[compute-math] Expression: {payload.expression}")
+    print(f"[compute-math] Dependencies: {payload.dependencies}", flush=True)
+    logger.info(f"[compute-math] Dependencies: {payload.dependencies}")
 
     try:
-        # Evaluate with suppressed numpy warnings for divide/invalid operations;
-        # sanitize afterwards to ensure no infinities or NaNs are persisted.
+        if is_temporal:
+            # Temporal mode: need time axis (tout, tLap, or __time_s__)
+            fs_hz, time_col = _get_sampling_rate_hz(df)
+            msg = f"[compute-math] Time axis column: {time_col}, fs: {fs_hz:.2f} Hz"
+            print(msg, flush=True)
+            logger.info(msg)
+            
+            print(f"[compute-math] Creating temporal namespace with {len(df)} rows...", flush=True)
+            namespace = _create_temporal_namespace(df, payload.dependencies, fs_hz, time_col)
+            print(f"[compute-math] Temporal namespace keys: {list(namespace.keys())}", flush=True)
+            logger.info(f"[compute-math] Temporal namespace keys: {list(namespace.keys())}")
+        else:
+            # Scalar mode: standard element-wise evaluation
+            namespace = {dep: df[dep].values for dep in payload.dependencies}
+            namespace.update(_MATH_NAMESPACE)
+            print(f"[compute-math] Scalar namespace keys: {list(namespace.keys())}", flush=True)
+            logger.info(f"[compute-math] Scalar namespace keys: {list(namespace.keys())}")
+
+        # Evaluate with suppressed numpy warnings for divide/invalid operations
+        print(f"[compute-math] Starting eval() with expression: {payload.expression}", flush=True)
+        logger.info(f"[compute-math] Starting eval() with {len(df)} rows...")
         with np.errstate(divide="ignore", invalid="ignore"):
             result = np.asarray(eval(payload.expression, namespace), dtype=np.float64)  # noqa: S307
+        
+        msg = f"[compute-math] eval() result shape: {result.shape}, dtype: {result.dtype}"
+        print(msg, flush=True)
+        logger.info(msg)
     except Exception as exc:
+        err_msg = f"[compute-math] Expression evaluation failed: {exc}"
+        print(err_msg, flush=True)
+        logger.error(err_msg, exc_info=True)
         raise HTTPException(
             status_code=400, detail=f"Expression evaluation failed: {exc}"
         )
@@ -425,19 +609,36 @@ async def compute_math_channel(dataset_id: str, payload: ComputeMathRequest):
     # Replace non-finite values (inf, -inf, nan) with a safe numeric value (0.0)
     # to avoid propagating invalids into stored channels.
     if not np.all(np.isfinite(result)):
+        non_finite_count = np.sum(~np.isfinite(result))
+        msg = f"[compute-math] Found {non_finite_count} non-finite values, replacing with 0.0"
+        print(msg, flush=True)
+        logger.warning(msg)
         result = np.where(np.isfinite(result), result, 0.0)
 
     if result.shape == ():
         # Scalar result — broadcast to dataset length
+        msg = f"[compute-math] Broadcasting scalar result {result} to {len(df)} rows"
+        print(msg, flush=True)
+        logger.info(msg)
         result = np.full(len(df), float(result))
 
     if len(result) != len(df):
+        err_msg = f"[compute-math] Result length mismatch: {len(result)} vs dataset {len(df)}"
+        print(err_msg, flush=True)
+        logger.error(err_msg)
         raise HTTPException(
             status_code=400,
             detail=f"Expression result length ({len(result)}) does not match dataset ({len(df)})",
         )
 
+    final_msg = f"[compute-math] Final result: shape={result.shape}, min={np.min(result):.6f}, max={np.max(result):.6f}, mean={np.mean(result):.6f}"
+    print(final_msg, flush=True)
+    logger.info(final_msg)
+    
+    print(f"[compute-math] Adding channel '{payload.output_name}' to dataset...", flush=True)
     mat_loader.add_new_channel(payload.output_name, result, dataset_id)
+    print(f"[compute-math] Channel '{payload.output_name}' added successfully", flush=True)
+    logger.info(f"[compute-math] Channel '{payload.output_name}' added successfully")
 
     return ComputeMathResponse(
         message=f"Channel '{payload.output_name}' computed and added to dataset",

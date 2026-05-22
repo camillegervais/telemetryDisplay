@@ -5,7 +5,7 @@
  * Operations in a block run sequentially; the output of op N is available as input to op N+1.
  */
 import React, { useState, useCallback, useMemo, useEffect } from "react";
-import { analyzeMathExpression } from "../mathChannels";
+import { analyzeMathExpression, detectMathExpressionMode } from "../mathChannels";
 import { getFunctionDocumentation, getOperatorDocumentation } from "../mathFunctions";
 import type { SoftBlock, SoftOperation, SoftMathOp, SoftLutOp, MapTuningData } from "../types";
 
@@ -166,13 +166,16 @@ const MathHelpPanel: React.FC = () => {
   const functions = useMemo(() => getFunctionDocumentation(), []);
   const operators = useMemo(() => getOperatorDocumentation(), []);
 
+  const scalarFuncs = functions.filter((f) => f.mode === "scalar");
+  const temporalFuncs = functions.filter((f) => f.mode === "temporal");
+
   return (
     <div className="soft-help-panel">
       <div className="soft-help-section">
-        <span className="soft-help-section-title">Fonctions</span>
+        <span className="soft-help-section-title">Fonctions scalaires (élément-wise)</span>
         <table className="soft-help-table">
           <tbody>
-            {functions.map(({ name, description }) => (
+            {scalarFuncs.map(({ name, description }) => (
               <tr key={name}>
                 <td className="soft-help-name">{name}</td>
                 <td className="soft-help-desc">{description}</td>
@@ -181,6 +184,24 @@ const MathHelpPanel: React.FC = () => {
           </tbody>
         </table>
       </div>
+
+      <div className="soft-help-section">
+        <span className="soft-help-section-title">Fonctions temporelles (sur tout le signal)</span>
+        <p style={{ fontSize: "0.85em", color: "#666", marginBottom: "8px" }}>
+          ⓘ Opèrent sur l'intégralité du signal (ex: filtrage, dérivation)
+        </p>
+        <table className="soft-help-table">
+          <tbody>
+            {temporalFuncs.map(({ name, description }) => (
+              <tr key={name}>
+                <td className="soft-help-name">{name}</td>
+                <td className="soft-help-desc">{description}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
       <div className="soft-help-section">
         <span className="soft-help-section-title">Opérateurs</span>
         <table className="soft-help-table">
@@ -193,6 +214,19 @@ const MathHelpPanel: React.FC = () => {
             ))}
           </tbody>
         </table>
+      </div>
+
+      <div className="soft-help-section" style={{ backgroundColor: "#f5f5f5", padding: "8px", borderRadius: "4px" }}>
+        <span className="soft-help-section-title">💡 Exemples</span>
+        <p style={{ fontSize: "0.85em", margin: "4px 0", fontFamily: "monospace" }}>
+          • Scalaire: <code>gain(signal, 2.0)</code>
+        </p>
+        <p style={{ fontSize: "0.85em", margin: "4px 0", fontFamily: "monospace" }}>
+          • Temporelle: <code>lowpass(signal, 10)</code>
+        </p>
+        <p style={{ fontSize: "0.85em", margin: "4px 0", fontFamily: "monospace" }}>
+          • Mixte: <code>gain(lowpass(signal, 5), 2.0)</code>
+        </p>
       </div>
     </div>
   );
@@ -215,9 +249,14 @@ const MathOpEditor: React.FC<{
     const { dependencies, error } = analyzeMathExpression(exprDraft, availableSignals);
     setExprError(error);
     if (!error) {
-      onUpdate({ expression: exprDraft, dependencies });
+      const expressionMode = detectMathExpressionMode(exprDraft);
+      onUpdate({ expression: exprDraft, dependencies, expressionMode });
     }
   };
+
+  const currentMode = exprDraft ? detectMathExpressionMode(exprDraft) : "scalar";
+  const modeLabel = currentMode === "temporal" ? "⏱ Temporelle" : "⚡ Scalaire";
+  const modeColor = currentMode === "temporal" ? "#ff9500" : "#666";
 
   return (
     <div className="soft-math-editor">
@@ -233,6 +272,9 @@ const MathOpEditor: React.FC<{
           placeholder="ex: RPM * TPS / 100"
           spellCheck={false}
         />
+        <span style={{ fontSize: "0.85em", color: modeColor, fontWeight: "500", marginLeft: "8px", whiteSpace: "nowrap" }}>
+          {modeLabel}
+        </span>
         <button
           className={`soft-help-btn ${showHelp ? "soft-help-btn-active" : ""}`}
           onClick={() => setShowHelp((p) => !p)}
