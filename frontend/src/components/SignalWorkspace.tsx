@@ -3211,21 +3211,16 @@ export default function SignalWorkspace({
 
                   <p className="field-label">Signaux</p>
                   <div className="signal-grid">
-                    {availableSignals.map((signal, idx) => (
+                    {widget.signals.map((signal, idx) => (
                       <label key={`${widget.id}-${signal}`} className="signal-checkbox">
                         <input
                           type="checkbox"
-                          checked={widget.signals.includes(signal)}
+                          checked={true}
                           onChange={(event) => {
-                            const isChecked = event.target.checked;
                             setWidgets((prev) =>
                               prev.map((item) => {
                                 if (item.id === widget.id) {
-                                  if (isChecked) {
-                                    return { ...item, signals: [...item.signals, signal] };
-                                  } else {
-                                    return { ...item, signals: item.signals.filter((s) => s !== signal) };
-                                  }
+                                  return { ...item, signals: item.signals.filter((s) => s !== signal) };
                                 }
                                 return item;
                               })
