@@ -569,15 +569,15 @@ export default function MapTuning({
           </div>
           <div style={{ display: "flex", gap: "1rem", alignItems: "center" }}>
             <span className="field-label" style={{ margin: 0 }}>Gain:</span>
-            <button className="small-button" onClick={() => handleGainChange(gainVal - 1)}>−</button>
+            <button className="small-button" onClick={() => handleGainChange(gainVal - 0.1)}>−</button>
             <span style={{ minWidth: "20px", textAlign: "center" }}>{gainVal}</span>
-            <button className="small-button" onClick={() => handleGainChange(gainVal + 1)}>+</button>
+            <button className="small-button" onClick={() => handleGainChange(gainVal + 0.1)}>+</button>
           </div>
           <div style={{ display: "flex", gap: "1rem", alignItems: "center" }}>
             <span className="field-label" style={{ margin: 0 }}>Offset:</span>
-            <button className="small-button" onClick={() => handleOffsetChange(offsetVal - 1)}>−</button>
+            <button className="small-button" onClick={() => handleOffsetChange(offsetVal - 0.1)}>−</button>
             <span style={{ minWidth: "20px", textAlign: "center" }}>{offsetVal}</span>
-            <button className="small-button" onClick={() => handleOffsetChange(offsetVal + 1)}>+</button>
+            <button className="small-button" onClick={() => handleOffsetChange(offsetVal + 0.1)}>+</button>
           </div>
           <div className="map-tuning-min-max">
             <span>Min: <strong style={{ color: "#22c55e" }}>{minValue.toFixed(2)}</strong></span>

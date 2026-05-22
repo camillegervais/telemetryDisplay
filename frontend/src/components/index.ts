@@ -3,3 +3,4 @@ export { default as SignalWorkspace } from "./SignalWorkspace";
 export { ConfigExportImport } from "./ConfigExportImport";
 export { ImportSelectionModal } from "./ImportSelectionModal";
 export { SignalColorManager } from "./SignalColorManager";
+export { TelDataImportModal } from "./TelDataImportModal";

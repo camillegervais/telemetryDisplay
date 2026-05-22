@@ -374,6 +374,7 @@ class ConfigManagerClass {
       "user-preferences": this.storage["user-preferences"],
       "soft-blocks": this.storage["soft-blocks"],
       "signal-colors": this.storage["signal-colors"],
+      "teldata-configs": this.storage["teldata-configs"],
     };
 
     return TOML.stringify(exportData);
@@ -392,6 +393,7 @@ class ConfigManagerClass {
       const mapConfigs = (parsed["map-configs"] as ConfigStorage["map-configs"]) || {};
       const softBlocks = (parsed["soft-blocks"] as ConfigStorage["soft-blocks"]) || [];
       const signalColors = (parsed["signal-colors"] as ConfigStorage["signal-colors"]) || {};
+      const telDataConfigs = (parsed["teldata-configs"] as ConfigStorage["teldata-configs"]) || [];
       const meta = parsed._meta as { version?: string; exportDate?: string } | undefined;
 
       return {
@@ -415,6 +417,10 @@ class ConfigManagerClass {
         signalColors: {
           items: signalColors,
           count: Object.keys(signalColors).length,
+        },
+        telDataConfigs: {
+          items: telDataConfigs,
+          count: telDataConfigs.length,
         },
         meta: {
           version: meta?.version || "1.0",
@@ -520,6 +526,22 @@ class ConfigManagerClass {
             ...this.storage["signal-colors"],
             ...data.signalColors.items,
           };
+        }
+      }
+      // Handle TelData configs
+      if (selection.telDataConfigs?.enabled) {
+        const selectedConfigs = selection.telDataConfigs.selectedIds && selection.telDataConfigs.selectedIds.length > 0
+          ? data.telDataConfigs.items.filter((c) => selection.telDataConfigs?.selectedIds?.includes(c.id))
+          : data.telDataConfigs.items;
+
+        if (selection.telDataConfigs.mode === "replace") {
+          updates["teldata-configs"] = selectedConfigs;
+        } else {
+          updates["teldata-configs"] = mergeArrays(
+            this.storage["teldata-configs"],
+            selectedConfigs,
+            "id"
+          );
         }
       }
 

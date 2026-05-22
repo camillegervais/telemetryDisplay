@@ -100,6 +100,17 @@ export type UserPreferences = {
 };
 
 /**
+ * Named channel selection config for TelData COM imports.
+ * Several configs can be saved and reused across sessions.
+ */
+export type TelDataImportConfig = {
+  id: string;
+  name: string;
+  channels: string[];
+  targetFrequencyHz: number;
+};
+
+/**
  * All configuration types unified under one structure
  * Keys correspond to localStorage keys (e.g., "telemetry-display.config.layouts")
  */
@@ -119,6 +130,8 @@ export type ConfigStorage = {
   "soft-blocks": SoftBlock[];
   /** Signal name to color mapping (hex format) */
   "signal-colors": Record<string, string>;
+  /** Named channel configs for TelData COM imports */
+  "teldata-configs": TelDataImportConfig[];
 };
 
 /**
@@ -138,6 +151,7 @@ export const CONFIG_DEFAULTS: ConfigStorage = {
   "highlight-lut": null,
   "soft-blocks": [],
   "signal-colors": {},
+  "teldata-configs": [],
 };
 
 /**
@@ -259,6 +273,11 @@ export type ImportSelection = {
     enabled: boolean;
     mode: ImportMode;
   };
+  telDataConfigs?: {
+    enabled: boolean;
+    mode: ImportMode;
+    selectedIds?: string[];
+  };
 };
 
 /**
@@ -284,6 +303,9 @@ export type ParsedTomlData = {
   };
   signalColors: {
     items: Record<string, string>;
+  };
+  telDataConfigs: {
+    items: TelDataImportConfig[];
     count: number;
   };
   meta?: {

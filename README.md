@@ -35,6 +35,11 @@ Pour vérifier que les prérequis sont validés vous pouvez taper les commandes 
 1. Ouvrir un terminal dans `frontend/`.
 2. Installer les dépendances: `npm install`
 
+### Lanceur global
+
+1. Retourner dans `telemetryDisplay`.
+2. Installer les dépendances: `npm install`.
+
 ## Démarrage
 
 Pour une utilisation quotidienne, préférez le démarrage complet depuis la racine.
