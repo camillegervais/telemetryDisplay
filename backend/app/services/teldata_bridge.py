@@ -433,9 +433,20 @@ def export_lap(
         lap = run.GetLap(lap_id)
         lap = win32com.client.Dispatch(lap.QueryInterface(pythoncom.IID_IDispatch))
 
-        # Build name → COM object map (case-insensitive lookup)
+        # Build name → COM object map (case-insensitive lookup).
+        # If multiple channels expose the same name (VCH math vs base), prefer
+        # the one with valid sample metadata (SampleCount>0 and SampleRate>0).
         chan_count = lap.GetChanCount()
         chan_map: Dict[str, object] = {}
+
+        def _chan_has_valid_samples(ch) -> bool:
+            try:
+                sc = int(getattr(ch, "SampleCount", 0))
+                sr = int(getattr(ch, "SampleRate", 0))
+                return sc > 0 and sr > 0
+            except Exception:
+                return False
+
         for c in range(chan_count):
             try:
                 chan = lap.GetChan(c)
@@ -450,7 +461,20 @@ def export_lap(
                         name = chan.GetPropertyName(0)
                     except Exception:
                         name = f"chan_{c}"
-                chan_map[str(name).lower()] = chan
+                key = str(name).lower()
+                if key in chan_map:
+                    existing = chan_map[key]
+                    # Keep existing if it has valid samples; otherwise prefer this one
+                    if _chan_has_valid_samples(existing):
+                        logger.debug("Keeping existing channel for key=%s (existing has samples)", key)
+                    elif _chan_has_valid_samples(chan):
+                        chan_map[key] = chan
+                        logger.debug("Replaced channel for key=%s with channel #%d (has samples)", key, c)
+                    else:
+                        # neither has valid samples; keep first seen
+                        logger.debug("Duplicate channel key=%s found but neither has valid samples; keeping first", key)
+                else:
+                    chan_map[key] = chan
             except Exception:
                 logger.exception("Failed to enumerate channel #%d on run=%s lap=%s", run_id, lap_id)
                 continue
