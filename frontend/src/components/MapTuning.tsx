@@ -103,6 +103,7 @@ export default function MapTuning({
   const [savedConfigs, setSavedConfigs] = useState<string[]>([]);
   const [showConfigMenu, setShowConfigMenu] = useState(false);
   const [showExportPanel, setShowExportPanel] = useState<boolean>(false);
+  const [configFilter, setConfigFilter] = useState<string>("");
 
   // Calcul min/max pour la heatmap
   const { minValue, maxValue } = useMemo(() => {
@@ -180,7 +181,7 @@ export default function MapTuning({
 
   const copyXBreakpoints = useCallback(async () => {
     try {
-      const text = rowHeaders.map((h) => String(h)).join("\n");
+      const text = rowHeaders.map((h) => String(h)).join("\t");
       await navigator.clipboard.writeText(text);
       setSaveMessage({ type: "success", text: "Breakpoints X copiés." });
       setTimeout(() => setSaveMessage(null), 1500);
@@ -493,35 +494,59 @@ export default function MapTuning({
             background: "var(--bg-3)",
             border: "1px solid var(--line)",
             zIndex: 100,
-            maxHeight: "200px",
+            maxHeight: "50vh",
             overflowY: "auto",
             marginTop: "2px"
           }}>
+            <input
+              type="text"
+              placeholder="Filtrer..."
+              value={configFilter}
+              onChange={(e) => setConfigFilter(e.target.value)}
+              style={{
+                width: "100%",
+                padding: "0.5rem",
+                borderBottom: "1px solid var(--line)",
+                background: "var(--bg-2)",
+                color: "var(--fg-1)",
+                border: "none",
+                boxSizing: "border-box",
+                fontSize: "0.8rem"
+              }}
+            />
             {savedConfigs.length === 0 ? (
               <div style={{ padding: "1rem", textAlign: "center", fontSize: "0.8rem", color: "var(--fg-2)" }}>Aucune sauvegarde</div>
             ) : (
-              savedConfigs.map(name => (
-                <div 
-                  key={name} 
-                  onClick={() => handleLoadConfig(name)}
-                  style={{ 
-                    padding: "0.5rem", 
-                    cursor: "pointer", 
-                    display: "flex", 
-                    justifyContent: "space-between", 
-                    borderBottom: "1px solid var(--line)",
-                    fontSize: "0.8rem"
-                  }}
-                  onMouseEnter={(e) => e.currentTarget.style.background = "rgba(255, 70, 93, 0.15)"}
-                  onMouseLeave={(e) => e.currentTarget.style.background = "transparent"}
-                >
-                  <span>{name}</span>
-                  <button 
-                    onClick={(e) => handleDeleteConfig(e, name)}
-                    style={{ background: "none", border: "none", color: "var(--magenta)", cursor: "pointer" }}
-                  >✕</button>
-                </div>
-              ))
+              savedConfigs
+                .filter(name => name.toLowerCase().includes(configFilter.toLowerCase()))
+                .length === 0 ? (
+                <div style={{ padding: "1rem", textAlign: "center", fontSize: "0.8rem", color: "var(--fg-2)" }}>Aucun résultat</div>
+              ) : (
+                savedConfigs
+                  .filter(name => name.toLowerCase().includes(configFilter.toLowerCase()))
+                  .map(name => (
+                    <div 
+                      key={name} 
+                      onClick={() => handleLoadConfig(name)}
+                      style={{ 
+                        padding: "0.5rem", 
+                        cursor: "pointer", 
+                        display: "flex", 
+                        justifyContent: "space-between", 
+                        borderBottom: "1px solid var(--line)",
+                        fontSize: "0.8rem"
+                      }}
+                      onMouseEnter={(e) => e.currentTarget.style.background = "rgba(255, 70, 93, 0.15)"}
+                      onMouseLeave={(e) => e.currentTarget.style.background = "transparent"}
+                    >
+                      <span>{name}</span>
+                      <button 
+                        onClick={(e) => handleDeleteConfig(e, name)}
+                        style={{ background: "none", border: "none", color: "var(--magenta)", cursor: "pointer" }}
+                      >✕</button>
+                    </div>
+                  ))
+              )
             )}
           </div>
         )}
