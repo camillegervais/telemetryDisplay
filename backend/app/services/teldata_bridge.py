@@ -4,13 +4,16 @@ Each API call re-opens the archive so COM objects never cross thread boundaries.
 Session state (archive path + flat run list as plain data) lives in a simple dict.
 """
 
+import datetime
 import re
+import tempfile
 import uuid
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
 import numpy as np
+import logging
 
 # win32com is only available on Windows with TelDataX4 installed.
 # Import errors surface at call time, not at module import, so the backend
@@ -171,6 +174,110 @@ def _open_archive(archive_path: str):  # type: ignore[return]
     return main_obj
 
 
+logger = logging.getLogger(__name__)
+
+
+# ---------------------------------------------------------------------------
+# VCH merging (mirrors codVCHMerger.m logic)
+# ---------------------------------------------------------------------------
+
+def _collect_vch_files(vch_path: str) -> List[Path]:
+    """Return all .vch files reachable from *vch_path* (file or folder)."""
+    p = Path(vch_path)
+    if p.is_file() and p.suffix.lower() == ".vch":
+        return [p]
+    if p.is_dir():
+        return sorted(p.glob("*.vch"))
+    return []
+
+
+def _merge_vch(vch_path: str) -> Tuple[Optional[str], Optional[Path]]:
+    """Collect, deduplicate and merge .vch files from *vch_path*.
+
+    Returns ``(resolved_path, temp_file)`` where:
+    - *resolved_path*: path to pass to COM ``MatLibrary1`` (str).
+    - *temp_file*: ``Path`` of the temp merged file to delete after use,
+      or ``None`` if no temp file was created (single .vch used as-is).
+
+    Returns ``(None, None)`` if no .vch files are found.
+    """
+    files = _collect_vch_files(vch_path)
+    if not files:
+        return None, None
+
+    # --- Deduplicate by filename (case-insensitive, keep first) ---
+    seen: set = set()
+    unique: List[Path] = []
+    for f in files:
+        key = f.name.lower()
+        if key not in seen:
+            seen.add(key)
+            unique.append(f)
+
+    # --- Single file: use directly, no temp file needed ---
+    if len(unique) == 1:
+        return str(unique[0]), None
+
+    # --- Read files; skip those without a <VirtualChannels> section ---
+    contents: List[str] = []
+    for f in unique:
+        try:
+            text = f.read_text(encoding="utf-8", errors="replace")
+        except OSError:
+            continue
+        if "</VirtualChannels>" in text:
+            contents.append(text)
+
+    if not contents:
+        return None, None
+    if len(contents) == 1:
+        # Only one valid file after filtering
+        return str(unique[0]), None
+
+    # --- Merge: inject subsequent files' <VirtualChannels> blocks into the first ---
+    # Mirrors the MATLAB logic:
+    #   vchMerged = [vchMerged(1:NVirtualChannelsIdx-2)       <-- up to 2 chars before </VirtualChannels>
+    #                extractBetween(next, '<VirtualChannels>', '</VirtualChannels>')  <-- inner block
+    #                vchMerged(NVirtualChannelsIdx:end)]       <-- from </VirtualChannels> onwards
+    merged = contents[0]
+    for extra in contents[1:]:
+        m = re.search(r"<VirtualChannels>(.*?)</VirtualChannels>", extra, re.DOTALL)
+        if not m:
+            continue
+        inner = m.group(1)
+        idx = merged.rfind("</VirtualChannels>")
+        if idx == -1:
+            continue
+        # Strip the \r\n (or \n) before </VirtualChannels> to avoid double blank line
+        merged = merged[: max(idx - 2, 0)] + inner + merged[idx:]
+
+    # --- Write to temp file ---
+    timestamp = datetime.datetime.now().strftime("%y%m%d_%H-%M-%S")
+    tmp_dir = Path(tempfile.gettempdir())
+    tmp_path = tmp_dir / f"vchMerged_{timestamp}.vch"
+    tmp_path.write_text(merged, encoding="utf-8")
+    logger.debug("Merged %d VCH files into %s", len(contents), str(tmp_path))
+    return str(tmp_path), tmp_path
+
+
+def _apply_vch(main_obj, vch_path: str) -> Optional[Path]:
+    """Merge .vch files and load into the archive COM object.
+
+    Returns the temp file ``Path`` to clean up (or ``None``).
+    """
+    resolved, tmp_file = _merge_vch(vch_path)
+    if resolved is None:
+        return None
+    logger.debug("Applying VCH resolved=%s tmp_file=%s", resolved, str(tmp_file) if tmp_file else "None")
+    mat_lib_idx = main_obj.GetPropertyIndex(1, "MatLibrary1")  # 1 = Text
+    if mat_lib_idx >= 0:
+        main_obj.SetPropertyData(mat_lib_idx, resolved)
+    status_idx = main_obj.GetPropertyIndex(0, "TDXGlobalStatus")  # 0 = Value
+    if status_idx >= 0:
+        main_obj.SetPropertyData(status_idx, 1)
+    return tmp_file
+
+
 # ---------------------------------------------------------------------------
 # Public API
 # ---------------------------------------------------------------------------
@@ -221,16 +328,24 @@ def get_laps(session_id: str, run_id: int) -> List[LapInfo]:
         pythoncom.CoUninitialize()
 
 
-def get_channels(session_id: str, run_id: int, lap_id: int) -> List[str]:
-    """Return available channel names (original casing) for the specified run/lap."""
+def get_channels(session_id: str, run_id: int, lap_id: int, vch_path: Optional[str] = None) -> List[str]:
+    """Return available channel names (original casing) for the specified run/lap.
+    If vch_path is provided, loads the .vch file first to expose math channels.
+    """
     _require_com()
     session = _sessions.get(session_id)
     if session is None:
         raise KeyError(f"Session not found: {session_id}")
 
     pythoncom.CoInitialize()
+    tmp_vch: Optional[Path] = None
     try:
         main_obj = _open_archive(session.archive_path)
+
+        # Merge + apply .vch files to expose math channels before listing
+        if vch_path:
+            tmp_vch = _apply_vch(main_obj, vch_path)
+
         run = _navigate_to_run(main_obj, run_id)
         if run is None:
             raise ValueError(f"Run id {run_id} not found in archive")
@@ -262,6 +377,11 @@ def get_channels(session_id: str, run_id: int, lap_id: int) -> List[str]:
 
         return channels
     finally:
+        if tmp_vch is not None:
+            try:
+                tmp_vch.unlink(missing_ok=True)
+            except OSError:
+                pass
         pythoncom.CoUninitialize()
 
 
@@ -272,6 +392,7 @@ def export_lap(
     channels: List[str],
     target_frequency_hz: float,
     output_dir: Path,
+    vch_path: Optional[str] = None,
 ) -> Path:
     """
     Read requested channels from the given run/lap, resample to a uniform time
@@ -295,6 +416,12 @@ def export_lap(
         from scipy.io import savemat
 
         main_obj = _open_archive(session.archive_path)
+
+        # Merge + apply .vch files to enable math channel computation
+        tmp_vch: Optional[Path] = None
+        if vch_path:
+            tmp_vch = _apply_vch(main_obj, vch_path)
+
         run = _navigate_to_run(main_obj, run_id)
         if run is None:
             raise ValueError(f"Run id {run_id} not found")
@@ -310,33 +437,73 @@ def export_lap(
         chan_count = lap.GetChanCount()
         chan_map: Dict[str, object] = {}
         for c in range(chan_count):
-            chan = lap.GetChan(c)
-            chan = win32com.client.Dispatch(chan.QueryInterface(pythoncom.IID_IDispatch))
-            chan_map[chan.Name.lower()] = chan
+            try:
+                chan = lap.GetChan(c)
+                chan = win32com.client.Dispatch(chan.QueryInterface(pythoncom.IID_IDispatch))
+                # Prefer .Name property when available, fallback to property name
+                try:
+                    name = getattr(chan, "Name", None)
+                except Exception:
+                    name = None
+                if not name:
+                    try:
+                        name = chan.GetPropertyName(0)
+                    except Exception:
+                        name = f"chan_{c}"
+                chan_map[str(name).lower()] = chan
+            except Exception:
+                logger.exception("Failed to enumerate channel #%d on run=%s lap=%s", run_id, lap_id)
+                continue
+
+        # Diagnostic: log what channel names are present after opening the archive
+        try:
+            keys = list(chan_map.keys())
+            logger.debug("Export: chan_count=%d mapped=%d sample_keys=%s", chan_count, len(keys), keys[:20])
+        except Exception:
+            logger.exception("Failed to log channel map diagnostics")
 
         # Read requested channels
         channel_data: List[Tuple[str, np.ndarray, np.ndarray]] = []
         not_found: List[str] = []
 
+        failed_reads: List[str] = []
         for ch_name in channels:
             matched_key = ch_name.lower()
             if matched_key not in chan_map:
                 not_found.append(ch_name)
                 continue
             chan = chan_map[matched_key]
-            sample_count = chan.SampleCount
-            sample_rate = int(chan.SampleRate)
-            buffer = win32com.client.VARIANT(
-                pythoncom.VT_ARRAY | pythoncom.VT_R8,
-                [0.0] * sample_count,
-            )
-            data = chan.GetValues(0, buffer, sample_count, sample_count)
-            values = np.array(data[0], dtype=np.float64)
-            t_orig = np.arange(len(values)) / sample_rate
-            channel_data.append((ch_name, t_orig, values))
+            try:
+                sample_count = int(getattr(chan, "SampleCount", 0))
+                sample_rate = int(getattr(chan, "SampleRate", 0))
+                if sample_count <= 0 or sample_rate <= 0:
+                    raise RuntimeError(f"Invalid sample metadata: count={sample_count} rate={sample_rate}")
+
+                buffer = win32com.client.VARIANT(
+                    pythoncom.VT_ARRAY | pythoncom.VT_R8,
+                    [0.0] * sample_count,
+                )
+                data = chan.GetValues(0, buffer, sample_count, sample_count)
+                # GetValues may return a tuple/sequence where the first element is the array
+                if isinstance(data, (list, tuple)) and len(data) > 0:
+                    raw_values = data[0]
+                else:
+                    raw_values = data
+                values = np.array(raw_values, dtype=np.float64)
+                t_orig = np.arange(len(values)) / sample_rate
+                channel_data.append((ch_name, t_orig, values))
+            except Exception:
+                logger.exception("Failed to read values for channel '%s' (run=%s lap=%s)", ch_name, run_id, lap_id)
+                failed_reads.append(ch_name)
+                continue
+
+        logger.debug("Export read summary: requested=%d found=%d not_found=%s failed_reads=%s",
+                     len(channels), len(channel_data), not_found, failed_reads)
 
         if not channel_data:
-            raise ValueError(f"No valid channels found. Missing: {not_found}")
+            msg = f"No valid channels found. Missing: {not_found}. Failed reads: {failed_reads}"
+            logger.error(msg)
+            raise ValueError(msg)
 
         # Build common time axis
         max_duration = max(t[-1] for _, t, _ in channel_data if len(t) > 0)
@@ -377,6 +544,11 @@ def export_lap(
         return mat_path
 
     finally:
+        if tmp_vch is not None:
+            try:
+                tmp_vch.unlink(missing_ok=True)
+            except OSError:
+                pass
         pythoncom.CoUninitialize()
 
 

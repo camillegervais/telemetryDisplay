@@ -15,17 +15,16 @@ import type { TelDataImportConfig } from "../types/ConfigTypes";
 // Types
 // ---------------------------------------------------------------------------
 
-type Step = "path" | "run" | "lap" | "channels" | "export";
+type Step = "path" | "run" | "lap" | "config" | "validate";
 
 interface TelDataImportModalProps {
   configs: TelDataImportConfig[];
-  /** Called with the .mat path returned by the export endpoint. */
   onImportFromPath: (matPath: string) => Promise<void>;
   onCancel: () => void;
 }
 
 // ---------------------------------------------------------------------------
-// Styles (inline, consistent with existing modals)
+// Styles
 // ---------------------------------------------------------------------------
 
 const overlayStyle: CSSProperties = {
@@ -99,7 +98,7 @@ const rowStyle: CSSProperties = {
 };
 
 // ---------------------------------------------------------------------------
-// Helpers
+// Helper
 // ---------------------------------------------------------------------------
 
 function formatLapTime(ms: number | null): string {
@@ -126,15 +125,40 @@ export function TelDataImportModal({ configs, onImportFromPath, onCancel }: TelD
   const [selectedConfigId, setSelectedConfigId] = useState<string | null>(
     configs.length > 0 ? configs[0].id : null,
   );
+  const [vchPath, setVchPath] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [availableChannels, setAvailableChannels] = useState<string[]>([]);
-  const [exportChannels, setExportChannels] = useState<string[] | null>(null);
-  const [channelFilterInput, setChannelFilterInput] = useState("");
+  const [exportChannels, setExportChannels] = useState<string[]>([]);
+  const [channelFilter, setChannelFilter] = useState("");
 
   const selectedConfig = configs.find((c) => c.id === selectedConfigId) ?? null;
 
-  // ---- Step handlers -------------------------------------------------------
+  // ---------------------------------------------------------------------------
+  // Helpers
+  // ---------------------------------------------------------------------------
+
+  function resolveConfigChannels(
+    available: string[],
+    configChannels: string[],
+  ): { present: Array<{ config: string; actual: string }>; missing: string[] } {
+    const availMap = new Map(available.map((c) => [c.toLowerCase(), c]));
+    const present: Array<{ config: string; actual: string }> = [];
+    const missing: string[] = [];
+    for (const ch of configChannels) {
+      const actual = availMap.get(ch.toLowerCase());
+      if (actual !== undefined) {
+        present.push({ config: ch, actual });
+      } else {
+        missing.push(ch);
+      }
+    }
+    return { present, missing };
+  }
+
+  // ---------------------------------------------------------------------------
+  // Step handlers
+  // ---------------------------------------------------------------------------
 
   async function handleOpenArchive() {
     const path = archivePath.trim();
@@ -169,29 +193,34 @@ export function TelDataImportModal({ configs, onImportFromPath, onCancel }: TelD
     }
   }
 
-  async function handleSelectLap(lapId: number) {
+  function handleSelectLap(lapId: number) {
     setSelectedLapId(lapId);
+    setAvailableChannels([]);
+    setExportChannels([]);
+    setChannelFilter("");
+    setStep("config");
+  }
+
+  async function handleLoadChannels() {
+    if (sessionId === null || selectedRunId === null || selectedLapId === null) return;
     setLoading(true);
     setError(null);
     try {
-      if (sessionId === null || selectedRunId === null) {
-        throw new Error("Session or run not set");
-      }
-      const ch = await getTelDataChannels(sessionId, selectedRunId, lapId);
-      setAvailableChannels(ch.channels || []);
-      
-      // Initialize exportChannels from config, but use actual channel names from available channels
+      const ch = await getTelDataChannels(
+        sessionId,
+        selectedRunId,
+        selectedLapId,
+        vchPath || undefined,
+      );
+      const available = ch.channels || [];
+      setAvailableChannels(available);
       if (selectedConfig) {
-        const availableSet = new Map(ch.channels.map(c => [c.toLowerCase(), c]));
-        const normalized = selectedConfig.channels
-          .map(c => availableSet.get(c.toLowerCase()) ?? c)
-          .filter(c => availableSet.has(c.toLowerCase()));
-        setExportChannels(normalized);
+        const { present } = resolveConfigChannels(available, selectedConfig.channels);
+        setExportChannels(present.map((p) => p.actual));
       } else {
         setExportChannels([]);
       }
-      
-      setStep("channels");
+      setStep("validate");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Impossible de charger les channels");
     } finally {
@@ -200,7 +229,14 @@ export function TelDataImportModal({ configs, onImportFromPath, onCancel }: TelD
   }
 
   async function handleExport() {
-    if (!sessionId || selectedRunId === null || selectedLapId === null || !selectedConfig || !exportChannels) return;
+    if (
+      !sessionId ||
+      selectedRunId === null ||
+      selectedLapId === null ||
+      !selectedConfig ||
+      exportChannels.length === 0
+    )
+      return;
     setLoading(true);
     setError(null);
     try {
@@ -210,10 +246,9 @@ export function TelDataImportModal({ configs, onImportFromPath, onCancel }: TelD
         selectedLapId,
         exportChannels,
         selectedConfig.targetFrequencyHz,
+        vchPath || undefined,
       );
-      // Feed the generated .mat directly into the existing import pipeline
       await onImportFromPath(exportResult.mat_path);
-      // Clean up session (best effort)
       void closeTelDataSession(sessionId);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Echec de l'export");
@@ -222,90 +257,56 @@ export function TelDataImportModal({ configs, onImportFromPath, onCancel }: TelD
     }
   }
 
-  function handleChannelsNext() {
-    // Proceed to export step after channels selection
-    setStep("export");
-  }
-
   function handleBack() {
     setError(null);
-    if (step === "run") { setStep("path"); setRuns([]); setSelectedRunId(null); }
-    else if (step === "lap") { setStep("run"); setLaps([]); setSelectedLapId(null); }
-    else if (step === "channels") { setStep("lap"); setSelectedLapId(null); setAvailableChannels([]); setExportChannels(null); setChannelFilterInput(""); }
-    else if (step === "export") { setStep("channels"); }
-  }
-
-  // Check if a channel is selected, using case-insensitive comparison
-  function isChannelSelected(ch: string): boolean {
-    if (!exportChannels) return false;
-    const chLower = ch.toLowerCase();
-    return exportChannels.some((ec) => ec.toLowerCase() === chLower);
-  }
-
-  // Add or get the canonical name from exportChannels (if exists with different case)
-  function getCanonicalChannelName(ch: string): string {
-    if (!exportChannels) return ch;
-    const chLower = ch.toLowerCase();
-    const existing = exportChannels.find((ec) => ec.toLowerCase() === chLower);
-    return existing ?? ch;
-  }
-
-  // Toggle channel selection, preserving case from available channels
-  function toggleChannelSelection(ch: string) {
-    setExportChannels((prev) => {
-      const base = prev ?? [];
-      const chLower = ch.toLowerCase();
-      const existingIdx = base.findIndex((ec) => ec.toLowerCase() === chLower);
-      if (existingIdx >= 0) {
-        // Remove
-        return base.filter((_, i) => i !== existingIdx);
-      } else {
-        // Add
-        return [...base, ch];
-      }
-    });
-  }
-
-  // Simple edit distance for suggestion ranking
-  function levenshtein(a: string, b: string): number {
-    const m = a.length, n = b.length;
-    const dp: number[][] = Array.from({ length: m + 1 }, () => Array(n + 1).fill(0));
-    for (let i = 0; i <= m; i++) dp[i][0] = i;
-    for (let j = 0; j <= n; j++) dp[0][j] = j;
-    for (let i = 1; i <= m; i++) {
-      for (let j = 1; j <= n; j++) {
-        dp[i][j] = Math.min(
-          dp[i-1][j] + 1,
-          dp[i][j-1] + 1,
-          dp[i-1][j-1] + (a[i-1] === b[j-1] ? 0 : 1),
-        );
-      }
+    if (step === "run") {
+      setStep("path");
+      setRuns([]);
+      setSelectedRunId(null);
+    } else if (step === "lap") {
+      setStep("run");
+      setLaps([]);
+      setSelectedLapId(null);
+    } else if (step === "config") {
+      setStep("lap");
+      setSelectedLapId(null);
+    } else if (step === "validate") {
+      setStep("config");
+      setAvailableChannels([]);
+      setExportChannels([]);
+      setChannelFilter("");
     }
-    return dp[m][n];
   }
 
-  function suggestMatches(missing: string, available: string[], max = 3): string[] {
-    const lower = missing.toLowerCase();
-    const candidates = available.map((a) => ({ name: a, score: levenshtein(lower, a.toLowerCase()) }));
-    candidates.sort((x, y) => x.score - y.score);
-    return candidates.slice(0, max).map((c) => c.name);
-  }
-
-  // ---- Step labels ---------------------------------------------------------
+  // ---------------------------------------------------------------------------
+  // Derived
+  // ---------------------------------------------------------------------------
 
   const stepLabels: Record<Step, string> = {
     path: "1 — Archive",
     run: "2 — Run",
     lap: "3 — Lap",
-    channels: "4 — Sélectionner canaux",
-    export: "5 — Exporter",
+    config: "4 — Config & .vch",
+    validate: "5 — Validation & Export",
   };
 
-  // ---- Render --------------------------------------------------------------
+  const channelStatus = selectedConfig
+    ? resolveConfigChannels(availableChannels, selectedConfig.channels)
+    : { present: [], missing: [] };
+
+  const filteredAvailable = availableChannels.filter((ch) =>
+    ch.toLowerCase().includes(channelFilter.toLowerCase()),
+  );
+
+  // ---------------------------------------------------------------------------
+  // Render
+  // ---------------------------------------------------------------------------
 
   return (
     <div style={overlayStyle} onClick={onCancel}>
       <div style={modalStyle} onClick={(e) => e.stopPropagation()}>
+
+        {/* Header */}
         <div>
           <div style={headerStyle}>Import TelData</div>
           <div style={{ fontSize: "0.78rem", color: "rgba(255,255,255,0.5)" }}>
@@ -313,35 +314,57 @@ export function TelDataImportModal({ configs, onImportFromPath, onCancel }: TelD
           </div>
         </div>
 
-        {error ? (
-          <div style={{ color: "var(--accent)", fontSize: "0.82rem", padding: "0.4rem 0.6rem", border: "1px solid rgba(255,70,93,0.4)", borderRadius: "3px" }}>
+        {/* Error */}
+        {error && (
+          <div
+            style={{
+              color: "var(--accent)",
+              fontSize: "0.82rem",
+              padding: "0.4rem 0.6rem",
+              border: "1px solid rgba(255,70,93,0.4)",
+              borderRadius: "3px",
+            }}
+          >
             {error}
           </div>
-        ) : null}
+        )}
 
-        {/* ---- Step: path ---- */}
-        {step === "path" ? (
+        {/* ------------------------------------------------------------------ */}
+        {/* Step: path                                                          */}
+        {/* ------------------------------------------------------------------ */}
+        {step === "path" && (
           <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
             <label style={{ fontSize: "0.8rem", color: "rgba(255,255,255,0.6)" }}>
               Chemin de l'archive TelDataX4
             </label>
-            {loading ? (<div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "0.5rem", padding: "1rem", color: "var(--accent)" }}>
-                  <span className="loading-spinner" aria-hidden="true" />
-                  Chargement des runs...
-                </div>
-              ) : (
-            <input
-              style={inputStyle}
-              type="text"
-              value={archivePath}
-              onChange={(e) => setArchivePath(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && void handleOpenArchive()}
-              placeholder="\\server\share\run ou C:\WinTAX4\Data\..."
-              autoFocus
-            />
-              )}
+            {loading ? (
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "0.5rem",
+                  padding: "1rem",
+                  color: "var(--accent)",
+                }}
+              >
+                <span className="loading-spinner" aria-hidden="true" />
+                Ouverture de l'archive...
+              </div>
+            ) : (
+              <input
+                style={inputStyle}
+                type="text"
+                value={archivePath}
+                onChange={(e) => setArchivePath(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && void handleOpenArchive()}
+                placeholder="\\server\share\run ou C:\WinTAX4\Data\..."
+                autoFocus
+              />
+            )}
             <div style={rowStyle}>
-              <button className="small-button" onClick={onCancel} disabled={loading}>Annuler</button>
+              <button className="small-button" onClick={onCancel} disabled={loading}>
+                Annuler
+              </button>
               <button
                 className="import-button"
                 onClick={() => void handleOpenArchive()}
@@ -351,27 +374,49 @@ export function TelDataImportModal({ configs, onImportFromPath, onCancel }: TelD
               </button>
             </div>
           </div>
-        ) : null}
+        )}
 
-        {/* ---- Step: run ---- */}
-        {step === "run" ? (
+        {/* ------------------------------------------------------------------ */}
+        {/* Step: run                                                           */}
+        {/* ------------------------------------------------------------------ */}
+        {step === "run" && (
           <div style={{ display: "flex", flexDirection: "column", gap: "0.4rem" }}>
             <label style={{ fontSize: "0.8rem", color: "rgba(255,255,255,0.6)" }}>
               Sélectionner un run ({runs.length})
             </label>
-            <div style={{ display: "flex", flexDirection: "column", gap: "0.25rem", maxHeight: "50vh", overflowY: "auto" }}>
+            <div
+              style={{
+                display: "flex",
+                flexDirection: "column",
+                gap: "0.25rem",
+                maxHeight: "52vh",
+                overflowY: "auto",
+              }}
+            >
               {loading ? (
-                <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "0.5rem", padding: "1rem", color: "var(--accent)" }}>
-                  <span className="loading-spinner" aria-hidden="true" />
-                  Chargement des tours...
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "0.5rem",
+                    padding: "1rem",
+                    color: "var(--accent)",
+                  }}
+                >
+                  <span className="loading-spinner" aria-hidden="true" /> Chargement...
                 </div>
               ) : runs.length === 0 ? (
-                <div style={{ color: "rgba(255,255,255,0.7)", padding: "1rem" }}>Aucun run trouvé.</div>
+                <div style={{ color: "rgba(255,255,255,0.6)", padding: "1rem" }}>
+                  Aucun run trouvé.
+                </div>
               ) : (
                 runs.map((run) => (
                   <button
                     key={run.id}
-                    style={{ ...(selectedRunId === run.id ? listItemSelected : listItemBase), paddingLeft: `${0.75 + run.level * 1.2}rem` }}
+                    style={{
+                      ...(selectedRunId === run.id ? listItemSelected : listItemBase),
+                      paddingLeft: `${0.75 + run.level * 1.2}rem`,
+                    }}
                     onClick={() => void handleSelectRun(run.id)}
                     disabled={loading}
                   >
@@ -386,43 +431,72 @@ export function TelDataImportModal({ configs, onImportFromPath, onCancel }: TelD
               )}
             </div>
             <div style={rowStyle}>
-              <button className="small-button" onClick={handleBack} disabled={loading}>Retour</button>
+              <button className="small-button" onClick={handleBack} disabled={loading}>
+                Retour
+              </button>
             </div>
           </div>
-        ) : null}
+        )}
 
-        {/* ---- Step: lap ---- */}
-        {step === "lap" ? (
+        {/* ------------------------------------------------------------------ */}
+        {/* Step: lap                                                           */}
+        {/* ------------------------------------------------------------------ */}
+        {step === "lap" && (
           <div style={{ display: "flex", flexDirection: "column", gap: "0.4rem" }}>
             <label style={{ fontSize: "0.8rem", color: "rgba(255,255,255,0.6)" }}>
               Sélectionner un lap ({laps.length})
             </label>
-            <div style={{ display: "flex", flexDirection: "column", gap: "0.25rem", maxHeight: "50vh", overflowY: "auto" }}>
-              {loading ? (
-                <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "0.5rem", padding: "1rem", color: "var(--accent)" }}>
-                  <span className="loading-spinner" aria-hidden="true" />
-                  Chargement des channels...
+            <div
+              style={{
+                display: "flex",
+                flexDirection: "column",
+                gap: "0.25rem",
+                maxHeight: "52vh",
+                overflowY: "auto",
+              }}
+            >
+              {laps.length === 0 ? (
+                <div style={{ color: "rgba(255,255,255,0.6)", padding: "1rem" }}>
+                  Aucun tour trouvé.
                 </div>
-              ) : laps.length === 0 ? (
-                <div style={{ color: "rgba(255,255,255,0.7)", padding: "1rem" }}>Aucun tour trouvé.</div>
               ) : (
                 laps.map((lap) => (
                   <button
                     key={lap.id}
                     style={selectedLapId === lap.id ? listItemSelected : listItemBase}
-                    onClick={() => void handleSelectLap(lap.id)}
-                    disabled={loading}
+                    onClick={() => handleSelectLap(lap.id)}
                   >
-                    <span style={{ display: "flex", justifyContent: "space-between", width: "100%", alignItems: "center" }}>
+                    <span
+                      style={{
+                        display: "flex",
+                        justifyContent: "space-between",
+                        width: "100%",
+                        alignItems: "center",
+                      }}
+                    >
                       <span>
-                        <span style={{ opacity: 0.45, marginRight: "0.4rem", fontSize: "0.76rem" }}>#{lap.id}</span>
+                        <span
+                          style={{
+                            opacity: 0.45,
+                            marginRight: "0.4rem",
+                            fontSize: "0.76rem",
+                          }}
+                        >
+                          #{lap.id}
+                        </span>
                         {lap.driver_name ? (
                           <strong>{lap.driver_name}</strong>
                         ) : (
                           <span style={{ opacity: 0.55 }}>Inconnu</span>
                         )}
                       </span>
-                      <span style={{ opacity: 0.65, fontSize: "0.8rem", fontVariantNumeric: "tabular-nums" }}>
+                      <span
+                        style={{
+                          opacity: 0.65,
+                          fontSize: "0.8rem",
+                          fontVariantNumeric: "tabular-nums",
+                        }}
+                      >
                         {formatLapTime(lap.lap_time_ms)}
                       </span>
                     </span>
@@ -431,134 +505,54 @@ export function TelDataImportModal({ configs, onImportFromPath, onCancel }: TelD
               )}
             </div>
             <div style={rowStyle}>
-              <button className="small-button" onClick={handleBack} disabled={loading}>Retour</button>
-            </div>
-          </div>
-        ) : null}
-
-        {/* ---- Step: channels ---- */}
-        {step === "channels" ? (
-          <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
-            <label style={{ fontSize: "0.8rem", color: "rgba(255,255,255,0.6)" }}>
-              Canaux disponibles ({availableChannels.length})
-            </label>
-            
-            {/* Filter input */}
-            <input
-              type="text"
-              placeholder="Filtrer les canaux..."
-              value={channelFilterInput}
-              onChange={(e) => setChannelFilterInput(e.target.value)}
-              style={inputStyle}
-            />
-
-            {loading ? (
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "0.5rem", padding: "1rem", color: "var(--accent)" }}>
-                <span className="loading-spinner" aria-hidden="true" />
-                Chargement...
-              </div>
-            ) : (
-              <>
-                {/* List of available channels with checkboxes */}
-                <div style={{ display: "flex", flexDirection: "column", gap: "0.2rem", maxHeight: "40vh", overflowY: "auto", border: "1px solid rgba(255,70,93,0.15)", borderRadius: "3px", padding: "0.4rem" }}>
-                  {availableChannels.length === 0 ? (
-                    <div style={{ color: "rgba(255,255,255,0.6)", padding: "0.5rem" }}>Aucun channel trouvé.</div>
-                  ) : (
-                    availableChannels
-                      .filter((ch) => ch.toLowerCase().includes(channelFilterInput.toLowerCase()))
-                      .map((ch) => {
-                        const isChecked = isChannelSelected(ch);
-                        return (
-                          <label key={ch} style={{ display: "flex", alignItems: "center", gap: "0.4rem", padding: "0.3rem 0.4rem", cursor: "pointer", fontSize: "0.8rem" }}>
-                            <input
-                              type="checkbox"
-                              checked={isChecked}
-                              onChange={() => toggleChannelSelection(ch)}
-                              style={{ cursor: "pointer" }}
-                            />
-                            <span style={{ fontFamily: "monospace" }}>{ch}</span>
-                          </label>
-                        );
-                      })
-                  )}
-                </div>
-
-                {/* Missing channels section */}
-                {selectedConfig && (
-                  <div style={{ marginTop: "0.4rem" }}>
-                    <div style={{ fontSize: "0.78rem", color: "rgba(255,255,255,0.55)", marginBottom: "0.25rem" }}>
-                      Canaux de la config "{selectedConfig.name}" non disponibles
-                    </div>
-                    {selectedConfig.channels.filter((c) => !availableChannels.map(a => a.toLowerCase()).includes(c.toLowerCase())).length === 0 ? (
-                      <div style={{ color: "rgba(255,255,255,0.6)", fontSize: "0.78rem" }}>
-                        Tous les canaux de la config sont présents.
-                      </div>
-                    ) : (
-                      <div style={{ display: "flex", flexDirection: "column", gap: "0.35rem" }}>
-                        {selectedConfig.channels
-                          .filter((c) => !availableChannels.map(a => a.toLowerCase()).includes(c.toLowerCase()))
-                          .map((missing) => (
-                            <div key={missing} style={{ padding: "0.35rem 0.4rem", border: "1px dashed rgba(255,70,93,0.2)", borderRadius: "3px", fontSize: "0.78rem" }}>
-                              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: "0.4rem" }}>
-                                <div style={{ fontFamily: "monospace" }}>{missing}</div>
-                                <div style={{ display: "flex", gap: "0.3rem", flexWrap: "wrap", justifyContent: "flex-end" }}>
-                                  {suggestMatches(missing, availableChannels, 3).map((s) => (
-                                    <button
-                                      key={s}
-                                      className="small-button"
-                                      onClick={() => toggleChannelSelection(s)}
-                                      style={{ fontSize: "0.75rem" }}
-                                    >
-                                      + {s}
-                                    </button>
-                                  ))}
-                                </div>
-                              </div>
-                            </div>
-                          ))}
-                      </div>
-                    )}
-                  </div>
-                )}
-              </>
-            )}
-
-            <div style={rowStyle}>
-              <button className="small-button" onClick={handleBack} disabled={loading}>Retour</button>
-              <button
-                className="import-button"
-                onClick={handleChannelsNext}
-                disabled={!exportChannels || exportChannels.length === 0 || loading}
-              >
-                Suivant
+              <button className="small-button" onClick={handleBack}>
+                Retour
               </button>
             </div>
           </div>
-        ) : null}
+        )}
 
-        {/* ---- Step: config ---- */}
-        {step === "export" ? (
+        {/* ------------------------------------------------------------------ */}
+        {/* Step: config                                                        */}
+        {/* ------------------------------------------------------------------ */}
+        {step === "config" && (
           <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
             {configs.length === 0 ? (
               <p style={{ fontSize: "0.82rem", color: "rgba(255,255,255,0.5)" }}>
-                Aucune config TelData sauvegardée. Créez-en une dans le panneau "Configs TelData".
+                Aucune config sauvegardée. Créez-en une dans le panneau "Configs TelData".
               </p>
             ) : (
               <>
                 <div>
                   <label style={{ fontSize: "0.8rem", color: "rgba(255,255,255,0.6)" }}>
-                    Config de resampling
+                    Config d'import (channels + fréquence)
                   </label>
-                  <div style={{ display: "flex", flexDirection: "column", gap: "0.25rem", marginTop: "0.3rem" }}>
+                  <div
+                    style={{
+                      display: "flex",
+                      flexDirection: "column",
+                      gap: "0.25rem",
+                      marginTop: "0.3rem",
+                    }}
+                  >
                     {configs.map((cfg) => (
                       <button
                         key={cfg.id}
                         style={selectedConfigId === cfg.id ? listItemSelected : listItemBase}
                         onClick={() => setSelectedConfigId(cfg.id)}
                       >
-                        <strong>{cfg.name}</strong>
-                        <span style={{ marginLeft: "0.5rem", opacity: 0.6, fontSize: "0.76rem" }}>
-                          {cfg.targetFrequencyHz} Hz
+                        <span
+                          style={{
+                            display: "flex",
+                            justifyContent: "space-between",
+                            alignItems: "baseline",
+                            width: "100%",
+                          }}
+                        >
+                          <strong>{cfg.name}</strong>
+                          <span style={{ opacity: 0.55, fontSize: "0.76rem" }}>
+                            {cfg.channels.length} canaux — {cfg.targetFrequencyHz} Hz
+                          </span>
                         </span>
                       </button>
                     ))}
@@ -566,36 +560,257 @@ export function TelDataImportModal({ configs, onImportFromPath, onCancel }: TelD
                 </div>
 
                 {selectedConfig && (
-                  <div style={{ marginTop: "0.4rem", padding: "0.6rem", border: "1px solid rgba(255,70,93,0.15)", borderRadius: "3px" }}>
-                    <div style={{ fontSize: "0.78rem", color: "rgba(255,255,255,0.55)", marginBottom: "0.4rem" }}>
-                      Résumé de l'export
-                    </div>
-                    <div style={{ fontSize: "0.78rem", lineHeight: 1.6, color: "rgba(255,255,255,0.7)" }}>
-                      <div><strong>Fréquence :</strong> {selectedConfig.targetFrequencyHz} Hz</div>
-                      <div><strong>Canaux :</strong> {exportChannels?.length ?? 0}</div>
-                      {exportChannels && exportChannels.length > 0 && (
-                        <div style={{ marginTop: "0.3rem", fontSize: "0.75rem", opacity: 0.6 }}>
-                          {exportChannels.join(", ")}
-                        </div>
-                      )}
-                    </div>
+                  <div style={{ fontSize: "0.76rem", color: "rgba(255,255,255,0.4)", lineHeight: 1.6 }}>
+                    {selectedConfig.channels.join(", ")}
                   </div>
                 )}
-            {loading ? (
-              <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", padding: "0.75rem 0", color: "var(--accent)" }}>
+
+                <div>
+                  <label style={{ fontSize: "0.8rem", color: "rgba(255,255,255,0.6)" }}>
+                    Dossier / fichier .vch{" "}
+                    <span style={{ opacity: 0.5 }}>(optionnel — math channels)</span>
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="C:\WinTAX4\Libraries\... ou \\server\..."
+                    value={vchPath}
+                    onChange={(e) => setVchPath(e.target.value)}
+                    style={{ ...inputStyle, marginTop: "0.25rem" }}
+                  />
+                </div>
+              </>
+            )}
+
+            {loading && (
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "0.5rem",
+                  padding: "0.5rem 0",
+                  color: "var(--accent)",
+                }}
+              >
                 <span className="loading-spinner" aria-hidden="true" />
-                Création du fichier .mat en cours...
+                Chargement des channels...
               </div>
-            ) : null}
-          </>
-        )}
+            )}
 
             <div style={rowStyle}>
-              <button className="small-button" onClick={handleBack} disabled={loading}>Retour</button>
+              <button className="small-button" onClick={handleBack} disabled={loading}>
+                Retour
+              </button>
+              <button
+                className="import-button"
+                onClick={() => void handleLoadChannels()}
+                disabled={!selectedConfig || loading}
+              >
+                {loading ? "Chargement..." : "Charger les channels →"}
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* ------------------------------------------------------------------ */}
+        {/* Step: validate                                                      */}
+        {/* ------------------------------------------------------------------ */}
+        {step === "validate" && selectedConfig && (
+          <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
+
+            {/* Config channel status */}
+            <div>
+              <div
+                style={{
+                  fontSize: "0.8rem",
+                  color: "rgba(255,255,255,0.6)",
+                  marginBottom: "0.35rem",
+                }}
+              >
+                Canaux de la config "{selectedConfig.name}"
+                <span style={{ marginLeft: "0.4rem", opacity: 0.5 }}>
+                  ({channelStatus.present.length}/{selectedConfig.channels.length} présents)
+                </span>
+              </div>
+              <div
+                style={{
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: "0.2rem",
+                  maxHeight: "22vh",
+                  overflowY: "auto",
+                  border: "1px solid rgba(255,70,93,0.12)",
+                  borderRadius: "3px",
+                  padding: "0.4rem",
+                }}
+              >
+                {selectedConfig.channels.map((ch) => {
+                  const found = channelStatus.present.find((p) => p.config === ch);
+                  return (
+                    <div
+                      key={ch}
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "0.5rem",
+                        fontSize: "0.8rem",
+                        padding: "0.2rem 0.3rem",
+                      }}
+                    >
+                      <span
+                        style={{
+                          color: found ? "#4caf50" : "rgba(255,70,93,0.9)",
+                          fontSize: "0.85rem",
+                          fontWeight: "bold",
+                          minWidth: "1rem",
+                        }}
+                      >
+                        {found ? "✓" : "✗"}
+                      </span>
+                      <span
+                        style={{ fontFamily: "monospace", opacity: found ? 1 : 0.5 }}
+                      >
+                        {ch}
+                      </span>
+                      {found && found.actual !== ch && (
+                        <span style={{ fontSize: "0.72rem", opacity: 0.45 }}>
+                          → {found.actual}
+                        </span>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+              {channelStatus.missing.length > 0 && (
+                <div
+                  style={{
+                    fontSize: "0.76rem",
+                    color: "rgba(255,70,93,0.7)",
+                    marginTop: "0.25rem",
+                  }}
+                >
+                  {channelStatus.missing.length} can
+                  {channelStatus.missing.length > 1 ? "aux" : "al"} introuvable
+                  {channelStatus.missing.length > 1 ? "s" : ""} — ignoré
+                  {channelStatus.missing.length > 1 ? "s" : ""} à l'export.
+                </div>
+              )}
+            </div>
+
+            {/* All available channels — filterable reference list */}
+            <div>
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  marginBottom: "0.25rem",
+                }}
+              >
+                <div style={{ fontSize: "0.8rem", color: "rgba(255,255,255,0.6)" }}>
+                  Tous les canaux disponibles ({availableChannels.length})
+                </div>
+                <input
+                  type="text"
+                  placeholder="Filtrer..."
+                  value={channelFilter}
+                  onChange={(e) => setChannelFilter(e.target.value)}
+                  style={{ ...inputStyle, width: "45%", padding: "0.3rem 0.5rem" }}
+                />
+              </div>
+              <div
+                style={{
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: "0.15rem",
+                  maxHeight: "22vh",
+                  overflowY: "auto",
+                  border: "1px solid rgba(255,70,93,0.12)",
+                  borderRadius: "3px",
+                  padding: "0.4rem",
+                }}
+              >
+                {filteredAvailable.length === 0 ? (
+                  <div style={{ color: "rgba(255,255,255,0.5)", fontSize: "0.8rem" }}>
+                    Aucun résultat.
+                  </div>
+                ) : (
+                  filteredAvailable.map((ch) => {
+                    const inConfig = selectedConfig.channels.some(
+                      (c) => c.toLowerCase() === ch.toLowerCase(),
+                    );
+                    return (
+                      <div
+                        key={ch}
+                        style={{
+                          fontSize: "0.78rem",
+                          fontFamily: "monospace",
+                          padding: "0.15rem 0.3rem",
+                          color: inConfig
+                            ? "rgba(255,255,255,0.9)"
+                            : "rgba(255,255,255,0.4)",
+                        }}
+                      >
+                        {ch}
+                        {inConfig && (
+                          <span
+                            style={{
+                              marginLeft: "0.4rem",
+                              color: "#4caf50",
+                              fontSize: "0.7rem",
+                            }}
+                          >
+                            ✓ config
+                          </span>
+                        )}
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+            </div>
+
+            {/* Export summary */}
+            <div
+              style={{
+                fontSize: "0.78rem",
+                padding: "0.5rem 0.6rem",
+                border: "1px solid rgba(255,70,93,0.12)",
+                borderRadius: "3px",
+                color: "rgba(255,255,255,0.6)",
+                lineHeight: 1.7,
+              }}
+            >
+              <strong style={{ color: "rgba(255,255,255,0.8)" }}>Export :</strong>{" "}
+              {exportChannels.length} can{exportChannels.length !== 1 ? "aux" : "al"} —{" "}
+              {selectedConfig.targetFrequencyHz} Hz
+              {vchPath && (
+                <div style={{ opacity: 0.55, fontSize: "0.74rem" }}>VCH : {vchPath}</div>
+              )}
+            </div>
+
+            {loading && (
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "0.5rem",
+                  color: "var(--accent)",
+                  fontSize: "0.82rem",
+                }}
+              >
+                <span className="loading-spinner" aria-hidden="true" />
+                Création du fichier .mat...
+              </div>
+            )}
+
+            <div style={rowStyle}>
+              <button className="small-button" onClick={handleBack} disabled={loading}>
+                Retour
+              </button>
               <button
                 className="import-button"
                 onClick={() => void handleExport()}
-                disabled={!selectedConfig || !exportChannels || exportChannels.length === 0 || loading}
+                disabled={exportChannels.length === 0 || loading}
               >
                 {loading ? (
                   <span className="loading-inline">
@@ -603,12 +818,13 @@ export function TelDataImportModal({ configs, onImportFromPath, onCancel }: TelD
                     Export + import...
                   </span>
                 ) : (
-                  "Exporter et charger"
+                  `Exporter ${exportChannels.length} can${exportChannels.length !== 1 ? "aux" : "al"}`
                 )}
               </button>
             </div>
           </div>
-        ) : null}
+        )}
+
       </div>
     </div>
   );

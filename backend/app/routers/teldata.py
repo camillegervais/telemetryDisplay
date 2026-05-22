@@ -65,7 +65,7 @@ def get_laps(session_id: str, request: TelDataLapsRequest) -> TelDataLapsRespons
 @router.post("/{session_id}/channels", response_model=TelDataChannelsResponse)
 def get_channels_route(session_id: str, request: TelDataChannelsRequest) -> TelDataChannelsResponse:
     try:
-        channels = teldata_bridge.get_channels(session_id, request.run_id, request.lap_id)
+        channels = teldata_bridge.get_channels(session_id, request.run_id, request.lap_id, request.vch_path)
         return TelDataChannelsResponse(channels=channels)
     except KeyError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
@@ -81,6 +81,8 @@ def export_teldata(session_id: str, request: TelDataExportRequest) -> TelDataExp
     Resample the requested channels to a common time axis and write a .mat file
     to the import cache.  The returned mat_path can be fed directly to
     POST /api/datasets/import-from-path to load the dataset.
+    
+    If vch_path is provided, loads the .vch file to enable math channel computation.
     """
     try:
         mat_path = teldata_bridge.export_lap(
@@ -90,6 +92,7 @@ def export_teldata(session_id: str, request: TelDataExportRequest) -> TelDataExp
             channels=request.channels,
             target_frequency_hz=request.target_frequency_hz,
             output_dir=_IMPORT_CACHE,
+            vch_path=request.vch_path,
         )
         return TelDataExportResponse(mat_path=str(mat_path))
     except KeyError as exc:

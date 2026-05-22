@@ -233,11 +233,11 @@ export type TelDataChannelsResponse = {
   channels: string[];
 };
 
-export async function getTelDataChannels(sessionId: string, runId: number, lapId: number): Promise<TelDataChannelsResponse> {
+export async function getTelDataChannels(sessionId: string, runId: number, lapId: number, vchPath?: string): Promise<TelDataChannelsResponse> {
   const response = await fetch(`${API_BASE_URL}/teldata/${sessionId}/channels`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ run_id: runId, lap_id: lapId }),
+    body: JSON.stringify({ run_id: runId, lap_id: lapId, ...(vchPath && { vch_path: vchPath }) }),
   });
   if (!response.ok) {
     const payload = await response.json().catch(() => ({ detail: "Failed to get channels" }));
@@ -278,6 +278,7 @@ export async function exportTelData(
   lapId: number,
   channels: string[],
   targetFrequencyHz: number,
+  vchPath?: string,
 ): Promise<TelDataExportResponse> {
   const response = await fetch(`${API_BASE_URL}/teldata/${sessionId}/export`, {
     method: "POST",
@@ -287,6 +288,7 @@ export async function exportTelData(
       lap_id: lapId,
       channels,
       target_frequency_hz: targetFrequencyHz,
+      ...(vchPath && { vch_path: vchPath }),
     }),
   });
   if (!response.ok) {

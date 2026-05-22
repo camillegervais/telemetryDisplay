@@ -143,6 +143,7 @@ class TelDataLapsResponse(BaseModel):
 class TelDataChannelsRequest(BaseModel):
     run_id: int
     lap_id: int
+    vch_path: Optional[str] = Field(default=None, description="Optional .vch file path to enable math channels")
 
 
 class TelDataChannelsResponse(BaseModel):
@@ -154,6 +155,7 @@ class TelDataExportRequest(BaseModel):
     lap_id: int
     channels: List[str] = Field(..., min_length=1)
     target_frequency_hz: float = Field(default=100.0, gt=0)
+    vch_path: Optional[str] = Field(default=None, description="Optional path to .vch file for math channels")
 
 
 class TelDataExportResponse(BaseModel):
