@@ -306,10 +306,5 @@ export type ParsedTomlData = {
   };
   telDataConfigs: {
     items: TelDataImportConfig[];
-    count: number;
-  };
-  meta?: {
-    version: string;
-    exportDate: string;
-  };
-};
+  }
+}
