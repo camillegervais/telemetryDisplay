@@ -127,6 +127,17 @@ export function ImportSelectionModal({ data, onConfirm, onCancel, isLoading = fa
     gap: "0.4rem",
   };
 
+  const smallButtonStyle: CSSProperties = {
+    marginBottom: "0.6rem",
+    padding: "0.3rem 0.6rem",
+    fontSize: "0.75rem",
+    cursor: "pointer",
+    borderRadius: "4px",
+    border: "1px solid rgba(52, 211, 153, 0.6)",
+    background: "rgba(22, 8, 12, 0.6)",
+    color: "var(--fg-1)",
+  };
+
   const footerStyle: CSSProperties = {
     display: "flex",
     gap: "1rem",
@@ -202,6 +213,54 @@ export function ImportSelectionModal({ data, onConfirm, onCancel, isLoading = fa
           : (prev.softBlocks?.selectedIds || []).filter((id) => id !== blockId),
       },
     }));
+  };
+
+  const handleSelectAllLayouts = () => {
+    setSelection((prev) => {
+      const allIds = data.layouts.items.map((l) => l.id);
+      const currentlySelected = prev.layouts?.selectedIds || [];
+      const allSelected = currentlySelected.length === allIds.length && allIds.length > 0;
+      return {
+        ...prev,
+        layouts: {
+          ...prev.layouts!,
+          enabled: true,
+          selectedIds: allSelected ? [] : allIds,
+        },
+      };
+    });
+  };
+
+  const handleSelectAllMapConfigs = () => {
+    setSelection((prev) => {
+      const allKeys = data.mapConfigs.keys || [];
+      const currentlySelected = prev.mapConfigs?.selectedKeys || [];
+      const allSelected = currentlySelected.length === allKeys.length && allKeys.length > 0;
+      return {
+        ...prev,
+        mapConfigs: {
+          ...prev.mapConfigs!,
+          enabled: true,
+          selectedKeys: allSelected ? [] : allKeys,
+        },
+      };
+    });
+  };
+
+  const handleSelectAllSoftBlocks = () => {
+    setSelection((prev) => {
+      const allIds = data.softBlocks.items.map((b) => b.id);
+      const currentlySelected = prev.softBlocks?.selectedIds || [];
+      const allSelected = currentlySelected.length === allIds.length && allIds.length > 0;
+      return {
+        ...prev,
+        softBlocks: {
+          ...prev.softBlocks!,
+          enabled: true,
+          selectedIds: allSelected ? [] : allIds,
+        },
+      };
+    });
   };
 
   const handleConfirm = () => {
@@ -287,7 +346,10 @@ export function ImportSelectionModal({ data, onConfirm, onCancel, isLoading = fa
         {/* Layouts Section */}
         {renderSection("Layouts", "layouts", data.layouts.count, (
           <div style={itemsListStyle}>
-            
+            <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: "0.5rem" }}>
+              <button style={smallButtonStyle} onClick={handleSelectAllLayouts}>Tout sélectionner</button>
+            </div>
+
             {data.layouts.items.map((layout) => (
               <label key={layout.id} style={itemCheckboxStyle}>
                 <input
@@ -301,12 +363,13 @@ export function ImportSelectionModal({ data, onConfirm, onCancel, isLoading = fa
           </div>
         ))}
 
-        {/* Math Channels Section */}
-        {renderSection("Canaux Math", "mathChannels", data.mathChannels.count)}
-
         {/* Map Configs Section */}
         {renderSection("Cartos", "mapConfigs", data.mapConfigs.count, (
           <div style={itemsListStyle}>
+            <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: "0.5rem" }}>
+              <button style={smallButtonStyle} onClick={handleSelectAllMapConfigs}>Tout sélectionner</button>
+            </div>
+
             {data.mapConfigs.keys.map((key) => (
               <label key={key} style={itemCheckboxStyle}>
                 <input
@@ -323,6 +386,10 @@ export function ImportSelectionModal({ data, onConfirm, onCancel, isLoading = fa
         {/* Soft Blocks Section */}
         {renderSection("Soft Blocks", "softBlocks", data.softBlocks.count, (
           <div style={itemsListStyle}>
+            <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: "0.5rem" }}>
+              <button style={smallButtonStyle} onClick={handleSelectAllSoftBlocks}>Tout sélectionner</button>
+            </div>
+
             {data.softBlocks.items.map((block) => (
               <label key={block.id} style={itemCheckboxStyle}>
                 <input
