@@ -526,7 +526,7 @@ function buildChartConfig(
       x: xValues,
       y: yValues,
       line: {
-        color: COLORS[index % COLORS.length],
+        color: (ConfigManager.get("signal-colors") as Record<string, string> | undefined)?.[signal] ?? COLORS[index % COLORS.length],
         width: 2,
       },
       yaxis: useSharedYAxis ? "y" : index === 0 ? "y" : `y${index + 1}`,
@@ -674,7 +674,7 @@ function buildXYChartConfig(
       x: xValues,
       y: yValues,
       marker: {
-        color: COLORS[index % COLORS.length],
+        color: (ConfigManager.get("signal-colors") as Record<string, string> | undefined)?.[signal] ?? COLORS[index % COLORS.length],
         size: 5,
         opacity: 0.8,
       },
@@ -795,7 +795,15 @@ export default function SignalWorkspace({
   } = useTelemetryStore();
 
   const initialTab = useMemo(() => createDefaultTab(), []);
-  const [tabs, setTabs] = useState<WorkspaceTab[]>([initialTab]);
+  const [tabs, setTabs] = useState<WorkspaceTab[]>([initialTab]);  
+  // Force re-render when signal color mapping changes so plots update
+  const [, setSignalColorsRevision] = useState(0);
+  useEffect(() => {
+    const unsubscribe = ConfigManager.subscribe("signal-colors", () => {
+      setSignalColorsRevision((v) => v + 1);
+    });
+    return unsubscribe;
+  }, []);
   const [activeTabId, setActiveTabId] = useState<string>(initialTab.id);
   const [gridCols, setGridCols] = useState(initialTab.gridCols);
   const [gridRows, setGridRows] = useState(initialTab.gridRows);

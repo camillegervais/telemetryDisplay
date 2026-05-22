@@ -160,13 +160,20 @@ export function SignalColorManager() {
         <div style={listStyle}>
           {Object.entries(signalColors).map(([signalName, color]) => (
             <div key={signalName} style={itemStyle}>
-              <input
-                type="color"
-                value={color}
-                onChange={(e) => handleColorChange(signalName, e.target.value)}
-                style={swatchStyle}
-                title={`Couleur pour ${signalName}`}
-              />
+              <div style={{ position: "relative", width: "24px", height: "24px", flexShrink: 0 }}>
+                <div
+                  style={{ ...swatchStyle, background: color, position: "absolute", top: 0, left: 0 }}
+                  title={`Modifier couleur pour ${signalName}`}
+                />
+                <input
+                  id={`color-${signalName}`}
+                  type="color"
+                  value={color}
+                  onChange={(e) => handleColorChange(signalName, e.target.value)}
+                  style={{ position: "absolute", top: 0, left: 0, width: "100%", height: "100%", opacity: 0, border: "none", padding: 0, margin: 0, cursor: "pointer" }}
+                  aria-label={`Color picker for ${signalName}`}
+                />
+              </div>
               <div style={signalNameStyle} title={signalName}>
                 {signalName}
               </div>
