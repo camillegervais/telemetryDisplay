@@ -1490,15 +1490,12 @@ export default function SignalWorkspace({
 
   // Listen for layout changes from other tabs (cross-tab sync)
   useEffect(() => {
-    const unsubscribe = ConfigManager.subscribe<SavedWorkspaceConfig[]>("layouts", (newLayouts) => {
-      // Update savedConfigs if different (avoid loops)
-      if (JSON.stringify(newLayouts) !== JSON.stringify(savedConfigs)) {
-        setSavedConfigs(newLayouts);
-      }
-    });
+    const unsubscribe = ConfigManager.subscribeDebouncedFull<SavedWorkspaceConfig[]>("layouts", (newLayouts) => {
+      setSavedConfigs(newLayouts);
+    }, 50);
 
     return () => unsubscribe();
-  }, [savedConfigs]);
+  }, []);
 
   // Listen for session changes from other tabs with debounce (active workspace state)
   // Note: activeTabId is NOT synced to allow different tabs on different windows
@@ -2233,22 +2230,13 @@ export default function SignalWorkspace({
 
     // If the name is already saved, we update the saved configuration
     if(savedConfigs.find(e => e.name === nextName)) {
-      setSavedConfigs((prev) => {
-        const nextConfigs = prev.map((elem) => {
-          if(elem.name === nextName) {
-            return {
-              id: elem.id,
-              name: elem.name,
-              tabs: normalizedTabs,
-              activeTabId,
-              mapTuning: mapTuningData || emptyMapTuningData,
-            };
-          } else {
-            return elem;
-          }
-        });
-        return nextConfigs;
-      });
+      const nextConfigs = savedConfigs.map((elem) =>
+        elem.name === nextName
+          ? { id: elem.id, name: elem.name, tabs: normalizedTabs, activeTabId, mapTuning: mapTuningData || emptyMapTuningData }
+          : elem
+      );
+      setSavedConfigs(nextConfigs);
+      ConfigManager.set("layouts", nextConfigs);
     }
     // Else we add the current configuration
     else {
@@ -2267,14 +2255,10 @@ export default function SignalWorkspace({
       setSelectedConfigId(newId);
 
       // Add the new configuration to the list
-      setSavedConfigs((prev) => {
-        const nextConfigs = [...prev, newConfig];
-        ConfigManager.set("layouts", nextConfigs);
-        return nextConfigs;
-      });
+      const nextConfigs = [...savedConfigs, newConfig];
+      setSavedConfigs(nextConfigs);
+      ConfigManager.set("layouts", nextConfigs);
     }
-    
-    
   }
 
   function loadConfiguration(configId: string) {
