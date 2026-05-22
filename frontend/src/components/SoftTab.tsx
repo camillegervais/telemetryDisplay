@@ -353,9 +353,10 @@ const BlockCard: React.FC<{
   onUpdate: (patch: Partial<SoftBlock>) => void;
   onDelete: () => void;
   onCalculate: () => void;
+  onDuplicate?: () => void;
   mapConfigs: Record<string, MapTuningData>;
   onSwitchToMapTuning?: () => void;
-}> = ({ block, blockIndex, allBlocks, baseSignals, status, onUpdate, onDelete, onCalculate, mapConfigs, onSwitchToMapTuning }) => {
+}> = ({ block, blockIndex, allBlocks, baseSignals, status, onUpdate, onDelete, onCalculate, onDuplicate, mapConfigs, onSwitchToMapTuning }) => {
   const [collapsed, setCollapsed] = useState(true);
   const [nameEdit, setNameEdit] = useState(block.name);
 
@@ -434,6 +435,7 @@ const BlockCard: React.FC<{
         >
           {status.state === "running" ? "…" : "▶ Run"}
         </button>
+        <button className="soft-icon-btn" onClick={onDuplicate} title="Dupliquer le bloc">⧉</button>
         <button className="soft-icon-btn soft-icon-btn-danger" onClick={onDelete} title="Supprimer le bloc">×</button>
       </div>
 
@@ -508,6 +510,84 @@ export default function SoftTab({
     onChange(softBlocks.filter((b) => b.id !== blockId));
   }, [softBlocks, onChange]);
 
+  const duplicateBlock = useCallback((blockId: string) => {
+    const idx = softBlocks.findIndex((b) => b.id === blockId);
+    if (idx === -1) return;
+    const src = softBlocks[idx];
+
+    // Helper: strip existing _EvoN suffix if present
+    const stripEvo = (s: string) => s.replace(/_Evo\d+$/, "");
+
+    // Find next global Evo counter by scanning all block/operation names
+    let maxN = 0;
+    const evoRe = /_Evo(\d+)$/;
+    for (const b of softBlocks) {
+      const m = b.name.match(evoRe);
+      if (m) maxN = Math.max(maxN, parseInt(m[1], 10));
+      for (const op of b.operations) {
+        const mo = op.name.match(evoRe);
+        if (mo) maxN = Math.max(maxN, parseInt(mo[1], 10));
+      }
+    }
+    const nextN = maxN + 1;
+    const suffix = `_Evo${nextN}`;
+
+    const baseBlockName = stripEvo(src.name || `Bloc ${idx + 1}`);
+    let newBlockName = `${baseBlockName}${suffix}`;
+
+    // Ensure uniqueness (rare): increment nextN if collision
+    const existingNames = new Set(softBlocks.map((b) => b.name));
+    let curN = nextN;
+    while (existingNames.has(newBlockName)) {
+      curN += 1;
+      newBlockName = `${baseBlockName}_Evo${curN}`;
+    }
+
+    // Build mapping oldOpName -> newOpName (strip old Evo suffixes first)
+    const nameMap: Record<string, string> = {};
+    for (const op of src.operations) {
+      const baseOpName = stripEvo(op.name);
+      nameMap[op.name] = `${baseOpName}${suffix}`;
+    }
+
+    const escapeRegExp = (str: string) => str.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+    // Clone operations: new ids, new names, replace references in expressions & dependencies
+    const newOps = src.operations.map((op) => {
+      const newName = nameMap[op.name];
+      let newExpr = op.kind === "math" && typeof op.expression === "string" ? op.expression : (op as any).expression;
+      if (newExpr && typeof newExpr === "string") {
+        // Replace occurrences of any old op names with their new names (word boundaries)
+        for (const [oldName, newN] of Object.entries(nameMap)) {
+          const re = new RegExp(`\\b${escapeRegExp(oldName)}\\b`, "g");
+          newExpr = newExpr.replace(re, newN);
+        }
+      }
+
+      const newDeps = (op as any).dependencies?.map((d: string) => {
+        return nameMap[d] ?? d;
+      }) ?? [];
+
+      return {
+        ...op,
+        id: makeId("op"),
+        name: newName,
+        expression: newExpr,
+        dependencies: newDeps,
+      } as SoftOperation;
+    });
+
+    const newBlock: SoftBlock = {
+      ...src,
+      id: makeId("blk"),
+      name: newBlockName,
+      operations: newOps,
+    };
+
+    const next = [...softBlocks.slice(0, idx + 1), newBlock, ...softBlocks.slice(idx + 1)];
+    onChange(next);
+  }, [softBlocks, onChange]);
+
   const runAll = useCallback(() => {
     softBlocks.forEach((b) => onCalculateBlock(b.id));
   }, [softBlocks, onCalculateBlock]);
@@ -553,6 +633,7 @@ export default function SoftTab({
               onUpdate={(patch) => updateBlock(block.id, patch)}
               onDelete={() => deleteBlock(block.id)}
               onCalculate={() => onCalculateBlock(block.id)}
+              onDuplicate={() => duplicateBlock(block.id)}
               mapConfigs={mapConfigs}
               onSwitchToMapTuning={onSwitchToMapTuning}
             />

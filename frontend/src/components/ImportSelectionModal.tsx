@@ -287,6 +287,7 @@ export function ImportSelectionModal({ data, onConfirm, onCancel, isLoading = fa
         {/* Layouts Section */}
         {renderSection("Layouts", "layouts", data.layouts.count, (
           <div style={itemsListStyle}>
+            
             {data.layouts.items.map((layout) => (
               <label key={layout.id} style={itemCheckboxStyle}>
                 <input
