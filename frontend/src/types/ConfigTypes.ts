@@ -304,8 +304,14 @@ export type ParsedTomlData = {
   };
   signalColors: {
     items: Record<string, string>;
+    count: number;
   };
   telDataConfigs: {
     items: TelDataImportConfig[];
+    count: number;
+  }
+  meta: {
+    version: string;
+    exportDate: string;
   }
 }

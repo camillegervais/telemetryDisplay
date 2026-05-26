@@ -266,6 +266,8 @@ export function ImportSelectionModal({ data, onConfirm, onCancel, isLoading = fa
         },
       };
     });
+  };
+
   const handleTelDataConfigSelect = (configId: string, checked: boolean) => {
     setSelection((prev) => ({
       ...prev,
@@ -488,4 +490,4 @@ export function ImportSelectionModal({ data, onConfirm, onCancel, isLoading = fa
       </div>
     </div>
   );
-}}
+}

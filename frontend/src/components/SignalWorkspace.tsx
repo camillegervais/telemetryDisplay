@@ -868,6 +868,7 @@ export default function SignalWorkspace({
     () => ConfigManager.get<Record<string, MapTuningData>>("map-configs") ?? {}
   );
   const mapConfigsRef = useRef<Record<string, MapTuningData>>(mapConfigs);
+  const datasetIdRef = useRef<string | null>(datasetId);
   const [softBlocks, setSoftBlocks] = useState<SoftBlock[]>(() => ConfigManager.get<SoftBlock[]>("soft-blocks") ?? []);
   const [softBlockStatuses, setSoftBlockStatuses] = useState<Record<string, BlockStatus>>({});
   const softBlocksRef = useRef(softBlocks);
@@ -879,6 +880,7 @@ export default function SignalWorkspace({
   const lastSavedSessionRef = useRef<WorkspaceSessionSnapshot | null>(null);
   
   useEffect(() => { activeTabIdRef.current = activeTabId; }, [activeTabId]);
+  useEffect(() => { datasetIdRef.current = datasetId; }, [datasetId]);
   useEffect(() => { savedConfigsRef.current = savedConfigs; }, [savedConfigs]);
   useEffect(() => { tabsRef.current = tabs; }, [tabs]);
   useEffect(() => { currentConfigIdRef.current = currentConfigId; }, [currentConfigId]);
@@ -1358,7 +1360,7 @@ export default function SignalWorkspace({
       setMapConfigs(next);
       mapConfigsRef.current = next;
 
-      if (!datasetId) return;
+      if (!datasetIdRef.current) return;
       if (changedKeys.length === 0) return;
 
       // Debounce recalculation to avoid spamming
@@ -1388,7 +1390,8 @@ export default function SignalWorkspace({
   async function calculateSoftBlock(blockId: string, blocksSnapshot?: SoftBlock[]): Promise<void> {
     const blocks = blocksSnapshot ?? softBlocksRef.current;
     const block = blocks.find((b) => b.id === blockId);
-    if (!block || !datasetId) return;
+    const currentDatasetId = datasetIdRef.current;
+    if (!block || !currentDatasetId) return;
     if (block.enabled === false) return;
 
     setSoftBlockStatuses((prev) => ({ ...prev, [blockId]: { state: "running" } }));
@@ -1406,7 +1409,7 @@ export default function SignalWorkspace({
             throw new Error(`Map "${lutOp.mapConfigKey}" introuvable. Sauvegardez-la d'abord dans l'onglet Rejeu Cartos.`);
           }
           await calculateMapTuning({
-            datasetId,
+            datasetId: currentDatasetId,
             inputChannelX: mapCfg.inputChannelX,
             inputChannelY: mapCfg.inputChannelY,
             outputChannelName: lutOp.name,  // use op name as output (not map's outputChannelName)
@@ -1422,7 +1425,7 @@ export default function SignalWorkspace({
           const mathOp = op as SoftMathOp;
           if (mathOp.dependencies.length > 0 && mathOp.expression.trim()) {
             await computeMathChannel({
-              datasetId,
+              datasetId: currentDatasetId,
               output_name: mathOp.name,
               expression: mathOp.expression,
               dependencies: mathOp.dependencies,
