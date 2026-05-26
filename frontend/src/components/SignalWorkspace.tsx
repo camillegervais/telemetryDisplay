@@ -812,6 +812,11 @@ export default function SignalWorkspace({
   const [savedConfigs, setSavedConfigs] = useState<SavedWorkspaceConfig[]>(() => ConfigManager.get<SavedWorkspaceConfig[]>("layouts") ?? []);
   const [selectedConfigId, setSelectedConfigId] = useState<string>("");
   const [currentConfigId, setCurrentConfigId] = useState<string | null>(null);
+  // Refs to expose current state values to subscription callbacks without stale closures.
+  const savedConfigsRef = useRef(savedConfigs);
+  const tabsRef = useRef(tabs);
+  const currentConfigIdRef = useRef(currentConfigId);
+  const selectedConfigIdRef = useRef(selectedConfigId);
   const [dragFromId, setDragFromId] = useState<number | null>(null);
   const [signalDropCell, setSignalDropCell] = useState<string | null>(null);
   const [expandedWidgetId, setExpandedWidgetId] = useState<number | null>(null);
@@ -842,9 +847,11 @@ export default function SignalWorkspace({
   const sessionSaveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastSavedSessionRef = useRef<WorkspaceSessionSnapshot | null>(null);
   
-  useEffect(() => {
-    activeTabIdRef.current = activeTabId;
-  }, [activeTabId]);
+  useEffect(() => { activeTabIdRef.current = activeTabId; }, [activeTabId]);
+  useEffect(() => { savedConfigsRef.current = savedConfigs; }, [savedConfigs]);
+  useEffect(() => { tabsRef.current = tabs; }, [tabs]);
+  useEffect(() => { currentConfigIdRef.current = currentConfigId; }, [currentConfigId]);
+  useEffect(() => { selectedConfigIdRef.current = selectedConfigId; }, [selectedConfigId]);
 
   // Keep ref in sync so async callbacks always see latest blocks
   useEffect(() => {
@@ -1467,16 +1474,14 @@ export default function SignalWorkspace({
   }, [sessionHydrated, tabs, activeTabId, currentConfigId, selectedConfigId]);
 
   // Listen for layout changes from other tabs (cross-tab sync)
+  // Uses subscribeDebouncedFull + empty deps + ref to prevent stale-closure loops.
   useEffect(() => {
-    const unsubscribe = ConfigManager.subscribe<SavedWorkspaceConfig[]>("layouts", (newLayouts) => {
-      // Update savedConfigs if different (avoid loops)
-      if (JSON.stringify(newLayouts) !== JSON.stringify(savedConfigs)) {
+    return ConfigManager.subscribeDebouncedFull<SavedWorkspaceConfig[]>("layouts", (newLayouts) => {
+      if (JSON.stringify(newLayouts) !== JSON.stringify(savedConfigsRef.current)) {
         setSavedConfigs(newLayouts);
       }
-    });
-
-    return () => unsubscribe();
-  }, [savedConfigs]);
+    }, 150);
+  }, []);
 
   // Listen for session changes from other tabs with debounce (active workspace state)
   // Note: activeTabId is NOT synced to allow different tabs on different windows
@@ -1487,9 +1492,9 @@ export default function SignalWorkspace({
         if (!newSnapshot) return;
 
         // Check if tabs or config changed (but NOT activeTabId)
-        if (JSON.stringify(newSnapshot.tabs) !== JSON.stringify(tabs) ||
-            newSnapshot.currentConfigId !== currentConfigId ||
-            newSnapshot.selectedConfigId !== selectedConfigId) {
+        if (JSON.stringify(newSnapshot.tabs) !== JSON.stringify(tabsRef.current) ||
+            newSnapshot.currentConfigId !== currentConfigIdRef.current ||
+            newSnapshot.selectedConfigId !== selectedConfigIdRef.current) {
           
           const clonedTabs = newSnapshot.tabs.map((tab) => sanitizeTabWidgetIds(tab));
           setTabs(clonedTabs);

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ConfigManager } from "../store/ConfigManager";
 import type { CSSProperties } from "react";
 
@@ -8,6 +8,8 @@ export function SignalColorManager() {
   );
   const [newSignalName, setNewSignalName] = useState("");
   const [newSignalColor, setNewSignalColor] = useState("#00a8ff");
+  // Debounce timer for live color-picker drags to avoid flooding other tabs.
+  const colorChangeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Subscribe to signal-colors changes
   useEffect(() => {
@@ -43,7 +45,15 @@ export function SignalColorManager() {
       ...signalColors,
       [signalName]: newColor,
     };
-    ConfigManager.set("signal-colors", updated);
+    // Update local state immediately so the UI feels responsive.
+    setSignalColors(updated);
+    // Debounce the ConfigManager write: color pickers fire continuously while dragging,
+    // which would flood other tabs. Only persist once the user stops for 150ms.
+    if (colorChangeTimerRef.current !== null) clearTimeout(colorChangeTimerRef.current);
+    colorChangeTimerRef.current = setTimeout(() => {
+      ConfigManager.set("signal-colors", updated);
+      colorChangeTimerRef.current = null;
+    }, 150);
   };
 
   const containerStyle: CSSProperties = {

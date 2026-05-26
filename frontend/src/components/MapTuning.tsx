@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect, useCallback } from "react";
+import React, { useState, useMemo, useEffect, useCallback, useRef } from "react";
 
 import { ConfigManager } from "../store/ConfigManager";
 import { useHoverToLutCell } from "../hooks/useHoverToLutCell";
@@ -96,6 +96,9 @@ export default function MapTuning({
   );
   const [rowHeaders, setRowHeaders] = useState<number[]>([20.0, 40.0, 60.0, 80.0, 100.0]);
   const [colHeaders, setColHeaders] = useState<number[]>([1000.0, 2000.0, 3000.0, 4000.0, 5000.0]);
+
+  // Ref: debounce timer for the live auto-save to ConfigManager.
+  const autoSaveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // State: UI feedback
   const [isSaving, setIsSaving] = useState(false);
@@ -340,7 +343,8 @@ export default function MapTuning({
     }
   };
 
-  // Persist current map config on every change so other tabs/components can react
+  // Persist current map config on every change so other tabs/components can react.
+  // Debounced (300ms) to avoid flooding other tabs during rapid edits (cell typing, paste).
   useEffect(() => {
     if (!outputChannelName) return;
     const data: MapTuningData = {
@@ -355,20 +359,33 @@ export default function MapTuning({
       offsetVal,
       interpolation,
     };
-    try {
-      const existingConfigs = ConfigManager.get<Record<string, MapTuningData>>("map-configs") ?? {};
-      // Only auto-update an existing saved config to avoid creating new partial entries
-      // while the user is typing the name. Creation of a new config must be explicit
-      // via the Save button (`handleSave`).
-      if (existingConfigs[outputChannelName]) {
-        ConfigManager.set("map-configs", {
-          ...existingConfigs,
-          [outputChannelName]: data,
-        });
+
+    if (autoSaveTimeoutRef.current !== null) clearTimeout(autoSaveTimeoutRef.current);
+
+    autoSaveTimeoutRef.current = setTimeout(() => {
+      autoSaveTimeoutRef.current = null;
+      try {
+        const existingConfigs = ConfigManager.get<Record<string, MapTuningData>>("map-configs") ?? {};
+        // Only auto-update an existing saved config to avoid creating new partial entries
+        // while the user is typing the name. Creation of a new config must be explicit
+        // via the Save button (`handleSave`).
+        if (existingConfigs[outputChannelName]) {
+          ConfigManager.set("map-configs", {
+            ...existingConfigs,
+            [outputChannelName]: data,
+          });
+        }
+      } catch (e) {
+        // ignore persistence errors for live updates
       }
-    } catch (e) {
-      // ignore persistence errors for live updates
-    }
+    }, 300);
+
+    return () => {
+      if (autoSaveTimeoutRef.current !== null) {
+        clearTimeout(autoSaveTimeoutRef.current);
+        autoSaveTimeoutRef.current = null;
+      }
+    };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [inputChannelX, inputChannelY, outputChannelName, gridData, rowHeaders, colHeaders, braking_signal, gainVal, offsetVal, interpolation]);
 
