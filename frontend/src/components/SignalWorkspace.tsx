@@ -133,6 +133,23 @@ type ResizeState = {
   startHeightSpan: number;
 };
 
+function buildSessionSnapshot(
+  tabs: WorkspaceTab[],
+  activeTabId: string,
+  currentConfigId: string | null,
+  selectedConfigId: string
+): WorkspaceSessionSnapshot {
+  return {
+    tabs: tabs.map((tab) => ({
+      ...tab,
+      widgets: tab.widgets.map(({ menuOpen, ...widget }) => ({ ...widget, menuOpen: false })),
+    })),
+    activeTabId,
+    currentConfigId,
+    selectedConfigId,
+  };
+}
+
 const COLORS = ["#00a8ff", "#ff2d4f", "#ffd447", "#34d399", "#ff8a33", "#ff9aa8"];
 const SIGNAL_DRAG_MIME = "application/x-telemetry-signal";
 const TRAJECTORY_TAB_ID = "tab-trajectory";
@@ -466,6 +483,10 @@ function buildOriginAlignedRange(values: number[]): [number, number] | null {
   return [-halfSpan, halfSpan];
 }
 
+function getSignalColor(signal: string, index: number): string {
+  return (ConfigManager.get("signal-colors") as Record<string, string> | undefined)?.[signal] ?? COLORS[index % COLORS.length];
+}
+
 function buildChartConfig(
   title: string,
   series: SignalSeries | null,
@@ -526,7 +547,7 @@ function buildChartConfig(
       x: xValues,
       y: yValues,
       line: {
-        color: (ConfigManager.get("signal-colors") as Record<string, string> | undefined)?.[signal] ?? COLORS[index % COLORS.length],
+        color: getSignalColor(signal, index),
         width: 2,
       },
       yaxis: useSharedYAxis ? "y" : index === 0 ? "y" : `y${index + 1}`,
@@ -674,7 +695,7 @@ function buildXYChartConfig(
       x: xValues,
       y: yValues,
       marker: {
-        color: (ConfigManager.get("signal-colors") as Record<string, string> | undefined)?.[signal] ?? COLORS[index % COLORS.length],
+        color: getSignalColor(signal, index),
         size: 5,
         opacity: 0.8,
       },
@@ -747,6 +768,16 @@ function firstFreeCell(
   widthSpan: number = 1,
   heightSpan: number = 1
 ): { row: number; col: number } {
+  return findFirstFreeCell(widgets, rows, cols, widthSpan, heightSpan) ?? { row: 1, col: 1 };
+}
+
+function findFirstFreeCell(
+  widgets: GraphWidget[],
+  rows: number,
+  cols: number,
+  widthSpan: number = 1,
+  heightSpan: number = 1
+): { row: number; col: number } | null {
   for (let row = 1; row <= rows; row += 1) {
     for (let col = 1; col <= cols; col += 1) {
       const testWidget = { id: -1, title: "", signals: [], menuOpen: false, row, col, widthSpan, heightSpan };
@@ -755,7 +786,7 @@ function firstFreeCell(
       }
     }
   }
-  return { row: 1, col: 1 };
+  return null;
 }
 
 function fitWidgetsToGrid(widgets: GraphWidget[], rows: number, cols: number): GraphWidget[] {
@@ -859,12 +890,21 @@ export default function SignalWorkspace({
   }, [softBlocks]);
 
   // Helper function to update widgets and sync to tabs
-  function updateWidgetsAndTabs(updater: (prev: GraphWidget[]) => GraphWidget[]): void {
+  function updateWidgetsAndTabs(
+    updater: (prev: GraphWidget[]) => GraphWidget[],
+    options?: { nextTabId?: number }
+  ): void {
     setWidgets((prevWidgets) => {
       const newWidgets = updater(prevWidgets);
       setTabs((prevTabs) =>
         prevTabs.map((tab) =>
-          tab.id === activeTabIdRef.current ? { ...tab, widgets: newWidgets } : tab
+          tab.id === activeTabIdRef.current
+            ? {
+                ...tab,
+                widgets: newWidgets,
+                ...(options?.nextTabId !== undefined ? { nextId: options.nextTabId } : {}),
+              }
+            : tab
         )
       );
       return newWidgets;
@@ -1445,15 +1485,7 @@ export default function SignalWorkspace({
       return;
     }
 
-    const sessionSnapshot: WorkspaceSessionSnapshot = {
-      tabs: tabs.map(tab => ({
-        ...tab,
-        widgets: tab.widgets.map(({ menuOpen, ...w }) => ({ ...w, menuOpen: false }))
-      })),
-      activeTabId,
-      currentConfigId,
-      selectedConfigId,
-    };
+    const sessionSnapshot = buildSessionSnapshot(tabs, activeTabId, currentConfigId, selectedConfigId);
 
     // Skip save if content hasn't changed
     if (JSON.stringify(sessionSnapshot) === JSON.stringify(lastSavedSessionRef.current)) {
@@ -1491,14 +1523,44 @@ export default function SignalWorkspace({
       (newSnapshot) => {
         if (!newSnapshot) return;
 
+        const localPersistedSnapshot = buildSessionSnapshot(
+          tabsRef.current,
+          activeTabIdRef.current,
+          currentConfigIdRef.current,
+          selectedConfigIdRef.current
+        );
+        if (
+          sessionSaveTimeoutRef.current !== null &&
+          JSON.stringify(newSnapshot) !== JSON.stringify(localPersistedSnapshot)
+        ) {
+          return;
+        }
+
         // Check if tabs or config changed (but NOT activeTabId)
         if (JSON.stringify(newSnapshot.tabs) !== JSON.stringify(tabsRef.current) ||
             newSnapshot.currentConfigId !== currentConfigIdRef.current ||
             newSnapshot.selectedConfigId !== selectedConfigIdRef.current) {
-          
-          const clonedTabs = newSnapshot.tabs.map((tab) => sanitizeTabWidgetIds(tab));
+
+          const currentLocalTab = tabsRef.current.find((tab) => tab.id === activeTabIdRef.current);
+          const localMenuOpenById = new Map(
+            (currentLocalTab?.widgets ?? []).map((widget) => [widget.id, widget.menuOpen])
+          );
+          const clonedTabs = newSnapshot.tabs.map((tab) => {
+            const sanitizedTab = sanitizeTabWidgetIds(tab);
+            if (sanitizedTab.id !== activeTabIdRef.current) {
+              return sanitizedTab;
+            }
+
+            return {
+              ...sanitizedTab,
+              widgets: sanitizedTab.widgets.map((widget) => ({
+                ...widget,
+                menuOpen: localMenuOpenById.get(widget.id) ?? widget.menuOpen,
+              })),
+            };
+          });
           setTabs(clonedTabs);
-          
+
           // Update widgets for current active tab if it exists in the new tabs
           const currentActiveTab = clonedTabs.find((tab) => tab.id === activeTabIdRef.current);
           if (
@@ -1522,6 +1584,32 @@ export default function SignalWorkspace({
 
     return () => unsubscribe();
   }, []); // Empty dependencies - debounce is stable internally
+
+  useEffect(() => {
+    function onWindowPointerDown(event: MouseEvent) {
+      const target = event.target;
+      if (!(target instanceof Element)) {
+        return;
+      }
+      if (target.closest(".graph-menu") || target.closest("[data-menu-toggle='true']")) {
+        return;
+      }
+
+      const hasOpenMenu = tabsRef.current
+        .flatMap((tab) => tab.widgets)
+        .some((widget) => widget.menuOpen);
+      if (!hasOpenMenu) {
+        return;
+      }
+
+      updateWidgetsAndTabs((prev) => prev.map((widget) => ({ ...widget, menuOpen: false })));
+    }
+
+    window.addEventListener("mousedown", onWindowPointerDown);
+    return () => {
+      window.removeEventListener("mousedown", onWindowPointerDown);
+    };
+  }, []);
 
 
   useEffect(() => {
@@ -2433,7 +2521,7 @@ export default function SignalWorkspace({
   }
 
   function addDroppedSignalToWidget(widgetId: number, signal: string) {
-    setWidgets((prev) =>
+    updateWidgetsAndTabs((prev) =>
       prev.map((item) => {
         if (item.id !== widgetId) {
           return item;
@@ -2490,6 +2578,137 @@ export default function SignalWorkspace({
 
     setWidgets((prev) => [...prev, candidate]);
     setNextId(newId + 1);
+  }
+
+  function duplicateWidget(widgetId: number) {
+    const source = widgets.find((item) => item.id === widgetId);
+    if (!source) {
+      return;
+    }
+
+    const newId = nextId;
+    const free = firstFreeCell(widgets, gridRows, gridCols, source.widthSpan, source.heightSpan);
+    const duplicate = normalizeWidget(
+      {
+        ...source,
+        id: newId,
+        signals: [...source.signals],
+        xSignal: source.xSignal ?? null,
+        options: source.options ? { ...source.options } : undefined,
+        menuOpen: false,
+        row: free.row,
+        col: free.col,
+      },
+      true
+    );
+
+    if (!canPlaceWidget(duplicate, free.row, free.col, gridRows, gridCols, widgets)) {
+      return;
+    }
+
+    setNextId(newId + 1);
+    updateWidgetsAndTabs((prev) => [...prev, duplicate], { nextTabId: newId + 1 });
+    updateSelectedWidgetId(newId);
+    setSeriesById((prev) => {
+      const sourceSeries = prev[widgetId];
+      if (!sourceSeries) {
+        return prev;
+      }
+      return { ...prev, [newId]: sourceSeries };
+    });
+    setLoadingById((prev) => ({ ...prev, [newId]: prev[widgetId] ?? false }));
+  }
+
+  function canMoveDraggedWidgetToTab(targetTabId: string): boolean {
+    if (dragFromId === null || targetTabId === activeTabIdRef.current) {
+      return false;
+    }
+
+    const sourceWidget = widgets.find((item) => item.id === dragFromId);
+    const targetTab = tabs.find((tab) => tab.id === targetTabId);
+    if (!sourceWidget || !targetTab) {
+      return false;
+    }
+
+    return (
+      findFirstFreeCell(
+        targetTab.widgets,
+        targetTab.gridRows,
+        targetTab.gridCols,
+        sourceWidget.widthSpan,
+        sourceWidget.heightSpan
+      ) !== null
+    );
+  }
+
+  function moveDraggedWidgetToTab(targetTabId: string) {
+    if (dragFromId === null || targetTabId === activeTabIdRef.current) {
+      setDragFromId(null);
+      return;
+    }
+
+    const currentTabs = tabsRef.current;
+    const sourceTab = currentTabs.find((tab) => tab.id === activeTabIdRef.current);
+    const targetTab = currentTabs.find((tab) => tab.id === targetTabId);
+    if (!sourceTab || !targetTab) {
+      setDragFromId(null);
+      return;
+    }
+
+    const sourceWidget = sourceTab.widgets.find((item) => item.id === dragFromId);
+    if (!sourceWidget) {
+      setDragFromId(null);
+      return;
+    }
+
+    const free = findFirstFreeCell(
+      targetTab.widgets,
+      targetTab.gridRows,
+      targetTab.gridCols,
+      sourceWidget.widthSpan,
+      sourceWidget.heightSpan
+    );
+    if (!free) {
+      setDragFromId(null);
+      return;
+    }
+
+    const movedWidget = normalizeWidget(
+      {
+        ...sourceWidget,
+        row: free.row,
+        col: free.col,
+        menuOpen: false,
+      },
+      true
+    );
+    const updatedTargetTab: WorkspaceTab = {
+      ...targetTab,
+      widgets: [...targetTab.widgets, movedWidget],
+    };
+    const nextTabs = currentTabs.map((tab) => {
+      if (tab.id === sourceTab.id) {
+        return {
+          ...tab,
+          widgets: tab.widgets.filter((item) => item.id !== sourceWidget.id),
+        };
+      }
+      if (tab.id === targetTab.id) {
+        return updatedTargetTab;
+      }
+      return tab;
+    });
+
+    setTabs(nextTabs);
+    setActiveTabId(targetTabId);
+    setGridCols(updatedTargetTab.gridCols);
+    setGridRows(updatedTargetTab.gridRows);
+    setNextId(updatedTargetTab.nextId);
+    setWidgets(updatedTargetTab.widgets);
+    setExpandedWidgetId(null);
+    updateSelectedWidgetId(sourceWidget.id);
+    setDragFromId(null);
+    setSignalDropCell(null);
   }
 
   function startResize(
@@ -2940,6 +3159,31 @@ export default function SignalWorkspace({
           <div
             key={tab.id}
             className={`workspace-tab ${tab.id === activeTabId ? "workspace-tab-active" : ""}`}
+            onDragOver={(event) => {
+              if (dragFromId === null) {
+                return;
+              }
+
+              if (canMoveDraggedWidgetToTab(tab.id)) {
+                event.preventDefault();
+                event.dataTransfer.dropEffect = "move";
+              } else {
+                event.dataTransfer.dropEffect = "none";
+              }
+            }}
+            onDrop={(event) => {
+              if (dragFromId === null) {
+                return;
+              }
+
+              if (!canMoveDraggedWidgetToTab(tab.id)) {
+                setDragFromId(null);
+                return;
+              }
+
+              event.preventDefault();
+              moveDraggedWidgetToTab(tab.id);
+            }}
           >
             <button className="workspace-tab-name" onClick={() => switchToTab(tab.id)} title={tab.name}>
               {tab.name}
@@ -3107,6 +3351,7 @@ export default function SignalWorkspace({
                   draggable
                   onDragStart={(e) => {
                     e.stopPropagation?.();
+                    e.dataTransfer.effectAllowed = "move";
                     updateSelectedWidgetId(widget.id);
                     setDragFromId(widget.id);
                   }}
@@ -3117,6 +3362,7 @@ export default function SignalWorkspace({
                 </button>
                 <button
                   className="icon-button"
+                  data-menu-toggle="true"
                   onClick={(e) => {
                     e.stopPropagation();
                     updateSelectedWidgetId(widget.id);
@@ -3129,6 +3375,16 @@ export default function SignalWorkspace({
                   title="Paramètres"
                 >
                   ⚙
+                </button>
+                <button
+                  className="icon-button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    duplicateWidget(widget.id);
+                  }}
+                  title="Dupliquer"
+                >
+                  ⧉
                 </button>
                 <button
                   className="icon-button icon-button-danger"
@@ -3189,7 +3445,7 @@ export default function SignalWorkspace({
                         value={widget.xSignal ?? ""}
                         onChange={(event) => {
                           const nextX = event.target.value || null;
-                          setWidgets((prev) =>
+                          updateWidgetsAndTabs((prev) =>
                             prev.map((item) =>
                               item.id === widget.id ? { ...item, xSignal: nextX } : item
                             )
@@ -3208,28 +3464,23 @@ export default function SignalWorkspace({
 
                   <p className="field-label">Signaux</p>
                   <div className="signal-grid">
-                    {availableSignals.map((signal, idx) => (
+                    {widget.signals.map((signal, idx) => (
                       <label key={`${widget.id}-${signal}`} className="signal-checkbox">
                         <input
                           type="checkbox"
-                          checked={widget.signals.includes(signal)}
-                          onChange={(event) => {
-                            const isChecked = event.target.checked;
-                            setWidgets((prev) =>
+                          checked={true}
+                          onChange={() => {
+                            updateWidgetsAndTabs((prev) =>
                               prev.map((item) => {
                                 if (item.id === widget.id) {
-                                  if (isChecked) {
-                                    return { ...item, signals: [...item.signals, signal] };
-                                  } else {
-                                    return { ...item, signals: item.signals.filter((s) => s !== signal) };
-                                  }
+                                  return { ...item, signals: item.signals.filter((s) => s !== signal) };
                                 }
                                 return item;
                               })
                             );
                           }}
                         />
-                        <span className="signal-badge" style={{ borderColor: COLORS[idx % COLORS.length] }}>
+                        <span className="signal-badge" style={{ borderColor: getSignalColor(signal, idx) }}>
                           {signal}
                         </span>
                       </label>
