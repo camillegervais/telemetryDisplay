@@ -1,9 +1,20 @@
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from app import db
 from app.routers import app_info, datasets, health, map_tuning, teldata
 
-app = FastAPI(title="Telemetry Display API", version="0.1.0")
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    db.init_db()
+    db.cleanup_old_imports(max_age_days=14)
+    yield
+
+
+app = FastAPI(title="Telemetry Display API", version="0.1.0", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,

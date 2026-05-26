@@ -1,0 +1,119 @@
+"""Lightweight SQLite persistence for import metadata."""
+
+import sqlite3
+import uuid as uuid_lib
+from datetime import datetime, timedelta
+from pathlib import Path
+from typing import Optional
+
+_DB_PATH = Path(__file__).resolve().parents[3] / "data" / "imports.db"
+
+
+def get_connection() -> sqlite3.Connection:
+    """Return a connection with row_factory enabled."""
+    _DB_PATH.parent.mkdir(parents=True, exist_ok=True)
+    conn = sqlite3.connect(str(_DB_PATH))
+    conn.row_factory = sqlite3.Row
+    return conn
+
+
+def init_db() -> None:
+    """Create tables if they don't exist."""
+    with get_connection() as conn:
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS recent_imports (
+                import_id    TEXT PRIMARY KEY,
+                dataset_id   TEXT,
+                source_path  TEXT NOT NULL,
+                imported_at  TEXT NOT NULL,
+                file_size    INTEGER,
+                signal_count INTEGER,
+                dataset_name TEXT
+            )
+        """)
+        conn.commit()
+
+
+def add_import(
+    source_path: str,
+    signal_count: int,
+    file_size: int = 0,
+    dataset_name: str = "",
+    dataset_id: Optional[str] = None,
+) -> str:
+    """Track a new import in the database. Returns the import_id.
+
+    If source_path already exists, the existing entry is kept unchanged to
+    avoid duplicating entries when the same file is reloaded (e.g. from the
+    Recent Imports panel).  File-upload paths include a UUID prefix so they
+    never collide with each other.
+    """
+    with get_connection() as conn:
+        existing = conn.execute(
+            "SELECT import_id FROM recent_imports WHERE source_path = ?",
+            (source_path,),
+        ).fetchone()
+        if existing:
+            return existing["import_id"]
+
+        import_id = str(uuid_lib.uuid4())
+        imported_at = datetime.utcnow().isoformat() + "Z"
+        conn.execute(
+            """INSERT INTO recent_imports
+               (import_id, dataset_id, source_path, imported_at, file_size, signal_count, dataset_name)
+               VALUES (?, ?, ?, ?, ?, ?, ?)""",
+            (import_id, dataset_id, source_path, imported_at, file_size, signal_count, dataset_name),
+        )
+        conn.commit()
+    return import_id
+
+
+def get_recent_imports(limit: int = 10) -> list:
+    """Return the most recent imports sorted by date descending."""
+    with get_connection() as conn:
+        rows = conn.execute(
+            "SELECT * FROM recent_imports ORDER BY imported_at DESC LIMIT ?",
+            (limit,),
+        ).fetchall()
+    return [dict(row) for row in rows]
+
+
+def delete_import(import_id: str) -> bool:
+    """Delete a single import entry and its cache file if applicable. Returns True if found."""
+    with get_connection() as conn:
+        row = conn.execute(
+            "SELECT source_path FROM recent_imports WHERE import_id = ?",
+            (import_id,),
+        ).fetchone()
+        if row is None:
+            return False
+        path = Path(row["source_path"])
+        try:
+            if path.exists() and "import_cache" in str(path):
+                path.unlink()
+        except Exception:
+            pass
+        conn.execute("DELETE FROM recent_imports WHERE import_id = ?", (import_id,))
+        conn.commit()
+    return True
+
+
+def cleanup_old_imports(max_age_days: int = 14) -> int:
+    """Delete DB entries and associated cache files older than max_age_days. Returns number deleted."""
+    cutoff = (datetime.utcnow() - timedelta(days=max_age_days)).isoformat() + "Z"
+    with get_connection() as conn:
+        old_rows = conn.execute(
+            "SELECT import_id, source_path FROM recent_imports WHERE imported_at < ?",
+            (cutoff,),
+        ).fetchall()
+        for row in old_rows:
+            path = Path(row["source_path"])
+            try:
+                if path.exists() and "import_cache" in str(path):
+                    path.unlink()
+            except Exception:
+                pass
+        count = len(old_rows)
+        conn.execute("DELETE FROM recent_imports WHERE imported_at < ?", (cutoff,))
+        conn.commit()
+    return count

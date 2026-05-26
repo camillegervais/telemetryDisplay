@@ -112,3 +112,19 @@ export type MapTuningCalculateResponse = {
   samplesProcessed: number;
   outputSignal: number[];
 };
+
+// ── Recent Imports ───────────────────────────────────────────────────────────
+
+export type RecentImportItem = {
+  import_id: string;
+  dataset_id: string | null;
+  source_path: string;
+  imported_at: string;
+  file_size: number | null;
+  signal_count: number | null;
+  dataset_name: string | null;
+};
+
+export type RecentImportsResponse = {
+  items: RecentImportItem[];
+};

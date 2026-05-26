@@ -160,3 +160,19 @@ class TelDataExportRequest(BaseModel):
 
 class TelDataExportResponse(BaseModel):
     mat_path: str
+
+
+# === Recent Imports ===
+
+class RecentImportItem(BaseModel):
+    import_id: str
+    dataset_id: Optional[str] = None
+    source_path: str
+    imported_at: str
+    file_size: Optional[int] = None
+    signal_count: Optional[int] = None
+    dataset_name: Optional[str] = None
+
+
+class RecentImportsResponse(BaseModel):
+    items: List[RecentImportItem]

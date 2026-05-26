@@ -1,11 +1,11 @@
 import { useEffect, useMemo, useState, type CSSProperties, type KeyboardEvent } from "react";
 
-import { queryDataset } from "../api";
+import { fetchRecentImports, deleteRecentImport, queryDataset } from "../api";
 import { useTelemetryStore } from "../store/telemetryStore";
 import { ConfigManager } from "../store/ConfigManager";
 import { TelDataImportModal } from "./TelDataImportModal";
 
-import type { DatasetMetadata, MapTuningData } from "../types";
+import type { DatasetMetadata, MapTuningData, RecentImportItem } from "../types";
 import type { TelDataImportConfig } from "../types/ConfigTypes";
 
 type ImportPanelProps = {
@@ -124,6 +124,11 @@ export default function ImportPanel({
   const [telDataConfigs, setTelDataConfigs] = useState<TelDataImportConfig[]>(
     () => ConfigManager.get<TelDataImportConfig[]>("teldata-configs") ?? []
   );
+  // Recent imports section
+  const [recentSectionOpen, setRecentSectionOpen] = useState(false);
+  const [recentImports, setRecentImports] = useState<RecentImportItem[]>([]);
+  const [loadingRecent, setLoadingRecent] = useState(false);
+  const [recentError, setRecentError] = useState<string | null>(null);
   // Form state for creating a new TelData config
   const [newConfigName, setNewConfigName] = useState("");
   const [newConfigChannels, setNewConfigChannels] = useState("");
@@ -253,8 +258,53 @@ export default function ImportPanel({
     };
   }, [datasetId, datasetMetadata]);
 
-  function formatStat(value: number): string {
-    return Number.isFinite(value) ? value.toFixed(3) : "-";
+  useEffect(() => {
+    if (!recentSectionOpen) return;
+    let alive = true;
+    setLoadingRecent(true);
+    setRecentError(null);
+    fetchRecentImports(15)
+      .then((res) => {
+        if (alive) setRecentImports(res.items);
+      })
+      .catch((err: unknown) => {
+        if (alive) setRecentError(err instanceof Error ? err.message : "Erreur de chargement");
+      })
+      .finally(() => {
+        if (alive) setLoadingRecent(false);
+      });
+    return () => { alive = false; };
+  }, [recentSectionOpen]);
+
+  function refreshRecentImports() {
+    setLoadingRecent(true);
+    setRecentError(null);
+    fetchRecentImports(15)
+      .then((res) => setRecentImports(res.items))
+      .catch((err: unknown) => setRecentError(err instanceof Error ? err.message : "Erreur"))
+      .finally(() => setLoadingRecent(false));
+  }
+
+  function formatImportDate(isoStr: string): string {
+    try {
+      const d = new Date(isoStr);
+      return d.toLocaleDateString("fr-FR", { day: "2-digit", month: "2-digit", year: "2-digit" })
+        + " "
+        + d.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" });
+    } catch {
+      return isoStr;
+    }
+  }
+
+  function formatFileSize(bytes: number | null): string {
+    if (!bytes) return "";
+    if (bytes < 1024 * 1024) return ` — ${(bytes / 1024).toFixed(0)} Ko`;
+    return ` — ${(bytes / (1024 * 1024)).toFixed(1)} Mo`;
+  }
+
+  function getDisplayName(item: RecentImportItem): string {
+    if (item.dataset_name) return item.dataset_name;
+    return item.source_path.split(/[\/\\]/).pop() ?? item.source_path;
   }
 
   async function handleImportClick() {
@@ -439,6 +489,128 @@ export default function ImportPanel({
         ) : null}
       </div>
 
+      {/* ---- Import TelData ---- */}
+      <div className="import-submenu">
+        <button
+          type="button"
+          className="import-submenu-toggle"
+          onClick={() => setTelDataSectionOpen((p) => !p)}
+        >
+          <span>{telDataSectionOpen ? "▾" : "▸"}</span>
+          <span>Import TelData</span>
+        </button>
+
+        {telDataSectionOpen ? (
+          <div className="import-submenu-content">
+            <button
+              className="import-button"
+              type="button"
+              onClick={() => setTelDataModalOpen(true)}
+            >
+              Ouvrir archive TelData…
+            </button>
+          </div>
+        ) : null}
+      </div>
+
+      {/* ---- Imports récents ---- */}
+      <div className="import-submenu">
+        <button
+          type="button"
+          className="import-submenu-toggle"
+          onClick={() => setRecentSectionOpen((prev) => !prev)}
+        >
+          <span>{recentSectionOpen ? "▾" : "▸"}</span>
+          <span>Imports récents</span>
+        </button>
+
+        {recentSectionOpen ? (
+          <div className="import-submenu-content">
+            <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: "0.4rem" }}>
+              <button
+                className="small-button"
+                type="button"
+                onClick={refreshRecentImports}
+                disabled={loadingRecent}
+                title="Rafraîchir la liste"
+              >
+                ↺
+              </button>
+            </div>
+
+            {loadingRecent ? (
+              <p className="panel-text loading-inline">
+                <span className="loading-spinner" aria-hidden="true" />
+                Chargement...
+              </p>
+            ) : recentError ? (
+              <p className="panel-text">{recentError}</p>
+            ) : recentImports.length === 0 ? (
+              <p className="panel-text">Aucun import récent.</p>
+            ) : (
+              <div style={{ display: "flex", flexDirection: "column", gap: "0.4rem" }}>
+                {recentImports.map((item) => (
+                  <div
+                    key={item.import_id}
+                    style={{
+                      display: "flex",
+                      flexDirection: "column",
+                      gap: "0.15rem",
+                      padding: "0.4rem 0.5rem",
+                      border: "1px solid rgba(255,70,93,0.2)",
+                      borderRadius: "3px",
+                    }}
+                  >
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: "0.4rem" }}>
+                      <div
+                        style={{
+                          fontSize: "0.83rem",
+                          fontWeight: 600,
+                          overflow: "hidden",
+                          textOverflow: "ellipsis",
+                          whiteSpace: "nowrap",
+                          flex: 1,
+                          minWidth: 0,
+                        }}
+                        title={item.source_path}
+                      >
+                        {getDisplayName(item)}
+                      </div>
+                      <button
+                        className="small-button"
+                        type="button"
+                        title="Supprimer cet import"
+                        onClick={() => {
+                          deleteRecentImport(item.import_id)
+                            .then(() => setRecentImports((prev) => prev.filter((r) => r.import_id !== item.import_id)))
+                            .catch(() => {});
+                        }}
+                      >
+                        ✕
+                      </button>
+                    </div>
+                    <div style={{ fontSize: "0.74rem", opacity: 0.55 }}>
+                      {formatImportDate(item.imported_at)}
+                      {item.signal_count != null ? ` — ${item.signal_count} signaux` : ""}
+                      {formatFileSize(item.file_size)}
+                    </div>
+                    <button
+                      className="import-button"
+                      type="button"
+                      style={{ marginTop: "0.25rem", padding: "0.2rem 0.5rem", fontSize: "0.78rem" }}
+                      onClick={() => onImportFromPath(item.source_path)}
+                      disabled={importing}
+                    >
+                      {importing ? "Import en cours..." : "Charger"}
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        ) : null}
+      </div>
+
       <div className="import-submenu">
         <button
           type="button"
@@ -531,10 +703,10 @@ export default function ImportPanel({
                     <div key={`stat-${signal}`} className="signals-stats-item">
                       <div className="signals-stats-title">{signal}</div>
                       <div className="signals-stats-values">
-                        <span>moy: {stat ? formatStat(stat.mean) : "-"}</span>
-                        <span>std: {stat ? formatStat(stat.std) : "-"}</span>
-                        <span>min: {stat ? formatStat(stat.min) : "-"}</span>
-                        <span>max: {stat ? formatStat(stat.max) : "-"}</span>
+                        <span>moy: {stat ? stat.mean : "-"}</span>
+                        <span>std: {stat ? stat.std : "-"}</span>
+                        <span>min: {stat ? stat.min : "-"}</span>
+                        <span>max: {stat ? stat.max : "-"}</span>
                       </div>
                     </div>
                   );
@@ -619,30 +791,6 @@ export default function ImportPanel({
                 ))}
               </div>
             )}
-          </div>
-        ) : null}
-      </div>
-
-      {/* ---- Import TelData ---- */}
-      <div className="import-submenu">
-        <button
-          type="button"
-          className="import-submenu-toggle"
-          onClick={() => setTelDataSectionOpen((p) => !p)}
-        >
-          <span>{telDataSectionOpen ? "▾" : "▸"}</span>
-          <span>Import TelData</span>
-        </button>
-
-        {telDataSectionOpen ? (
-          <div className="import-submenu-content">
-            <button
-              className="import-button"
-              type="button"
-              onClick={() => setTelDataModalOpen(true)}
-            >
-              Ouvrir archive TelData…
-            </button>
           </div>
         ) : null}
       </div>

@@ -9,6 +9,7 @@ import pandas as pd
 from fastapi import APIRouter, HTTPException, UploadFile
 
 from app.config import config
+from app import db
 from app.schemas import (
     DatasetImportResponse,
     DatasetImportFromPathRequest,
@@ -21,6 +22,8 @@ from app.schemas import (
     MapTuningCalculateResponse,
     ComputeMathRequest,
     ComputeMathResponse,
+    RecentImportItem,
+    RecentImportsResponse,
 )
 from app.services.mat_loader import MatLoader, MatValidationError
 from app.services.lut_2D import LUT2D
@@ -126,6 +129,17 @@ async def import_mat_file(file: UploadFile) -> DatasetImportResponse:
 
         df_normalized, metadata = mat_loader.load_and_normalize(stable_path)
 
+        try:
+            db.add_import(
+                source_path=str(stable_path),
+                signal_count=len(metadata.signal_names),
+                file_size=len(contents),
+                dataset_name=Path(file.filename).stem,
+                dataset_id=metadata.dataset_id,
+            )
+        except Exception:
+            pass  # DB tracking is best-effort
+
         return DatasetImportResponse(
             dataset_id=metadata.dataset_id,
             message=f"Dataset imported: {len(df_normalized)} normalized samples,"
@@ -157,6 +171,18 @@ def import_mat_file_from_path(request: DatasetImportFromPathRequest) -> DatasetI
 
     try:
         df_normalized, metadata = mat_loader.load_and_normalize(mat_path)
+
+        try:
+            db.add_import(
+                source_path=str(mat_path),
+                signal_count=len(metadata.signal_names),
+                file_size=mat_path.stat().st_size,
+                dataset_name=mat_path.stem,
+                dataset_id=metadata.dataset_id,
+            )
+        except Exception:
+            pass  # DB tracking is best-effort
+
         return DatasetImportResponse(
             dataset_id=metadata.dataset_id,
             message=f"Dataset imported from path: {len(df_normalized)} normalized samples,"
@@ -167,6 +193,35 @@ def import_mat_file_from_path(request: DatasetImportFromPathRequest) -> DatasetI
         raise HTTPException(status_code=422, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Import failed: {str(e)}")
+
+
+@router.get("/recent-imports", response_model=RecentImportsResponse)
+def get_recent_imports(limit: int = 10) -> RecentImportsResponse:
+
+    """Return the most recent dataset imports (MAT files and TelData exports)."""
+    limit = max(1, min(limit, 50))
+    rows = db.get_recent_imports(limit=limit)
+    items = [
+        RecentImportItem(
+            import_id=row["import_id"],
+            dataset_id=row.get("dataset_id"),
+            source_path=row["source_path"],
+            imported_at=row["imported_at"],
+            file_size=row.get("file_size"),
+            signal_count=row.get("signal_count"),
+            dataset_name=row.get("dataset_name"),
+        )
+        for row in rows
+    ]
+    return RecentImportsResponse(items=items)
+
+
+@router.delete("/recent-imports/{import_id}", status_code=204)
+def delete_recent_import(import_id: str) -> None:
+    """Delete a recent import entry and its cache file."""
+    found = db.delete_import(import_id)
+    if not found:
+        raise HTTPException(status_code=404, detail="Import not found")
 
 
 @router.get("/{dataset_id}/metadata", response_model=DatasetMetadataResponse)

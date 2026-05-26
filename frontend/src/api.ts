@@ -8,6 +8,7 @@ import type {
   MapTuningSaveResponse,
   MapTuningCalculateRequest,
   MapTuningCalculateResponse,
+  RecentImportsResponse,
 } from "./types";
 
 export type ComputeMathChannelRequest = {
@@ -300,4 +301,21 @@ export async function exportTelData(
 
 export async function closeTelDataSession(sessionId: string): Promise<void> {
   await fetch(`${API_BASE_URL}/teldata/${sessionId}`, { method: "DELETE" });
+}
+
+export async function fetchRecentImports(limit = 10): Promise<RecentImportsResponse> {
+  const response = await fetch(`${API_BASE_URL}/datasets/recent-imports?limit=${limit}`);
+  if (!response.ok) {
+    throw new Error("Failed to fetch recent imports");
+  }
+  return (await response.json()) as RecentImportsResponse;
+}
+
+export async function deleteRecentImport(importId: string): Promise<void> {
+  const response = await fetch(`${API_BASE_URL}/datasets/recent-imports/${encodeURIComponent(importId)}`, {
+    method: "DELETE",
+  });
+  if (!response.ok && response.status !== 404) {
+    throw new Error("Failed to delete import");
+  }
 }
