@@ -108,6 +108,7 @@ export type TelDataImportConfig = {
   name: string;
   channels: string[];
   targetFrequencyHz: number;
+  vchPath: string;
 };
 
 /**

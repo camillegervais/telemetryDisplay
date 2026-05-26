@@ -125,7 +125,6 @@ export function TelDataImportModal({ configs, onImportFromPath, onCancel }: TelD
   const [selectedConfigId, setSelectedConfigId] = useState<string | null>(
     configs.length > 0 ? configs[0].id : null,
   );
-  const [vchPath, setVchPath] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [availableChannels, setAvailableChannels] = useState<string[]>([]);
@@ -210,7 +209,7 @@ export function TelDataImportModal({ configs, onImportFromPath, onCancel }: TelD
         sessionId,
         selectedRunId,
         selectedLapId,
-        vchPath || undefined,
+        selectedConfig?.vchPath || undefined,
       );
       const available = ch.channels || [];
       setAvailableChannels(available);
@@ -246,7 +245,7 @@ export function TelDataImportModal({ configs, onImportFromPath, onCancel }: TelD
         selectedLapId,
         exportChannels,
         selectedConfig.targetFrequencyHz,
-        vchPath || undefined,
+        selectedConfig.vchPath || undefined,
       );
       await onImportFromPath(exportResult.mat_path);
       void closeTelDataSession(sessionId);
@@ -286,7 +285,7 @@ export function TelDataImportModal({ configs, onImportFromPath, onCancel }: TelD
     path: "1 — Archive",
     run: "2 — Run",
     lap: "3 — Lap",
-    config: "4 — Config & .vch",
+    config: "4 — Config",
     validate: "5 — Validation & Export",
   };
 
@@ -294,9 +293,9 @@ export function TelDataImportModal({ configs, onImportFromPath, onCancel }: TelD
     ? resolveConfigChannels(availableChannels, selectedConfig.channels)
     : { present: [], missing: [] };
 
-  const filteredAvailable = availableChannels.filter((ch) =>
+  const filteredAvailable = [...new Set(availableChannels)].filter((ch) =>
     ch.toLowerCase().includes(channelFilter.toLowerCase()),
-  );
+  ).sort();
 
   // ---------------------------------------------------------------------------
   // Render
@@ -524,7 +523,7 @@ export function TelDataImportModal({ configs, onImportFromPath, onCancel }: TelD
             ) : (
               <>
                 <div>
-                  <label style={{ fontSize: "0.8rem", color: "rgba(255,255,255,0.6)" }}>
+                  <label style={{ fontSize: "0.8rem", color: "rgba(255,255,255,0.8)" }}>
                     Config d'import (channels + fréquence)
                   </label>
                   <div
@@ -560,24 +559,15 @@ export function TelDataImportModal({ configs, onImportFromPath, onCancel }: TelD
                 </div>
 
                 {selectedConfig && (
-                  <div style={{ fontSize: "0.76rem", color: "rgba(255,255,255,0.4)", lineHeight: 1.6 }}>
-                    {selectedConfig.channels.join(", ")}
+                  <div style={{ fontSize: "0.76rem", color: "rgba(255,255,255,0.6)", lineHeight: 1.6 }}>
+                    <b>Channels: </b>{selectedConfig.channels.join(", ")}
                   </div>
                 )}
-
-                <div>
-                  <label style={{ fontSize: "0.8rem", color: "rgba(255,255,255,0.6)" }}>
-                    Dossier / fichier .vch{" "}
-                    <span style={{ opacity: 0.5 }}>(optionnel — math channels)</span>
-                  </label>
-                  <input
-                    type="text"
-                    placeholder="C:\WinTAX4\Libraries\... ou \\server\..."
-                    value={vchPath}
-                    onChange={(e) => setVchPath(e.target.value)}
-                    style={{ ...inputStyle, marginTop: "0.25rem" }}
-                  />
-                </div>
+                {selectedConfig && (
+                  <div style={{ fontSize: "0.76rem", color: "rgba(255,255,255,0.6)", lineHeight: 1.6 }}>
+                    <b>VCH Path:</b> {selectedConfig.vchPath}
+                  </div>
+                )}                
               </>
             )}
 
@@ -738,9 +728,10 @@ export function TelDataImportModal({ configs, onImportFromPath, onCancel }: TelD
                     const inConfig = selectedConfig.channels.some(
                       (c) => c.toLowerCase() === ch.toLowerCase(),
                     );
+                    const id_div = ch + '-1';
                     return (
                       <div
-                        key={ch}
+                        key={id_div}
                         style={{
                           fontSize: "0.78rem",
                           fontFamily: "monospace",
@@ -783,8 +774,8 @@ export function TelDataImportModal({ configs, onImportFromPath, onCancel }: TelD
               <strong style={{ color: "rgba(255,255,255,0.8)" }}>Export :</strong>{" "}
               {exportChannels.length} can{exportChannels.length !== 1 ? "aux" : "al"} —{" "}
               {selectedConfig.targetFrequencyHz} Hz
-              {vchPath && (
-                <div style={{ opacity: 0.55, fontSize: "0.74rem" }}>VCH : {vchPath}</div>
+              {selectedConfig.vchPath && (
+                <div style={{ opacity: 0.55, fontSize: "0.74rem" }}>VCH : {selectedConfig.vchPath}</div>
               )}
             </div>
 

@@ -128,8 +128,7 @@ export default function ImportPanel({
   const [newConfigName, setNewConfigName] = useState("");
   const [newConfigChannels, setNewConfigChannels] = useState("");
   const [newConfigFreq, setNewConfigFreq] = useState("100");
-
-
+  const [newConfigVCHPath, setNewConfigVCHPath] = useState("");
 
   const canImport = useMemo(() => selectedFile !== null && !importing, [importing, selectedFile]);
   const canImportFromPath = useMemo(() => matPath.trim().length > 0 && !importing, [importing, matPath]);
@@ -730,6 +729,15 @@ export default function ImportPanel({
                 onChange={(e) => setNewConfigFreq(e.target.value)}
                 style={{ width: "100%" }}
               />
+              <label className="field-label">VCH Path</label>
+              <input
+                className="table-input"
+                type="text"
+                value={newConfigVCHPath}
+                onChange={(e) => setNewConfigVCHPath(e.target.value)}
+                placeholder="Chemin vers les fichiers vch"
+                style={{ width: "100%" }}
+              />
               <button
                 className="import-button"
                 type="button"
@@ -742,12 +750,13 @@ export default function ImportPanel({
                   const freq = parseFloat(newConfigFreq);
                   const updated: TelDataImportConfig[] = [
                     ...telDataConfigs,
-                    { id: crypto.randomUUID(), name: newConfigName.trim(), channels, targetFrequencyHz: Number.isFinite(freq) ? freq : 100 },
+                    { id: crypto.randomUUID(), name: newConfigName.trim(), channels, targetFrequencyHz: Number.isFinite(freq) ? freq : 100, vchPath: newConfigVCHPath.trim() },
                   ];
                   ConfigManager.set("teldata-configs", updated);
                   setNewConfigName("");
                   setNewConfigChannels("");
                   setNewConfigFreq("100");
+                  setNewConfigVCHPath("");
                 }}
               >
                 Sauvegarder config
