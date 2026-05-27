@@ -6,6 +6,7 @@ import { queryDataset, calculateMapTuning, computeMathChannel } from "../api";
 import { evaluateMathChannel } from "../mathChannels";
 import { useTelemetryStore } from "../store/telemetryStore";
 import { ConfigManager } from "../store/ConfigManager";
+import { useSyncedConfig } from "../hooks/useConfig";
 import type { DatasetMetadata, DistanceRange, SignalSeries, TrackMapResponse, MapTuningData, SoftBlock, SoftLutOp, SoftMathOp } from "../types";
 import MapTuning from "./MapTuning";
 import SoftTab, { type BlockStatus } from "./SoftTab";
@@ -170,6 +171,7 @@ const emptyMapTuningData = {
   gainVal: 1,
   offsetVal: 0,
   interpolation: "linear" as const,
+  extrapolation: "clamp" as const,
 };
 
 function isEditableElement(target: EventTarget | null): boolean {
@@ -878,6 +880,9 @@ export default function SignalWorkspace({
   const activeTabIdRef = useRef(activeTabId);
   const sessionSaveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastSavedSessionRef = useRef<WorkspaceSessionSnapshot | null>(null);
+  // Tracks when we last wrote to the session key — used to extend the cross-tab
+  // guard beyond the debounce window (prevents another tab from undoing our save).
+  const lastSaveTimestampRef = useRef<number>(0);
   
   useEffect(() => { activeTabIdRef.current = activeTabId; }, [activeTabId]);
   useEffect(() => { datasetIdRef.current = datasetId; }, [datasetId]);
@@ -1313,22 +1318,12 @@ export default function SignalWorkspace({
   }, []);
 
   // ── Soft Blocks: persist + cross-tab sync ──────────────────────────────────
-  useEffect(() => {
-    ConfigManager.set("soft-blocks", softBlocks);
-  }, [softBlocks]);
-
-  useEffect(() => {
-    return ConfigManager.subscribeDebouncedFull<SoftBlock[]>(
-      "soft-blocks",
-      (newBlocks) => {
-        // Only update if different (avoids self-triggering)
-        if (JSON.stringify(newBlocks) !== JSON.stringify(softBlocksRef.current)) {
-          setSoftBlocks(newBlocks);
-        }
-      },
-      200
-    );
-  }, []);
+  // useSyncedConfig handles: debounced save (150ms), stable subscription with
+  // empty deps + valueRef, and lastSavedRef to prevent self-notification echo.
+  useSyncedConfig<SoftBlock[]>("soft-blocks", softBlocks, setSoftBlocks, {
+    saveDebounceMs: 150,
+    receiveDebounceMs: 200,
+  });
 
   // ── Map Configs: sync from other tabs (MapTuning tab saves here) ────────────
   useEffect(() => {
@@ -1339,7 +1334,7 @@ export default function SignalWorkspace({
       const prev = mapConfigsRef.current ?? {};
       const changedKeys: string[] = [];
       const allKeys = new Set<string>([...Object.keys(prev), ...Object.keys(next)]);
-      const fieldsToCheck = ["gridData", "rowHeaders", "colHeaders", "gainVal", "offsetVal", "braking_signal", "interpolation"];
+      const fieldsToCheck = ["gridData", "rowHeaders", "colHeaders", "gainVal", "offsetVal", "braking_signal", "interpolation", "extrapolation"];
       for (const k of allKeys) {
         const a = prev[k];
         const b = next[k];
@@ -1420,6 +1415,7 @@ export default function SignalWorkspace({
             gainVal: mapCfg.gainVal,
             offsetVal: mapCfg.offsetVal,
             interpolation: mapCfg.interpolation ?? "linear",
+            extrapolation: mapCfg.extrapolation ?? "clamp",
           });
         } else if (op.kind === "math") {
           const mathOp = op as SoftMathOp;
@@ -1503,6 +1499,7 @@ export default function SignalWorkspace({
     // Schedule debounced save
     sessionSaveTimeoutRef.current = setTimeout(() => {
       lastSavedSessionRef.current = sessionSnapshot;
+      lastSaveTimestampRef.current = Date.now(); // arm grace period
       ConfigManager.set("session", sessionSnapshot);
       sessionSaveTimeoutRef.current = null;
     }, 150); // Debounce delay
@@ -1526,16 +1523,21 @@ export default function SignalWorkspace({
       (newSnapshot) => {
         if (!newSnapshot) return;
 
-        const localPersistedSnapshot = buildSessionSnapshot(
-          tabsRef.current,
-          activeTabIdRef.current,
-          currentConfigIdRef.current,
-          selectedConfigIdRef.current
-        );
-        if (
-          sessionSaveTimeoutRef.current !== null &&
-          JSON.stringify(newSnapshot) !== JSON.stringify(localPersistedSnapshot)
-        ) {
+        // Grace-period guard: reject any incoming snapshot that would overwrite
+        // our state if we have a pending save OR have saved within the last 500ms.
+        // This prevents the race condition where Tab B saves ~200ms after Tab A,
+        // then Tab A's subscribe fires after its debounce and undoes Tab A's change.
+        // (The built-in subscribeDebouncedFull lastValue guard is insufficient here
+        //  because activeTabId differs between tabs, so Tab B's echo always bypasses it.)
+        const CROSS_TAB_SESSION_GRACE_MS = 500;
+        const hasPendingSave = sessionSaveTimeoutRef.current !== null;
+        const isWithinGracePeriod =
+          Date.now() - lastSaveTimestampRef.current < CROSS_TAB_SESSION_GRACE_MS;
+        const wouldOverwriteOurState =
+          JSON.stringify(newSnapshot.tabs) !== JSON.stringify(tabsRef.current) ||
+          newSnapshot.currentConfigId !== currentConfigIdRef.current ||
+          newSnapshot.selectedConfigId !== selectedConfigIdRef.current;
+        if ((hasPendingSave || isWithinGracePeriod) && wouldOverwriteOurState) {
           return;
         }
 

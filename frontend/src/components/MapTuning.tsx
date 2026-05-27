@@ -9,6 +9,7 @@ import { useHoverToLutCell } from "../hooks/useHoverToLutCell";
 import { MapTuningData } from "../types";
 
 const INTERPOLATION_OPTIONS: Array<MapTuningData["interpolation"]> = ["floor", "nearest", "linear", "round"];
+const EXTRAPOLATION_OPTIONS: Array<MapTuningData["extrapolation"]> = ["clamp", "linear"];
 
 interface MapTuningProps {
   availableSignals?: string[];
@@ -85,6 +86,10 @@ export default function MapTuning({
   const [outputChannelName, setOutputChannelName] = useState<string>("Ma_Nouvelle_Map");
   const [braking_signal, setBraking_signal] = useState<boolean>(false);
   const [interpolation, setInterpolation] = useState<MapTuningData["interpolation"]>("linear");
+  const [extrapolation, setExtrapolation] = useState<MapTuningData["extrapolation"]>("clamp");
+
+  // State: Channel filter
+  const [channelFilter, setChannelFilter] = useState("");
 
   // State: Grid
   const [numRows, setNumRows] = useState<number>(5);
@@ -322,6 +327,7 @@ export default function MapTuning({
       gainVal,
       offsetVal,
       interpolation,
+      extrapolation,
     };
     try {
       // Save to ConfigManager (persists to localStorage with cross-tab sync)
@@ -358,6 +364,7 @@ export default function MapTuning({
       gainVal,
       offsetVal,
       interpolation,
+      extrapolation,
     };
 
     if (autoSaveTimeoutRef.current !== null) clearTimeout(autoSaveTimeoutRef.current);
@@ -387,7 +394,7 @@ export default function MapTuning({
       }
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [inputChannelX, inputChannelY, outputChannelName, gridData, rowHeaders, colHeaders, braking_signal, gainVal, offsetVal, interpolation]);
+  }, [inputChannelX, inputChannelY, outputChannelName, gridData, rowHeaders, colHeaders, braking_signal, gainVal, offsetVal, interpolation, extrapolation]);
 
   const handleLoadConfig = (name: string) => {
     const configs = ConfigManager.get<Record<string, MapTuningData>>("map-configs") ?? {};
@@ -406,6 +413,7 @@ export default function MapTuning({
       setGainVal(config.gainVal ?? 1);
       setOffsetVal(config.offsetVal ?? 0);
       setInterpolation(config.interpolation ?? "linear");
+      setExtrapolation(config.extrapolation ?? "clamp");
       setShowConfigMenu(false);
       setSaveMessage({ type: "success", text: `Configuration "${name}" chargée.` });
     }
@@ -442,17 +450,43 @@ export default function MapTuning({
       {/* Configuration des Channels */}
       <section className="map-tuning-section">
         <h3>Configuration des Channels</h3>
+        <div style={{ marginBottom: "0.5rem" }}>
+          <label className="field-label">Filtrer les canaux</label>
+          <input
+            type="text"
+            className="signals-filter-input"
+            value={channelFilter}
+            onChange={(e) => setChannelFilter(e.target.value)}
+            placeholder="Filtrer..."
+            style={{ width: "100%" }}
+          />
+        </div>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: "1rem" }}>
           <div>
             <label className="field-label">Entrée X (Colonnes)</label>
             <select className="mini-select" style={{ width: "100%" }} value={inputChannelX} onChange={(e) => setInputChannelX(e.target.value)}>
-              {availableSignals.map((ch) => <option key={ch} value={ch}>{ch}</option>)}
+              {availableSignals
+                .filter((ch) => ch.toLowerCase().includes(channelFilter.toLowerCase()))
+                .map((ch) => <option key={ch} value={ch}>{ch}</option>)}
+              {/* Always keep the selected value visible even if filtered out */}
+              {inputChannelX && !availableSignals
+                .filter((ch) => ch.toLowerCase().includes(channelFilter.toLowerCase()))
+                .includes(inputChannelX) && (
+                <option key={inputChannelX} value={inputChannelX}>{inputChannelX}</option>
+              )}
             </select>
           </div>
           <div>
             <label className="field-label">Entrée Y (Lignes)</label>
             <select className="mini-select" style={{ width: "100%" }} value={inputChannelY} onChange={(e) => setInputChannelY(e.target.value)}>
-              {availableSignals.map((ch) => <option key={ch} value={ch}>{ch}</option>)}
+              {availableSignals
+                .filter((ch) => ch.toLowerCase().includes(channelFilter.toLowerCase()))
+                .map((ch) => <option key={ch} value={ch}>{ch}</option>)}
+              {inputChannelY && !availableSignals
+                .filter((ch) => ch.toLowerCase().includes(channelFilter.toLowerCase()))
+                .includes(inputChannelY) && (
+                <option key={inputChannelY} value={inputChannelY}>{inputChannelY}</option>
+              )}
             </select>
           </div>
           <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
@@ -469,6 +503,19 @@ export default function MapTuning({
                 onChange={(e) => setInterpolation(e.target.value as MapTuningData["interpolation"])}
               >
                 {INTERPOLATION_OPTIONS.map((option) => (
+                  <option key={option} value={option}>{option}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="field-label">Extrapolation (hors breakpoints)</label>
+              <select
+                className="mini-select"
+                style={{ width: "100%" }}
+                value={extrapolation}
+                onChange={(e) => setExtrapolation(e.target.value as MapTuningData["extrapolation"])}
+              >
+                {EXTRAPOLATION_OPTIONS.map((option) => (
                   <option key={option} value={option}>{option}</option>
                 ))}
               </select>

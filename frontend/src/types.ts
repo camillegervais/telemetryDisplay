@@ -92,6 +92,7 @@ export type MapTuningData = {
   gainVal: number;
   offsetVal: number;
   interpolation: "floor" | "nearest" | "linear" | "round";
+  extrapolation: "clamp" | "linear";
 };
 
 export type MapTuningSaveRequest = {

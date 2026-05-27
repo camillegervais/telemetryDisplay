@@ -45,6 +45,7 @@ async def save_map(payload: MapTuningRequest):
             "gainVal": payload.gainVal,
             "offsetVal": payload.offsetVal,
             "interpolation": payload.interpolation,
+            "extrapolation": payload.extrapolation,
         }
 
         return {

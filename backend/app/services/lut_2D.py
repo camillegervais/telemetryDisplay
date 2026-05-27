@@ -16,8 +16,9 @@ class LUT2D:
     gainVal: float
     offsetVal: float
     interpolation: str
+    extrapolation: str  # 'clamp' or 'linear'
 
-    def __init__(self, x_axis_label, y_axis_label, x_axis_values, y_axis_values, lut_values, output_channel, braking_signal, gainVal, offsetVal, interpolation='linear'):
+    def __init__(self, x_axis_label, y_axis_label, x_axis_values, y_axis_values, lut_values, output_channel, braking_signal, gainVal, offsetVal, interpolation='linear', extrapolation='clamp'):
         # Allow 2D LUTs as well as degenerate 1D shapes where one dimension may be 1.
         if lut_values.ndim != 2:
             raise AssertionError('lut_values must be 2D')
@@ -36,6 +37,7 @@ class LUT2D:
         self.gainVal = gainVal
         self.offsetVal = offsetVal
         self.interpolation = interpolation
+        self.extrapolation = extrapolation if extrapolation in {'clamp', 'linear'} else 'clamp'
 
     def _clamp_axis_indices(self, values: np.ndarray, axis: np.ndarray, mode: str) -> np.ndarray:
         if axis.size == 1:
@@ -59,9 +61,21 @@ class LUT2D:
         y_indices = self._clamp_axis_indices(y_data, y_vals, mode)
         return lut[x_indices, y_indices]
 
-    def _apply_1d(self, data: np.ndarray, axis: np.ndarray, values: np.ndarray, mode: str) -> np.ndarray:
+    def _apply_1d(self, data: np.ndarray, axis: np.ndarray, values: np.ndarray, mode: str, extrapolate: bool = False) -> np.ndarray:
         normalized_mode = mode if mode in {'floor', 'nearest', 'linear', 'round'} else 'linear'
         if normalized_mode == 'linear':
+            if extrapolate and axis.size >= 2:
+                # Linear extrapolation using the slope of the two outermost breakpoints
+                result = np.interp(data, axis, values, left=values[0], right=values[-1])
+                left_mask = data < axis[0]
+                right_mask = data > axis[-1]
+                if np.any(left_mask):
+                    slope = (values[1] - values[0]) / (axis[1] - axis[0])
+                    result[left_mask] = values[0] + slope * (data[left_mask] - axis[0])
+                if np.any(right_mask):
+                    slope = (values[-1] - values[-2]) / (axis[-1] - axis[-2])
+                    result[right_mask] = values[-1] + slope * (data[right_mask] - axis[-1])
+                return result
             return np.interp(data, axis, values, left=values[0], right=values[-1])
 
         indices = self._clamp_axis_indices(data, axis, 'floor' if normalized_mode == 'floor' else 'round')
@@ -106,22 +120,28 @@ class LUT2D:
                     bounds_error=False,
                     fill_value=None,
                 )
-                input_points = np.column_stack((x_data_clipped, y_data_clipped))
+                # For 'linear' mode, scipy extrapolates linearly when fill_value=None;
+                # for 'nearest' mode it uses nearest boundary (equivalent to clamping).
+                if self.extrapolation == 'linear' and mode == 'linear':
+                    input_points = np.column_stack((x_data, y_data))
+                else:
+                    input_points = np.column_stack((x_data_clipped, y_data_clipped))
                 output_channel = np.array(lut_function(input_points))
             else:
                 discrete_mode = 'floor' if mode == 'floor' else 'round'
+                # Discrete modes always clamp; linear extrapolation does not apply
                 output_channel = self._apply_discrete_2d(x_data_clipped, y_data_clipped, x_vals, y_vals, lut, discrete_mode)
 
         # Case: LUT has single row (lx == 1) — treat as 1D over y (use y axis values)
         elif lx == 1 and ly >= 1:
             # Use the single row lut[0, :] indexed by y_vals
             row = lut[0, :]
-            output_channel = self._apply_1d(y_data, y_vals, row, self.interpolation)
+            output_channel = self._apply_1d(y_data, y_vals, row, self.interpolation, extrapolate=(self.extrapolation == 'linear'))
 
         # Case: LUT has single column (ly == 1) — treat as 1D over x (use x axis values)
         elif ly == 1 and lx >= 1:
             col = lut[:, 0]
-            output_channel = self._apply_1d(x_data, x_vals, col, self.interpolation)
+            output_channel = self._apply_1d(x_data, x_vals, col, self.interpolation, extrapolate=(self.extrapolation == 'linear'))
 
         # Fallback: degenerate constant
         else:

@@ -187,6 +187,7 @@ Run through the following checks for **every file** that imports `ConfigManager`
 | `useHoverToLutCell.ts` | `current-hover-slap` | Uses plain `subscribe`, no debounce on receive | The internal `DEBOUNCE_MS` timer on the API call acts as the debounce; write side is immediate by design (hover must feel instant) |
 | `MapTuning.tsx` `handleSave` | `map-configs` | Immediate write (no debounce) | Explicit user action (button click), not continuous input |
 | `MapTuning.tsx` `handleDeleteConfig` | `map-configs` | Immediate write | Explicit user action |
+| `SignalWorkspace.tsx` session subscribe | `session` | Extended grace-period guard (`lastSaveTimestampRef`) | `activeTabId` differs between tabs, so `subscribeDebouncedFull`'s `lastValue` guard always fires for cross-tab echoes. A 500ms grace period after each save prevents another tab's concurrent save from undoing the first tab's change. |
 
 ---
 

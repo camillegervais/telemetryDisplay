@@ -113,6 +113,7 @@ export default function ImportPanel({
   const [loadingStats, setLoadingStats] = useState(false);
   const [statsError, setStatsError] = useState<string | null>(null);
   const [mapsSectionOpen, setMapsSectionOpen] = useState(false);
+  const [mapFilter, setMapFilter] = useState("");
   const [mapConfigs, setMapConfigs] = useState<Record<string, MapTuningData>>(() =>
     ConfigManager.get<Record<string, MapTuningData>>("map-configs") ?? {}
   );
@@ -469,7 +470,16 @@ export default function ImportPanel({
               <p className="panel-text">Aucune carto sauvegardée.</p>
             ) : (
               <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
-                {Object.entries(mapConfigs).map(([name, cfg]) => (
+                <input
+                  type="text"
+                  className="signals-filter-input"
+                  value={mapFilter}
+                  onChange={(e) => setMapFilter(e.target.value)}
+                  placeholder="Filtrer les cartos..."
+                />
+                {Object.entries(mapConfigs)
+                  .filter(([name]) => name.toLowerCase().includes(mapFilter.toLowerCase()))
+                  .map(([name, cfg]) => (
                   <div key={`map-${name}`} style={{ display: "flex", gap: "0.5rem", flexDirection: "column" }}>
                     <div style={{ minWidth: "160px", overflow: "hidden", textOverflow: "ellipsis" }}>{name}</div>
                     <div style={{ display: 'flex', flexDirection: "column"}}>
@@ -525,6 +535,9 @@ export default function ImportPanel({
                       </div>
                   </div>
                 ))}
+                {Object.keys(mapConfigs).length > 0 && Object.entries(mapConfigs).filter(([name]) => name.toLowerCase().includes(mapFilter.toLowerCase())).length === 0 ? (
+                  <p className="panel-text">Aucune carto ne correspond au filtre.</p>
+                ) : null}
               </div>
             )}
           </div>

@@ -83,6 +83,7 @@ class MapTuningRequest(BaseModel):
     gainVal: float
     offsetVal: float
     interpolation: str = "linear"
+    extrapolation: str = "clamp"
 
 
 class MapTuningSaveResponse(BaseModel):
