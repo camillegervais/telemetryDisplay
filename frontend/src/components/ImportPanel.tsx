@@ -1,11 +1,11 @@
 import { useEffect, useMemo, useState, type CSSProperties, type KeyboardEvent } from "react";
 
-import { fetchRecentImports, deleteRecentImport, queryDataset } from "../api";
+import { queryDataset } from "../api";
 import { useTelemetryStore } from "../store/telemetryStore";
 import { ConfigManager } from "../store/ConfigManager";
-import { TelDataImportModal } from "./TelDataImportModal";
+import { ImportDataModal } from "./ImportDataModal";
 
-import type { DatasetMetadata, MapTuningData, RecentImportItem } from "../types";
+import type { DatasetMetadata, MapTuningData } from "../types";
 import type { TelDataImportConfig } from "../types/ConfigTypes";
 
 type ImportPanelProps = {
@@ -75,7 +75,6 @@ function NumberInput({ value, onChange, style }: NumberInputProps) {
 }
 
 const LAST_MAT_PATH_KEY = "telemetry-display.last-mat-path.v1";
-const LAST_PICKER_PATH_KEY = "telemetry-display.last-picker-path.v1";
 
 function isAbortError(error: unknown): boolean {
   return error instanceof DOMException && error.name === "AbortError";
@@ -104,9 +103,8 @@ export default function ImportPanel({
   onImportFromPath,
 }: ImportPanelProps) {
   const { xAxisMode, startFinishOffsetM, setXAxisMode, setStartFinishOffsetM } = useTelemetryStore();
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [matPath, setMatPath] = useState("");
-  const [importSectionOpen, setImportSectionOpen] = useState(true);
+  const [matPath, setMatPath] = useState(() => window.localStorage.getItem(LAST_MAT_PATH_KEY) ?? "");
+  const [importModalOpen, setImportModalOpen] = useState(false);
   const [signalsSectionOpen, setSignalsSectionOpen] = useState(true);
   const [axisSectionOpen, setAxisSectionOpen] = useState(false);
   const [statsSectionOpen, setStatsSectionOpen] = useState(false);
@@ -118,25 +116,16 @@ export default function ImportPanel({
   const [mapConfigs, setMapConfigs] = useState<Record<string, MapTuningData>>(() =>
     ConfigManager.get<Record<string, MapTuningData>>("map-configs") ?? {}
   );
-  const [telDataSectionOpen, setTelDataSectionOpen] = useState(false);
   const [telDataConfigsSectionOpen, setTelDataConfigsSectionOpen] = useState(false);
-  const [telDataModalOpen, setTelDataModalOpen] = useState(false);
   const [telDataConfigs, setTelDataConfigs] = useState<TelDataImportConfig[]>(
     () => ConfigManager.get<TelDataImportConfig[]>("teldata-configs") ?? []
   );
-  // Recent imports section
-  const [recentSectionOpen, setRecentSectionOpen] = useState(false);
-  const [recentImports, setRecentImports] = useState<RecentImportItem[]>([]);
-  const [loadingRecent, setLoadingRecent] = useState(false);
-  const [recentError, setRecentError] = useState<string | null>(null);
   // Form state for creating a new TelData config
   const [newConfigName, setNewConfigName] = useState("");
   const [newConfigChannels, setNewConfigChannels] = useState("");
   const [newConfigFreq, setNewConfigFreq] = useState("100");
   const [newConfigVCHPath, setNewConfigVCHPath] = useState("");
 
-  const canImport = useMemo(() => selectedFile !== null && !importing, [importing, selectedFile]);
-  const canImportFromPath = useMemo(() => matPath.trim().length > 0 && !importing, [importing, matPath]);
   const allSignals = useMemo(
     () => uniqueStrings(datasetMetadata?.signal_names ?? []),
     [datasetMetadata]
@@ -148,13 +137,6 @@ export default function ImportPanel({
     }
     return allSignals.filter((signal) => signal.toLowerCase().includes(filter));
   }, [allSignals, signalFilter]);
-
-  useEffect(() => {
-    const savedPath = window.localStorage.getItem(LAST_MAT_PATH_KEY);
-    if (savedPath) {
-      setMatPath(savedPath);
-    }
-  }, []);
 
   // Sync map configs and listen for external updates
   useEffect(() => {
@@ -178,12 +160,6 @@ export default function ImportPanel({
       window.localStorage.setItem(LAST_MAT_PATH_KEY, datasetMetadata.source_path);
     }
   }, [datasetMetadata?.source_path]);
-
-  useEffect(() => {
-    if (xAxisMode === "time" && datasetMetadata && !datasetMetadata.has_time_axis) {
-      setXAxisMode("distance");
-    }
-  }, [datasetMetadata, xAxisMode, setXAxisMode]);
 
   useEffect(() => {
     if (!datasetId || !datasetMetadata || datasetMetadata.signal_names.length === 0) {
@@ -259,69 +235,10 @@ export default function ImportPanel({
   }, [datasetId, datasetMetadata]);
 
   useEffect(() => {
-    if (!recentSectionOpen) return;
-    let alive = true;
-    setLoadingRecent(true);
-    setRecentError(null);
-    fetchRecentImports(15)
-      .then((res) => {
-        if (alive) setRecentImports(res.items);
-      })
-      .catch((err: unknown) => {
-        if (alive) setRecentError(err instanceof Error ? err.message : "Erreur de chargement");
-      })
-      .finally(() => {
-        if (alive) setLoadingRecent(false);
-      });
-    return () => { alive = false; };
-  }, [recentSectionOpen]);
-
-  function refreshRecentImports() {
-    setLoadingRecent(true);
-    setRecentError(null);
-    fetchRecentImports(15)
-      .then((res) => setRecentImports(res.items))
-      .catch((err: unknown) => setRecentError(err instanceof Error ? err.message : "Erreur"))
-      .finally(() => setLoadingRecent(false));
-  }
-
-  function formatImportDate(isoStr: string): string {
-    try {
-      const d = new Date(isoStr);
-      return d.toLocaleDateString("fr-FR", { day: "2-digit", month: "2-digit", year: "2-digit" })
-        + " "
-        + d.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" });
-    } catch {
-      return isoStr;
+    if (xAxisMode === "time" && datasetMetadata && !datasetMetadata.has_time_axis) {
+      setXAxisMode("distance");
     }
-  }
-
-  function formatFileSize(bytes: number | null): string {
-    if (!bytes) return "";
-    if (bytes < 1024 * 1024) return ` — ${(bytes / 1024).toFixed(0)} Ko`;
-    return ` — ${(bytes / (1024 * 1024)).toFixed(1)} Mo`;
-  }
-
-  function getDisplayName(item: RecentImportItem): string {
-    if (item.dataset_name) return item.dataset_name;
-    return item.source_path.split(/[\/\\]/).pop() ?? item.source_path;
-  }
-
-  async function handleImportClick() {
-    if (!selectedFile) {
-      return;
-    }
-    await onImport(selectedFile);
-  }
-
-  async function handleImportFromPathClick() {
-    const path = matPath.trim().replace(/^"|"$/g, "");
-    if (!path) {
-      return;
-    }
-    window.localStorage.setItem(LAST_MAT_PATH_KEY, path);
-    await onImportFromPath(path);
-  }
+  }, [datasetMetadata, xAxisMode, setXAxisMode]);
 
   function updateMapGain(name: string, newGain: number) {
     if (!Number.isFinite(newGain)) return;
@@ -360,6 +277,27 @@ export default function ImportPanel({
       <div className="panel-header">
         <h2>Import</h2>
         <span className="panel-badge">Data</span>
+      </div>
+
+      <div className="import-cta-wrapper">
+        <button
+          type="button"
+          className="import-cta-button"
+          onClick={() => setImportModalOpen(true)}
+          disabled={importing}
+        >
+          {importing ? (
+            <span className="loading-inline">
+              <span className="loading-spinner" aria-hidden="true" />
+              Import en cours...
+            </span>
+          ) : (
+            <>
+              <span className="import-cta-icon">⬇</span>
+              <span>Importer des données</span>
+            </>
+          )}
+        </button>
       </div>
 
       <div className="import-submenu">
@@ -408,209 +346,7 @@ export default function ImportPanel({
         ) : null}
       </div>
 
-      <div className="import-submenu">
-        <button
-          type="button"
-          className="import-submenu-toggle"
-          onClick={() => setImportSectionOpen((prev) => !prev)}
-        >
-          <span>{importSectionOpen ? "▾" : "▸"}</span>
-          <span>Import de donnees</span>
-        </button>
-
-        {importSectionOpen ? (
-          <div className="import-submenu-content">
-            <label className="field-label" htmlFor="mat-file-input">
-              MAT file - Load un fichier une seule fois
-            </label>
-            <input
-              id="mat-file-input"
-              type="file"
-              accept=".mat"
-              className="file-input"
-              onChange={(event) => {
-                const pickedFile = event.target.files?.[0] ?? null;
-                setSelectedFile(pickedFile);
-
-                const pickerPath = event.target.value?.trim() ?? "";
-                if (pickerPath.length > 0) {
-                  window.localStorage.setItem(LAST_PICKER_PATH_KEY, pickerPath);
-
-                  // Browser file inputs often return C:\\fakepath\\..., which cannot be reused by backend path import.
-                  const normalized = pickerPath.replace(/\\\\/g, "/");
-                  const isFakePath = normalized.toLowerCase().includes("/fakepath/");
-                  if (!isFakePath && normalized.toLowerCase().endsWith(".mat")) {
-                    setMatPath(normalized);
-                    window.localStorage.setItem(LAST_MAT_PATH_KEY, normalized);
-                  }
-                }
-              }}
-            />
-
-            <button className="import-button" disabled={!canImport} onClick={handleImportClick}>
-              {importing ? (
-                <span className="loading-inline">
-                  <span className="loading-spinner" aria-hidden="true" />
-                  Import en cours...
-                </span>
-              ) : (
-                "Importer le dataset"
-              )}
-            </button>
-
-            <label className="field-label" htmlFor="mat-path-input">
-              MAT path - Permet de refresh entre les simulations
-            </label>
-            <input
-              id="mat-path-input"
-              type="text"
-              className="signals-filter-input"
-              value={matPath}
-              onChange={(event) => setMatPath(event.target.value)}
-              placeholder="Ex: C:/Users/camil/Documents/Code/telemetryDisplay/data/imola.mat"
-            />
-            <button
-              className="import-button"
-              disabled={!canImportFromPath}
-              onClick={handleImportFromPathClick}
-            >
-              {importing ? (
-                <span className="loading-inline">
-                  <span className="loading-spinner" aria-hidden="true" />
-                  Import en cours...
-                </span>
-              ) : (
-                "Importer depuis chemin"
-              )}
-            </button>
-
-            {selectedFile ? <p className="panel-text file-picked">{selectedFile.name}</p> : null}
-          </div>
-        ) : null}
-      </div>
-
-      {/* ---- Import TelData ---- */}
-      <div className="import-submenu">
-        <button
-          type="button"
-          className="import-submenu-toggle"
-          onClick={() => setTelDataSectionOpen((p) => !p)}
-        >
-          <span>{telDataSectionOpen ? "▾" : "▸"}</span>
-          <span>Import TelData</span>
-        </button>
-
-        {telDataSectionOpen ? (
-          <div className="import-submenu-content">
-            <button
-              className="import-button"
-              type="button"
-              onClick={() => setTelDataModalOpen(true)}
-            >
-              Ouvrir archive TelData…
-            </button>
-          </div>
-        ) : null}
-      </div>
-
-      {/* ---- Imports récents ---- */}
-      <div className="import-submenu">
-        <button
-          type="button"
-          className="import-submenu-toggle"
-          onClick={() => setRecentSectionOpen((prev) => !prev)}
-        >
-          <span>{recentSectionOpen ? "▾" : "▸"}</span>
-          <span>Imports récents</span>
-        </button>
-
-        {recentSectionOpen ? (
-          <div className="import-submenu-content">
-            <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: "0.4rem" }}>
-              <button
-                className="small-button"
-                type="button"
-                onClick={refreshRecentImports}
-                disabled={loadingRecent}
-                title="Rafraîchir la liste"
-              >
-                ↺
-              </button>
-            </div>
-
-            {loadingRecent ? (
-              <p className="panel-text loading-inline">
-                <span className="loading-spinner" aria-hidden="true" />
-                Chargement...
-              </p>
-            ) : recentError ? (
-              <p className="panel-text">{recentError}</p>
-            ) : recentImports.length === 0 ? (
-              <p className="panel-text">Aucun import récent.</p>
-            ) : (
-              <div style={{ display: "flex", flexDirection: "column", gap: "0.4rem" }}>
-                {recentImports.map((item) => (
-                  <div
-                    key={item.import_id}
-                    style={{
-                      display: "flex",
-                      flexDirection: "column",
-                      gap: "0.15rem",
-                      padding: "0.4rem 0.5rem",
-                      border: "1px solid rgba(255,70,93,0.2)",
-                      borderRadius: "3px",
-                    }}
-                  >
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: "0.4rem" }}>
-                      <div
-                        style={{
-                          fontSize: "0.83rem",
-                          fontWeight: 600,
-                          overflow: "hidden",
-                          textOverflow: "ellipsis",
-                          whiteSpace: "nowrap",
-                          flex: 1,
-                          minWidth: 0,
-                        }}
-                        title={item.source_path}
-                      >
-                        {getDisplayName(item)}
-                      </div>
-                      <button
-                        className="small-button"
-                        type="button"
-                        title="Supprimer cet import"
-                        onClick={() => {
-                          deleteRecentImport(item.import_id)
-                            .then(() => setRecentImports((prev) => prev.filter((r) => r.import_id !== item.import_id)))
-                            .catch(() => {});
-                        }}
-                      >
-                        ✕
-                      </button>
-                    </div>
-                    <div style={{ fontSize: "0.74rem", opacity: 0.55 }}>
-                      {formatImportDate(item.imported_at)}
-                      {item.signal_count != null ? ` — ${item.signal_count} signaux` : ""}
-                      {formatFileSize(item.file_size)}
-                    </div>
-                    <button
-                      className="import-button"
-                      type="button"
-                      style={{ marginTop: "0.25rem", padding: "0.2rem 0.5rem", fontSize: "0.78rem" }}
-                      onClick={() => onImportFromPath(item.source_path)}
-                      disabled={importing}
-                    >
-                      {importing ? "Import en cours..." : "Charger"}
-                    </button>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        ) : null}
-      </div>
-
+      {/* ---- Axe X ---- */}
       <div className="import-submenu">
         <button
           type="button"
@@ -795,14 +531,14 @@ export default function ImportPanel({
         ) : null}
       </div>
 
-      {telDataModalOpen ? (
-        <TelDataImportModal
-          configs={telDataConfigs}
-          onImportFromPath={async (matPath) => {
-            setTelDataModalOpen(false);
-            await onImportFromPath(matPath);
-          }}
-          onCancel={() => setTelDataModalOpen(false)}
+      {importModalOpen ? (
+        <ImportDataModal
+          importing={importing}
+          initialMatPath={matPath}
+          telDataConfigs={telDataConfigs}
+          onImport={onImport}
+          onImportFromPath={onImportFromPath}
+          onClose={() => setImportModalOpen(false)}
         />
       ) : null}
 

@@ -1738,6 +1738,134 @@ body::after {
   }
 }
 
+/* ---- Import CTA Button ---- */
+.import-cta-wrapper {
+  padding: 0.65rem 0.6rem 0.4rem;
+}
+
+.import-cta-button {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.55rem;
+  border: 1px solid rgba(255, 70, 93, 0.85);
+  background: linear-gradient(135deg, rgba(255, 70, 93, 0.2), rgba(121, 25, 42, 0.38));
+  color: var(--fg-1);
+  border-radius: 2px;
+  padding: 0.7rem 1rem;
+  cursor: pointer;
+  font-family: "Rajdhani", sans-serif;
+  font-size: 0.95rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  transition: transform 0.12s ease, box-shadow 0.12s ease, background 0.15s ease;
+  box-shadow: 0 2px 14px rgba(255, 70, 93, 0.18), inset 0 1px 0 rgba(255, 70, 93, 0.12);
+}
+
+.import-cta-button:hover:enabled {
+  transform: translateY(-1px);
+  background: linear-gradient(135deg, rgba(255, 70, 93, 0.32), rgba(180, 40, 65, 0.48));
+  box-shadow: 0 6px 22px rgba(255, 70, 93, 0.32);
+}
+
+.import-cta-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.import-cta-icon {
+  font-size: 1rem;
+  line-height: 1;
+  opacity: 0.9;
+}
+
+/* ---- Import Data Modal ---- */
+.import-data-modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 75;
+  display: grid;
+  place-items: center;
+  background: rgba(8, 3, 5, 0.75);
+  backdrop-filter: blur(3px);
+  padding: 0.8rem;
+}
+
+.import-data-modal {
+  width: min(520px, 96vw);
+  max-height: min(88vh, 780px);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  border: 1px solid rgba(255, 70, 93, 0.6);
+  background: linear-gradient(180deg, rgba(22, 8, 11, 0.99), rgba(14, 6, 9, 0.97));
+  box-shadow: 0 25px 60px rgba(0, 0, 0, 0.6), 0 0 40px rgba(255, 70, 93, 0.06);
+  animation: modal-fade-up 200ms ease-out;
+  width: 50vw;
+}
+
+.import-data-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.7rem;
+  padding: 0.65rem 0.85rem 0.5rem;
+  border-bottom: 1px solid rgba(255, 70, 93, 0.18);
+  flex-shrink: 0;
+}
+
+.import-data-modal-header h3 {
+  margin: 0;
+  font-family: "Rajdhani", sans-serif;
+  font-size: 0.95rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--fg-1);
+}
+
+.import-data-modal-tabs {
+  display: flex;
+  border-bottom: 1px solid rgba(255, 70, 93, 0.18);
+  flex-shrink: 0;
+}
+
+.import-data-modal-tab {
+  flex: 1;
+  padding: 0.55rem 0.5rem;
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid transparent;
+  color: rgba(244, 232, 234, 0.4);
+  font-family: "Rajdhani", sans-serif;
+  font-size: 0.82rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: color 0.14s, border-color 0.14s, background 0.14s;
+}
+
+.import-data-modal-tab:hover {
+  color: var(--fg-1);
+  background: rgba(255, 70, 93, 0.06);
+}
+
+.import-data-modal-tab.active {
+  color: rgb(255, 70, 93);
+  border-bottom-color: rgb(255, 70, 93);
+  background: rgba(255, 70, 93, 0.05);
+}
+
+.import-data-modal-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 0.8rem 0.85rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
 @keyframes logo-core-glow {
   0%,
   100% {
