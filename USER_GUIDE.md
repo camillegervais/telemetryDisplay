@@ -36,7 +36,7 @@ The interface consists of four main areas:
 
 **Left Panel** – Toggle between two modes:
 - **Data Hub**: Import datasets, view signal list, display statistics, quickly tune carto
-- **Graph Inspector**: Fine-tune individual graph properties
+- **Graph perso**: Fine-tune individual graph properties
 
 **Main Workspace** – Multi-tab dashboard where you create and manage graphs
 
@@ -47,18 +47,27 @@ The interface consists of four main areas:
 
 ### Importing a Dataset
 
-1. Click **"IMPORT DE DONNEES"** in the left panel
-2. Choose one of two methods:
-   - **File Path**: Enter the folder path (pulls latest .mat file)
-   - **Browse**: Select a .mat file directly from your computer
+Click the **"⬆ IMPORTER DES DONNÉES"** button in the left panel to open the import modal. It has three tabs:
 
-The application expects .mat files in the format specified in `MAT_FORMAT.md`.
+**Import MAT**
+- **Browse**: Select a `.mat` file directly from your computer
+- **MAT path**: Enter a full file path — useful for refreshing between simulation runs without re-browsing
+
+**Récents**
+- Lists the last 15 imported datasets
+- Click **Charger** to reload a previous dataset instantly
+- Click **✕** next to an entry to remove it from the history
+
+**TelData**
+- Click **Ouvrir archive TelData…** to import from a TelData archive using a saved configuration
+
+The application expects `.mat` files in the format specified in `MAT_FORMAT.md`.
 
 Once imported:
 - All signals become available in the **Signal List**
 - Any existing graphs automatically populate with the new data
 - The dataset persists across all open tabs
-- To switch datasets, simply import another one (previous data cannot be recovered from the application itself)
+- To switch datasets, simply import another one or reimport from recent ones
 - All software blocks that can be computed are computed and the signals are added to the signal list
 
 
@@ -66,8 +75,8 @@ Once imported:
 
 ### The Tab System
 
-- **Create a tab**: Click `+ TAB` or press `T`
-- **Switch tabs**: Click the tab name or press `Ctrl+Tab`
+- **Create a tab**: Click `+ TAB`
+- **Switch tabs**: Click the tab name
 - Each tab is independent and persists between browser's tabs opened
 
 ### Creating Graphs
@@ -78,8 +87,8 @@ Once imported:
 - Drag another signal onto an existing graph to **add** it
 
 **Method 2 – Quick Actions**:
-- Press `A` to add a time-series graph
-- Press `X` to add an XY (2D scatter) graph
+- Press `+ Graphe` to add a time-series graph
+- Press `+ Graphe XY` to add an XY (2D scatter) graph
 
 ### Graph Types
 
@@ -94,7 +103,7 @@ Once imported:
 
 If nothing is set up, the usual color sequence is used and the order is the order in which you drop the signals in the graph.
 
-At the bottom of the `Import Panel` you can associate a color with a signal's name so that each time youdrop a signal with that name on a graph, the signal trace has the selected color.
+At the bottom of the `Import Panel` you can associate a color with a signal's name so that each time you drop a signal with that name on a graph, the signal trace has the selected color.
 
 ## 3. Interactive Controls & Navigation
 
@@ -135,7 +144,7 @@ The following buttons help you manage your tab configurations:
 - `Sauver` save the current configuration, a nema is required: if you want to update your current configuration keep th e same name, otherwise enter a new name
 - `Suppr` delete the configuration from your computer: **cannot be undone**
 
-**/!\\** The tab configuration only store and load the configuration of the graphs, cartos and software blocks (intriduced further in that document) are not loaded. 
+**/!\\** The tab configuration only store and load the configuration of the graphs, cartos and software blocks (introduced further in that document) are not loaded. 
 
 ## 4. Math Channels & Custom Calculations
 
@@ -186,11 +195,12 @@ Create interpolation maps for calibration tuning.
 
 **How it works**:
 1. Select **Input X** (columns) and **Input Y** (rows) channels
-2. Define grid dimensions (5×5, 10×10, etc.)
-3. Enter header values (breakpoints for each axis, Ctrl+V from Excel is possible)
-4. Edit or paste table values (Ctrl+V from Excel is possible)
-5. Apply **Gain** and **Offset** scaling if needed
-6. Click **"💾 Sauvegarder"** to save locally
+2. Select the interpolation method and extrapolation method in case we hit breakpoints out of bounds.
+3. Define grid dimensions (5×5, 10×10, etc.)
+4. Enter header values (breakpoints for each axis, Ctrl+V from Excel is possible)
+5. Edit or paste table values (Ctrl+V from Excel is possible)
+6. Apply **Gain** and **Offset** scaling if needed
+7. Click **"💾 Sauvegarder"** to save locally
 
 **Features**:
 - Save multiple configurations locally
@@ -198,6 +208,7 @@ Create interpolation maps for calibration tuning.
 - Heatmap visualization (green=low, red=high)
 - Braking signal filtering option (signal active only when MBrakeR is not null)
 - Different type of interpolation: linear, round, nearest, floor
+- Different type of extrapolation: linear and clamp
 
 These maps can be included in software blocks in the `Soft` tab. To compute their output they have to be included in a software block, whose output will be computed each time you change numerical values of the carto (gain, offset, breakpoints and value). The computation is done no matter where in the application you change the value.
 
