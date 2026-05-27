@@ -2323,6 +2323,7 @@ export default function SignalWorkspace({
             return elem;
           }
         });
+        ConfigManager.set("layouts", nextConfigs);
         return nextConfigs;
       });
     }
