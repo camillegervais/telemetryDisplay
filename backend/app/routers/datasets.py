@@ -2,6 +2,8 @@
 
 from pathlib import Path
 from typing import List, Dict, Optional, Tuple
+import hashlib
+import shutil
 import uuid
 
 import numpy as np
@@ -158,8 +160,9 @@ def import_mat_file_from_path(request: DatasetImportFromPathRequest) -> DatasetI
     """
     Import a .mat file directly from a server-local path.
 
-    This endpoint is intended for repeated simulation workflows where the same file
-    is updated on disk and reloaded often.
+    The file is copied into import_cache so each version is preserved and
+    can be re-loaded independently from the Recent Imports list, even after
+    the simulation has overwritten the original file.
     """
     mat_path = Path(request.mat_path).expanduser().resolve()
 
@@ -170,15 +173,44 @@ def import_mat_file_from_path(request: DatasetImportFromPathRequest) -> DatasetI
         raise HTTPException(status_code=404, detail="MAT file path not found")
 
     try:
-        df_normalized, metadata = mat_loader.load_and_normalize(mat_path)
+        # Compute hash before loading so we can skip the cache copy if this
+        # exact content is already stored.
+        raw_bytes = mat_path.read_bytes()
+        content_hash = hashlib.md5(raw_bytes).hexdigest()
+
+        repo_root = Path(__file__).resolve().parents[3]
+        import_cache_dir = repo_root / "data" / "import_cache"
+        import_cache_dir.mkdir(parents=True, exist_ok=True)
+
+        already_in_cache = "import_cache" in str(mat_path)
+
+        # Resolve (or create) the cache path for this content
+        existing_record = db.get_import_by_hash(content_hash)
+        if existing_record and Path(existing_record["source_path"]).exists():
+            # Identical content already cached — load from the existing cache file
+            cache_path = Path(existing_record["source_path"])
+        elif already_in_cache:
+            # Already inside import_cache (re-loading from the list)
+            cache_path = mat_path
+        else:
+            # New content — copy to cache to preserve this version
+            safe_name = mat_path.name
+            cache_path = import_cache_dir / f"{uuid.uuid4().hex}_{safe_name}"
+            shutil.copy2(mat_path, cache_path)
+
+        df_normalized, metadata = mat_loader.load_and_normalize(cache_path)
+
+        original_path = None if already_in_cache else str(mat_path)
 
         try:
             db.add_import(
-                source_path=str(mat_path),
+                source_path=str(cache_path),
+                original_path=original_path,
                 signal_count=len(metadata.signal_names),
-                file_size=mat_path.stat().st_size,
+                file_size=cache_path.stat().st_size,
                 dataset_name=mat_path.stem,
                 dataset_id=metadata.dataset_id,
+                content_hash=content_hash,
             )
         except Exception:
             pass  # DB tracking is best-effort
@@ -206,6 +238,7 @@ def get_recent_imports(limit: int = 10) -> RecentImportsResponse:
             import_id=row["import_id"],
             dataset_id=row.get("dataset_id"),
             source_path=row["source_path"],
+            original_path=row.get("original_path"),
             imported_at=row["imported_at"],
             file_size=row.get("file_size"),
             signal_count=row.get("signal_count"),

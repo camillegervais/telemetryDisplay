@@ -169,6 +169,7 @@ class RecentImportItem(BaseModel):
     import_id: str
     dataset_id: Optional[str] = None
     source_path: str
+    original_path: Optional[str] = None
     imported_at: str
     file_size: Optional[int] = None
     signal_count: Optional[int] = None

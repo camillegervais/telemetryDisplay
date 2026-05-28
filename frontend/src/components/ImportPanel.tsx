@@ -170,13 +170,6 @@ export default function ImportPanel({
   }, []);
 
   useEffect(() => {
-    if (datasetMetadata?.source_path) {
-      setMatPath(datasetMetadata.source_path);
-      window.localStorage.setItem(LAST_MAT_PATH_KEY, datasetMetadata.source_path);
-    }
-  }, [datasetMetadata?.source_path]);
-
-  useEffect(() => {
     if (!datasetId || !datasetMetadata || datasetMetadata.signal_names.length === 0) {
       setSignalStats({});
       setStatsError(null);

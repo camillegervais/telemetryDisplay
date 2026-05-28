@@ -7,7 +7,6 @@ import type { RecentImportItem } from "../types";
 import type { TelDataImportConfig } from "../types/ConfigTypes";
 
 const LAST_MAT_PATH_KEY = "telemetry-display.last-mat-path.v1";
-const LAST_PICKER_PATH_KEY = "telemetry-display.last-picker-path.v1";
 
 type ImportDataModalProps = {
   importing: boolean;
@@ -79,7 +78,8 @@ export function ImportDataModal({
 
   function getDisplayName(item: RecentImportItem): string {
     if (item.dataset_name) return item.dataset_name;
-    return item.source_path.split(/[/\\]/).pop() ?? item.source_path;
+    const displayPath = item.original_path ?? item.source_path;
+    return displayPath.split(/[/\\]/).pop() ?? displayPath;
   }
 
   return (
@@ -139,16 +139,6 @@ export function ImportDataModal({
                   onChange={(event) => {
                     const pickedFile = event.target.files?.[0] ?? null;
                     setSelectedFile(pickedFile);
-                    const pickerPath = event.target.value?.trim() ?? "";
-                    if (pickerPath.length > 0) {
-                      window.localStorage.setItem(LAST_PICKER_PATH_KEY, pickerPath);
-                      const normalized = pickerPath.replace(/\\\\/g, "/");
-                      const isFakePath = normalized.toLowerCase().includes("/fakepath/");
-                      if (!isFakePath && normalized.toLowerCase().endsWith(".mat")) {
-                        setMatPath(normalized);
-                        window.localStorage.setItem(LAST_MAT_PATH_KEY, normalized);
-                      }
-                    }
                   }}
                 />
                 {selectedFile ? <p className="panel-text file-picked">{selectedFile.name}</p> : null}
@@ -247,7 +237,7 @@ export function ImportDataModal({
                               flex: 1,
                               minWidth: 0,
                             }}
-                            title={item.source_path}
+                            title={item.original_path ?? item.source_path}
                           >
                             {getDisplayName(item)}
                           </div>
@@ -273,6 +263,20 @@ export function ImportDataModal({
                           {item.signal_count != null ? ` — ${item.signal_count} signaux` : ""}
                           {formatFileSize(item.file_size)}
                         </div>
+                        {item.original_path ? (
+                          <div
+                            style={{
+                              fontSize: "0.70rem",
+                              opacity: 0.4,
+                              overflow: "hidden",
+                              textOverflow: "ellipsis",
+                              whiteSpace: "nowrap",
+                            }}
+                            title={item.original_path}
+                          >
+                            {item.original_path}
+                          </div>
+                        ) : null}
                         <button
                           className="import-button"
                           type="button"

@@ -120,6 +120,7 @@ export type RecentImportItem = {
   import_id: string;
   dataset_id: string | null;
   source_path: string;
+  original_path: string | null;
   imported_at: string;
   file_size: number | null;
   signal_count: number | null;
