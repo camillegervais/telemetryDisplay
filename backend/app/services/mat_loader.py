@@ -32,6 +32,8 @@ class DatasetMetadata:
     num_samples: int
     lap_distance_range: Tuple[float, float]
     signal_names: List[str]
+    max_slap: float  # Maximum value of original lap_distance/sLap before normalization
+    max_tlap: Optional[float] = None  # Maximum value of tLap signal if present
     source_sample_rate_hz: Optional[float] = None
     has_time_axis: bool = False
     interpolation_method: str = "linear"
@@ -141,6 +143,16 @@ class MatLoader:
         # Normalize all signals to reference spatial step
         df_normalized = self._resample_to_reference_step(lap_distance, trimmed_signals, source_time)
 
+        # Extract max tLap if the signal exists
+        max_tlap = None
+        if "tLap" in mat_data:
+            try:
+                tlap_raw = np.asarray(mat_data["tLap"]).flatten()
+                if len(tlap_raw) > 0:
+                    max_tlap = float(np.nanmax(tlap_raw))
+            except Exception:
+                pass  # tLap extraction is optional
+
         # Create metadata
         metadata = DatasetMetadata(
             dataset_id=str(uuid.uuid4()),
@@ -153,6 +165,8 @@ class MatLoader:
                 float(df_normalized.index.max()),
             ),
             signal_names=signal_names,
+            max_slap=float(lap_distance.max()),
+            max_tlap=max_tlap,
             source_sample_rate_hz=sample_rate_hz,
             has_time_axis=source_time is not None,
             enrichment_factor=source_step_m / self.reference_step_m if source_step_m > 0 else 1.0,

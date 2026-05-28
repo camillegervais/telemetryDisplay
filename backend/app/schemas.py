@@ -174,6 +174,8 @@ class RecentImportItem(BaseModel):
     file_size: Optional[int] = None
     signal_count: Optional[int] = None
     dataset_name: Optional[str] = None
+    max_slap: Optional[float] = None
+    max_tlap: Optional[float] = None
 
 
 class RecentImportsResponse(BaseModel):

@@ -5,3 +5,4 @@ import_cache
 .venv
 *.mat
 .vscode
+*.db

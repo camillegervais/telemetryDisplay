@@ -125,6 +125,8 @@ export type RecentImportItem = {
   file_size: number | null;
   signal_count: number | null;
   dataset_name: string | null;
+  max_slap: number | null;
+  max_tlap: number | null;
 };
 
 export type RecentImportsResponse = {

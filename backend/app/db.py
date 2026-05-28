@@ -30,13 +30,17 @@ def init_db() -> None:
                 imported_at   TEXT NOT NULL,
                 file_size     INTEGER,
                 signal_count  INTEGER,
-                dataset_name  TEXT
+                dataset_name  TEXT,
+                max_slap      REAL,
+                max_tlap      REAL
             )
         """)
         # Migrations for existing databases
         for col, definition in [
             ("content_hash",  "TEXT"),
             ("original_path", "TEXT"),
+            ("max_slap",      "REAL"),
+            ("max_tlap",      "REAL"),
         ]:
             try:
                 conn.execute(f"ALTER TABLE recent_imports ADD COLUMN {col} {definition}")
@@ -53,6 +57,8 @@ def add_import(
     dataset_id: Optional[str] = None,
     content_hash: Optional[str] = None,
     original_path: Optional[str] = None,
+    max_slap: Optional[float] = None,
+    max_tlap: Optional[float] = None,
 ) -> str:
     """Track a new import in the database. Returns the import_id.
 
@@ -83,10 +89,10 @@ def add_import(
         conn.execute(
             """INSERT INTO recent_imports
                (import_id, dataset_id, source_path, original_path, content_hash,
-                imported_at, file_size, signal_count, dataset_name)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                imported_at, file_size, signal_count, dataset_name, max_slap, max_tlap)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
             (import_id, dataset_id, source_path, original_path, content_hash,
-             imported_at, file_size, signal_count, dataset_name),
+             imported_at, file_size, signal_count, dataset_name, max_slap, max_tlap),
         )
         conn.commit()
     return import_id

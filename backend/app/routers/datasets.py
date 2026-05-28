@@ -138,6 +138,8 @@ async def import_mat_file(file: UploadFile) -> DatasetImportResponse:
                 file_size=len(contents),
                 dataset_name=Path(file.filename).stem,
                 dataset_id=metadata.dataset_id,
+                max_slap=metadata.max_slap,
+                max_tlap=metadata.max_tlap,
             )
         except Exception:
             pass  # DB tracking is best-effort
@@ -211,6 +213,8 @@ def import_mat_file_from_path(request: DatasetImportFromPathRequest) -> DatasetI
                 dataset_name=mat_path.stem,
                 dataset_id=metadata.dataset_id,
                 content_hash=content_hash,
+                max_slap=metadata.max_slap,
+                max_tlap=metadata.max_tlap,
             )
         except Exception:
             pass  # DB tracking is best-effort
@@ -243,6 +247,8 @@ def get_recent_imports(limit: int = 10) -> RecentImportsResponse:
             file_size=row.get("file_size"),
             signal_count=row.get("signal_count"),
             dataset_name=row.get("dataset_name"),
+            max_slap=row.get("max_slap"),
+            max_tlap=row.get("max_tlap"),
         )
         for row in rows
     ]

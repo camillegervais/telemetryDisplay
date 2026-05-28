@@ -262,6 +262,8 @@ export function ImportDataModal({
                           {formatImportDate(item.imported_at)}
                           {item.signal_count != null ? ` — ${item.signal_count} signaux` : ""}
                           {formatFileSize(item.file_size)}
+                          {item.max_slap != null ? ` — Max sLap: ${item.max_slap.toFixed(2)} m` : ""}
+                          {item.max_tlap != null ? ` — Max tLap: ${item.max_tlap.toFixed(2)} s` : ""}
                         </div>
                         {item.original_path ? (
                           <div
