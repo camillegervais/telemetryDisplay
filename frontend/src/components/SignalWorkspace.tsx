@@ -1449,13 +1449,22 @@ export default function SignalWorkspace({
     }
   }
 
-  // Recalculate all soft blocks when dataset changes
+  // Recalculate all soft blocks when dataset changes — only if outputs are missing
   useEffect(() => {
-    if (datasetId && softBlocksRef.current.length > 0) {
+    if (!datasetId || !datasetMetadata || datasetMetadata.dataset_id !== datasetId) return;
+    if (softBlocksRef.current.length === 0) return;
+
+    const signalSet = new Set(datasetMetadata.signal_names);
+    const allPresent = softBlocksRef.current
+      .filter((b) => b.enabled !== false)
+      .flatMap((b) => b.operations)
+      .every((op) => op.name.trim() !== "" && signalSet.has(op.name));
+
+    if (!allPresent) {
       calculateAllSoftBlocks(softBlocksRef.current);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [datasetId]);
+  }, [datasetId, datasetMetadata]);
 
   // Recalculate blocks whose LUT ops changed (debounced to avoid spamming on rapid edits)
   const pendingRecalcRef = useRef<ReturnType<typeof setTimeout> | null>(null);

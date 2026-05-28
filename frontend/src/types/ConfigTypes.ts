@@ -123,6 +123,10 @@ export type ConfigStorage = {
   "current-map-config": string | null;
   "user-preferences": UserPreferences;
   "dataset-id": string | null;
+  /** Dataset ID loaded in slot B (reference dataset) */
+  "dataset-id-ref": string | null;
+  /** Active comparison slot: A = primary, B = reference */
+  "active-slot": "A" | "B";
   /** sLap exported by SignalWorkspace on graph hover */
   "current-hover-slap": HoverSLap | null;
   /** Highlighted LUT cell(s) computed by useHoverToLutCell */
@@ -148,6 +152,8 @@ export const CONFIG_DEFAULTS: ConfigStorage = {
     displayName: "",
   },
   "dataset-id": null,
+  "dataset-id-ref": null,
+  "active-slot": "A",
   "current-hover-slap": null,
   "highlight-lut": null,
   "soft-blocks": [],
