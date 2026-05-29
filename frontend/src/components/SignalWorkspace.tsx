@@ -3365,6 +3365,11 @@ export default function SignalWorkspace({
             blockStatuses={softBlockStatuses}
             mapConfigs={mapConfigs}
             onSwitchToMapTuning={switchToAnalysisTab}
+            onDuplicateMapConfigs={(additions) => {
+              const updated = { ...mapConfigsRef.current, ...additions };
+              setMapConfigs(updated);
+              ConfigManager.set("map-configs", updated);
+            }}
           />
         </div>
       ) : isTabSwitching ? (

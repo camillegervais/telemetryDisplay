@@ -403,7 +403,9 @@ export default function MapTuning({
     if (config) {
       setInputChannelX(config.inputChannelX);
       setInputChannelY(config.inputChannelY);
-      setOutputChannelName(config.outputChannelName);
+      // Use the key `name` as the authoritative output name — the internal
+      // outputChannelName field can be stale if the config was cloned/renamed.
+      setOutputChannelName(name);
       setGridData(config.gridData);
       setRowHeaders(config.rowHeaders);
       setColHeaders(config.colHeaders);

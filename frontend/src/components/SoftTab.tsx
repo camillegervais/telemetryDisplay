@@ -27,6 +27,8 @@ interface SoftTabProps {
   blockStatuses: Record<string, BlockStatus>;
   mapConfigs: Record<string, MapTuningData>;
   onSwitchToMapTuning?: () => void;
+  /** Called when duplicating a block that contains lut2d ops — passes cloned map config entries to persist */
+  onDuplicateMapConfigs?: (additions: Record<string, MapTuningData>) => void;
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -489,6 +491,7 @@ export default function SoftTab({
   blockStatuses,
   mapConfigs,
   onSwitchToMapTuning,
+  onDuplicateMapConfigs,
 }: SoftTabProps) {
   const addBlock = () => {
     onChange([
@@ -518,7 +521,7 @@ export default function SoftTab({
     // Helper: strip existing _EvoN suffix if present
     const stripEvo = (s: string) => s.replace(/_Evo\d+$/, "");
 
-    // Find next global Evo counter by scanning all block/operation names
+    // Find next global Evo counter by scanning all block/operation names AND map config keys
     let maxN = 0;
     const evoRe = /_Evo(\d+)$/;
     for (const b of softBlocks) {
@@ -529,6 +532,12 @@ export default function SoftTab({
         if (mo) maxN = Math.max(maxN, parseInt(mo[1], 10));
       }
     }
+    // Also scan existing map config keys for _EvoN to avoid collisions
+    for (const key of Object.keys(mapConfigs)) {
+      const mk = key.match(evoRe);
+      if (mk) maxN = Math.max(maxN, parseInt(mk[1], 10));
+    }
+
     const nextN = maxN + 1;
     const suffix = `_Evo${nextN}`;
 
@@ -550,6 +559,31 @@ export default function SoftTab({
       nameMap[op.name] = `${baseOpName}${suffix}`;
     }
 
+    // Build mapping oldMapKey -> newMapKey for lut2d ops, and clone the map configs
+    const mapKeyMap: Record<string, string> = {};
+    const mapAdditions: Record<string, MapTuningData> = {};
+    const existingMapKeys = new Set(Object.keys(mapConfigs));
+    for (const op of src.operations) {
+      if (op.kind !== "lut2d" || !op.mapConfigKey) continue;
+      const srcMapKey = op.mapConfigKey;
+      if (mapKeyMap[srcMapKey]) continue; // already handled (shared key across multiple ops)
+      const baseMapKey = stripEvo(srcMapKey);
+      let newMapKey = `${baseMapKey}${suffix}`;
+      let mCurN = nextN;
+      while (existingMapKeys.has(newMapKey)) {
+        mCurN += 1;
+        newMapKey = `${baseMapKey}_Evo${mCurN}`;
+      }
+      existingMapKeys.add(newMapKey); // reserve it
+      mapKeyMap[srcMapKey] = newMapKey;
+      if (mapConfigs[srcMapKey]) {
+        // Deep-clone the map config under the new key and update its internal name
+        const cloned = JSON.parse(JSON.stringify(mapConfigs[srcMapKey]));
+        cloned.outputChannelName = newMapKey;
+        mapAdditions[newMapKey] = cloned;
+      }
+    }
+
     const escapeRegExp = (str: string) => str.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
     // Clone operations: new ids, new names, replace references in expressions & dependencies
@@ -568,12 +602,17 @@ export default function SoftTab({
         return nameMap[d] ?? d;
       }) ?? [];
 
+      const newMapConfigKey = op.kind === "lut2d"
+        ? (mapKeyMap[op.mapConfigKey] ?? op.mapConfigKey)
+        : undefined;
+
       return {
         ...op,
         id: makeId("op"),
         name: newName,
         expression: newExpr,
         dependencies: newDeps,
+        ...(op.kind === "lut2d" ? { mapConfigKey: newMapConfigKey } : {}),
       } as SoftOperation;
     });
 
@@ -585,8 +624,14 @@ export default function SoftTab({
     };
 
     const next = [...softBlocks.slice(0, idx + 1), newBlock, ...softBlocks.slice(idx + 1)];
+
+    // Persist cloned map configs before updating soft blocks
+    if (Object.keys(mapAdditions).length > 0) {
+      onDuplicateMapConfigs?.(mapAdditions);
+    }
+
     onChange(next);
-  }, [softBlocks, onChange]);
+  }, [softBlocks, onChange, mapConfigs, onDuplicateMapConfigs]);
 
   const runAll = useCallback(() => {
     softBlocks.forEach((b) => onCalculateBlock(b.id));
