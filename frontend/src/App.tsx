@@ -100,11 +100,19 @@ export default function App() {
   const [datasetMetadata, setDatasetMetadata] = useState<DatasetMetadata | null>(null);
   const [trackMap, setTrackMap] = useState<TrackMapResponse | null>(null);
   // ── Slot B (dataset de référence)
-  const [datasetIdB, setDatasetIdB] = useState<string | null>(() => ConfigManager.get<string | null>("dataset-id-ref") ?? null);
+  const [datasetIdB, setDatasetIdB] = useState<string | null>(() => ConfigManager.get<string | null>("dataset-id-b") ?? null);
   const [datasetMetadataB, setDatasetMetadataB] = useState<DatasetMetadata | null>(null);
   const [trackMapB, setTrackMapB] = useState<TrackMapResponse | null>(null);
+  // ── Slot C
+  const [datasetIdC, setDatasetIdC] = useState<string | null>(() => ConfigManager.get<string | null>("dataset-id-c") ?? null);
+  const [datasetMetadataC, setDatasetMetadataC] = useState<DatasetMetadata | null>(null);
+  const [trackMapC, setTrackMapC] = useState<TrackMapResponse | null>(null);
+  // ── Slot D
+  const [datasetIdD, setDatasetIdD] = useState<string | null>(() => ConfigManager.get<string | null>("dataset-id-d") ?? null);
+  const [datasetMetadataD, setDatasetMetadataD] = useState<DatasetMetadata | null>(null);
+  const [trackMapD, setTrackMapD] = useState<TrackMapResponse | null>(null);
   // ── Slot actif
-  const [activeSlot, setActiveSlot] = useState<"A" | "B">(() => ConfigManager.get<"A" | "B">("active-slot") ?? "A");
+  const [activeSlot, setActiveSlot] = useState<"A" | "B" | "C" | "D">(() => ConfigManager.get<"A" | "B" | "C" | "D">("active-slot") ?? "A");
   const [graphOnlyMode, setGraphOnlyMode] = useState(false);
   const [userDisplayName, setUserDisplayName] = useState(() => {
     const prefs = ConfigManager.get("user-preferences");
@@ -164,7 +172,7 @@ export default function App() {
       });
     }
 
-    const savedDatasetIdB = ConfigManager.get<string | null>("dataset-id-ref");
+    const savedDatasetIdB = ConfigManager.get<string | null>("dataset-id-b");
     if (savedDatasetIdB) {
       Promise.all([
         fetchDatasetMetadata(savedDatasetIdB),
@@ -175,7 +183,7 @@ export default function App() {
         setTrackMapB(trackMapData);
       }).catch(() => {
         if (!active) return;
-        ConfigManager.set("dataset-id-ref", null);
+        ConfigManager.set("dataset-id-b", null);
         setDatasetIdB(null);
       });
     }
@@ -196,8 +204,16 @@ export default function App() {
   }, [datasetId]);
 
   useEffect(() => {
-    ConfigManager.set("dataset-id-ref", datasetIdB);
+    ConfigManager.set("dataset-id-b", datasetIdB);
   }, [datasetIdB]);
+
+  useEffect(() => {
+    ConfigManager.set("dataset-id-c", datasetIdC);
+  }, [datasetIdC]);
+
+  useEffect(() => {
+    ConfigManager.set("dataset-id-d", datasetIdD);
+  }, [datasetIdD]);
 
   useEffect(() => {
     ConfigManager.set("active-slot", activeSlot);
@@ -225,10 +241,10 @@ export default function App() {
     return () => unsubscribe();
   }, [datasetId]);
 
-  // Cross-tab: écouter les changements de dataset-id-ref (slot B)
+  // Cross-tab: écouter les changements de dataset-id-b (slot B)
   useEffect(() => {
     const unsubscribe = ConfigManager.subscribeDebouncedFull<string | null>(
-      "dataset-id-ref",
+      "dataset-id-b",
       async (newDatasetIdB) => {
         if (newDatasetIdB !== undefined && newDatasetIdB !== datasetIdB) {
           setDatasetIdB(newDatasetIdB);
@@ -252,9 +268,63 @@ export default function App() {
     return () => unsubscribe();
   }, [datasetIdB]);
 
+  // Cross-tab: écouter les changements de dataset-id-c (slot C)
+  useEffect(() => {
+    const unsubscribe = ConfigManager.subscribeDebouncedFull<string | null>(
+      "dataset-id-c",
+      async (newDatasetIdC) => {
+        if (newDatasetIdC !== undefined && newDatasetIdC !== datasetIdC) {
+          setDatasetIdC(newDatasetIdC);
+          if (newDatasetIdC) {
+            try {
+              const metadata = await fetchDatasetMetadata(newDatasetIdC);
+              setDatasetMetadataC(metadata);
+              const trackMapData = await fetchTrackMap(newDatasetIdC);
+              setTrackMapC(trackMapData);
+            } catch (err) {
+              setError(err instanceof Error ? err.message : "Failed to load slot C dataset");
+            }
+          } else {
+            setDatasetMetadataC(null);
+            setTrackMapC(null);
+          }
+        }
+      },
+      300
+    );
+    return () => unsubscribe();
+  }, [datasetIdC]);
+
+  // Cross-tab: écouter les changements de dataset-id-d (slot D)
+  useEffect(() => {
+    const unsubscribe = ConfigManager.subscribeDebouncedFull<string | null>(
+      "dataset-id-d",
+      async (newDatasetIdD) => {
+        if (newDatasetIdD !== undefined && newDatasetIdD !== datasetIdD) {
+          setDatasetIdD(newDatasetIdD);
+          if (newDatasetIdD) {
+            try {
+              const metadata = await fetchDatasetMetadata(newDatasetIdD);
+              setDatasetMetadataD(metadata);
+              const trackMapData = await fetchTrackMap(newDatasetIdD);
+              setTrackMapD(trackMapData);
+            } catch (err) {
+              setError(err instanceof Error ? err.message : "Failed to load slot D dataset");
+            }
+          } else {
+            setDatasetMetadataD(null);
+            setTrackMapD(null);
+          }
+        }
+      },
+      300
+    );
+    return () => unsubscribe();
+  }, [datasetIdD]);
+
   // Cross-tab: écouter les changements de slot actif
   useEffect(() => {
-    const unsubscribe = ConfigManager.subscribe<"A" | "B">("active-slot", (newSlot) => {
+    const unsubscribe = ConfigManager.subscribe<"A" | "B" | "C" | "D">("active-slot", (newSlot) => {
       if (newSlot && newSlot !== activeSlot) setActiveSlot(newSlot);
     });
     return () => unsubscribe();
@@ -361,7 +431,59 @@ export default function App() {
     }
   }
 
-  async function loadImportedDataset(nextDatasetId: string, slot: "A" | "B") {
+  async function handleImportToSlotC(file: File) {
+    setImporting(true);
+    setError(null);
+    try {
+      const imported = await importDataset(file);
+      await loadImportedDataset(imported.dataset_id, "C");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Import slot C failed");
+    } finally {
+      setImporting(false);
+    }
+  }
+
+  async function handleImportFromPathToSlotC(matPath: string) {
+    setImporting(true);
+    setError(null);
+    try {
+      const imported = await importDatasetFromPath(matPath);
+      await loadImportedDataset(imported.dataset_id, "C");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Import slot C failed");
+    } finally {
+      setImporting(false);
+    }
+  }
+
+  async function handleImportToSlotD(file: File) {
+    setImporting(true);
+    setError(null);
+    try {
+      const imported = await importDataset(file);
+      await loadImportedDataset(imported.dataset_id, "D");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Import slot D failed");
+    } finally {
+      setImporting(false);
+    }
+  }
+
+  async function handleImportFromPathToSlotD(matPath: string) {
+    setImporting(true);
+    setError(null);
+    try {
+      const imported = await importDatasetFromPath(matPath);
+      await loadImportedDataset(imported.dataset_id, "D");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Import slot D failed");
+    } finally {
+      setImporting(false);
+    }
+  }
+
+  async function loadImportedDataset(nextDatasetId: string, slot: "A" | "B" | "C" | "D") {
     const [metadata, map] = await Promise.all([
       fetchDatasetMetadata(nextDatasetId),
       fetchTrackMap(nextDatasetId),
@@ -374,11 +496,21 @@ export default function App() {
       setActiveSlot("A");
       setXRange(null);
       setCursorDistance(null);
-    } else {
+    } else if (slot === "B") {
       setDatasetIdB(nextDatasetId);
       setDatasetMetadataB(metadata);
       setTrackMapB(map);
       setActiveSlot("B");
+    } else if (slot === "C") {
+      setDatasetIdC(nextDatasetId);
+      setDatasetMetadataC(metadata);
+      setTrackMapC(map);
+      setActiveSlot("C");
+    } else {
+      setDatasetIdD(nextDatasetId);
+      setDatasetMetadataD(metadata);
+      setTrackMapD(map);
+      setActiveSlot("D");
     }
   }
 
@@ -400,9 +532,15 @@ export default function App() {
       ? "Origine + echelle"
       : "Desactive";
   // Props dérivées selon le slot actif
-  const activeDatasetId = activeSlot === "A" ? datasetId : datasetIdB;
-  const activeMetadata   = activeSlot === "A" ? datasetMetadata : datasetMetadataB;
-  const activeTrackMap   = activeSlot === "A" ? trackMap : trackMapB;
+  const slotMap = {
+    A: { id: datasetId, metadata: datasetMetadata, trackMap },
+    B: { id: datasetIdB, metadata: datasetMetadataB, trackMap: trackMapB },
+    C: { id: datasetIdC, metadata: datasetMetadataC, trackMap: trackMapC },
+    D: { id: datasetIdD, metadata: datasetMetadataD, trackMap: trackMapD },
+  };
+  const activeDatasetId = slotMap[activeSlot].id;
+  const activeMetadata   = slotMap[activeSlot].metadata;
+  const activeTrackMap   = slotMap[activeSlot].trackMap;
   const hasImportedDataset = Boolean(activeDatasetId && activeMetadata);
 
   const refreshDatasetMetadata = async () => {
@@ -410,7 +548,9 @@ export default function App() {
     try {
       const updated = await fetchDatasetMetadata(activeDatasetId);
       if (activeSlot === "A") setDatasetMetadata(updated);
-      else setDatasetMetadataB(updated);
+      else if (activeSlot === "B") setDatasetMetadataB(updated);
+      else if (activeSlot === "C") setDatasetMetadataC(updated);
+      else setDatasetMetadataD(updated);
     } catch (err) {
       console.error("Failed to refresh dataset metadata:", err);
     }
@@ -883,9 +1023,17 @@ export default function App() {
                   activeSlot={activeSlot}
                   datasetIdB={datasetIdB}
                   datasetMetadataB={datasetMetadataB}
+                  datasetIdC={datasetIdC}
+                  datasetMetadataC={datasetMetadataC}
+                  datasetIdD={datasetIdD}
+                  datasetMetadataD={datasetMetadataD}
                   onImportToSlotB={handleImportToSlotB}
                   onImportFromPathToSlotB={handleImportFromPathToSlotB}
-                  onSwapSlot={() => setActiveSlot((prev) => (prev === "A" ? "B" : "A"))}
+                  onImportToSlotC={handleImportToSlotC}
+                  onImportFromPathToSlotC={handleImportFromPathToSlotC}
+                  onImportToSlotD={handleImportToSlotD}
+                  onImportFromPathToSlotD={handleImportFromPathToSlotD}
+                  onSwapSlot={(slot: "A" | "B" | "C" | "D") => setActiveSlot(slot)}
                 />
                 <SignalColorManager />
               </>
@@ -935,9 +1083,17 @@ export default function App() {
                   activeSlot={activeSlot}
                   datasetIdB={datasetIdB}
                   datasetMetadataB={datasetMetadataB}
+                  datasetIdC={datasetIdC}
+                  datasetMetadataC={datasetMetadataC}
+                  datasetIdD={datasetIdD}
+                  datasetMetadataD={datasetMetadataD}
                   onImportToSlotB={handleImportToSlotB}
                   onImportFromPathToSlotB={handleImportFromPathToSlotB}
-                  onSwapSlot={() => setActiveSlot((prev) => (prev === "A" ? "B" : "A"))}
+                  onImportToSlotC={handleImportToSlotC}
+                  onImportFromPathToSlotC={handleImportFromPathToSlotC}
+                  onImportToSlotD={handleImportToSlotD}
+                  onImportFromPathToSlotD={handleImportFromPathToSlotD}
+                  onSwapSlot={(slot: "A" | "B" | "C" | "D") => setActiveSlot(slot)}
                 />
                 <SignalColorManager />
               </>

@@ -124,9 +124,13 @@ export type ConfigStorage = {
   "user-preferences": UserPreferences;
   "dataset-id": string | null;
   /** Dataset ID loaded in slot B (reference dataset) */
-  "dataset-id-ref": string | null;
-  /** Active comparison slot: A = primary, B = reference */
-  "active-slot": "A" | "B";
+  "dataset-id-b": string | null;
+  /** Dataset ID loaded in slot C */
+  "dataset-id-c": string | null;
+  /** Dataset ID loaded in slot D */
+  "dataset-id-d": string | null;
+  /** Active comparison slot: A = primary, B/C/D = reference */
+  "active-slot": "A" | "B" | "C" | "D";
   /** sLap exported by SignalWorkspace on graph hover */
   "current-hover-slap": HoverSLap | null;
   /** Highlighted LUT cell(s) computed by useHoverToLutCell */
@@ -152,7 +156,9 @@ export const CONFIG_DEFAULTS: ConfigStorage = {
     displayName: "",
   },
   "dataset-id": null,
-  "dataset-id-ref": null,
+  "dataset-id-b": null,
+  "dataset-id-c": null,
+  "dataset-id-d": null,
   "active-slot": "A",
   "current-hover-slap": null,
   "highlight-lut": null,

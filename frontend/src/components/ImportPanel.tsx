@@ -14,13 +14,21 @@ type ImportPanelProps = {
   datasetMetadata: DatasetMetadata | null;
   onImport: (file: File) => Promise<void>;
   onImportFromPath: (matPath: string) => Promise<void>;
-  // Slot B (référence)
-  activeSlot: "A" | "B";
+  // Slots B, C, D (reference datasets)
+  activeSlot: "A" | "B" | "C" | "D";
   datasetIdB: string | null;
   datasetMetadataB: DatasetMetadata | null;
   onImportToSlotB: (file: File) => Promise<void>;
   onImportFromPathToSlotB: (matPath: string) => Promise<void>;
-  onSwapSlot: () => void;
+  datasetIdC: string | null;
+  datasetMetadataC: DatasetMetadata | null;
+  onImportToSlotC: (file: File) => Promise<void>;
+  onImportFromPathToSlotC: (matPath: string) => Promise<void>;
+  datasetIdD: string | null;
+  datasetMetadataD: DatasetMetadata | null;
+  onImportToSlotD: (file: File) => Promise<void>;
+  onImportFromPathToSlotD: (matPath: string) => Promise<void>;
+  onSwapSlot: (slot: "A" | "B" | "C" | "D") => void;
 };
 
 type SignalStats = {
@@ -111,11 +119,20 @@ export default function ImportPanel({
   activeSlot,
   datasetIdB,
   datasetMetadataB,
+  datasetIdC,
+  datasetMetadataC,
+  datasetIdD,
+  datasetMetadataD,
   onImportToSlotB,
   onImportFromPathToSlotB,
+  onImportToSlotC,
+  onImportFromPathToSlotC,
+  onImportToSlotD,
+  onImportFromPathToSlotD,
   onSwapSlot,
 }: ImportPanelProps) {
   const [importRefModalOpen, setImportRefModalOpen] = useState(false);
+  const [importRefTargetSlot, setImportRefTargetSlot] = useState<"B" | "C" | "D">("B");
   const { xAxisMode, startFinishOffsetM, setXAxisMode, setStartFinishOffsetM } = useTelemetryStore();
   const [matPath, setMatPath] = useState(() => window.localStorage.getItem(LAST_MAT_PATH_KEY) ?? "");
   const [importModalOpen, setImportModalOpen] = useState(false);
@@ -308,40 +325,95 @@ export default function ImportPanel({
         </button>
       </div>
 
-      {/* ── Slot A / B ── */}
+      {/* ── Slot A / B / C / D ── */}
       <div className="import-submenu" style={{ marginBottom: "0.25rem" }}>
-        <div style={{ display: "flex", alignItems: "center", gap: "0.4rem", padding: "0.35rem 0.5rem" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: "0.4rem", padding: "0.35rem 0.5rem", flexWrap: "wrap" }}>
           <button
             type="button"
             className={`small-button${activeSlot === "A" ? " small-button-active" : ""}`}
-            onClick={() => activeSlot !== "A" && onSwapSlot()}
+            onClick={() => activeSlot !== "A" && onSwapSlot("A")}
             title={datasetMetadata?.source_path ? datasetMetadata.source_path.split(/[\/\\]/).pop() : "Slot A"}
           >
             A
           </button>
-          <button
-            type="button"
-            className={`small-button${activeSlot === "B" ? " small-button-active" : ""}`}
-            onClick={() => activeSlot !== "B" && datasetIdB && onSwapSlot()}
-            disabled={!datasetIdB}
-            title={datasetMetadataB?.source_path ? datasetMetadataB.source_path.split(/[\/\\]/).pop() : "Slot B vide"}
-          >
-            B
-          </button>
-          <span style={{ fontSize: "0.75rem", opacity: 0.55, flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "0.2rem" }}>
+            <button
+              type="button"
+              className={`small-button${activeSlot === "B" ? " small-button-active" : ""}`}
+              onClick={() => activeSlot !== "B" && onSwapSlot("B")}
+              title={datasetMetadataB?.source_path ? datasetMetadataB.source_path.split(/[\/\\]/).pop() : "Slot B vide"}
+            >
+              B
+            </button>
+            <button
+              type="button"
+              className="small-button"
+              onClick={() => {
+                setImportRefTargetSlot("B");
+                setImportRefModalOpen(true);
+              }}
+              disabled={importing}
+              style={{ fontSize: "0.7rem", padding: "0.1rem 0.3rem" }}
+              title="Importer vers B"
+            >
+              +
+            </button>
+          </div>
+          <div style={{ display: "flex", alignItems: "center", gap: "0.2rem" }}>
+            <button
+              type="button"
+              className={`small-button${activeSlot === "C" ? " small-button-active" : ""}`}
+              onClick={() => activeSlot !== "C" && onSwapSlot("C")}
+              title={datasetMetadataC?.source_path ? datasetMetadataC.source_path.split(/[\/\\]/).pop() : "Slot C vide"}
+            >
+              C
+            </button>
+            <button
+              type="button"
+              className="small-button"
+              onClick={() => {
+                setImportRefTargetSlot("C");
+                setImportRefModalOpen(true);
+              }}
+              disabled={importing}
+              style={{ fontSize: "0.7rem", padding: "0.1rem 0.3rem" }}
+              title="Importer vers C"
+            >
+              +
+            </button>
+          </div>
+          <div style={{ display: "flex", alignItems: "center", gap: "0.2rem" }}>
+            <button
+              type="button"
+              className={`small-button${activeSlot === "D" ? " small-button-active" : ""}`}
+              onClick={() => activeSlot !== "D" && onSwapSlot("D")}
+              title={datasetMetadataD?.source_path ? datasetMetadataD.source_path.split(/[\/\\]/).pop() : "Slot D vide"}
+            >
+              D
+            </button>
+            <button
+              type="button"
+              className="small-button"
+              onClick={() => {
+                setImportRefTargetSlot("D");
+                setImportRefModalOpen(true);
+              }}
+              disabled={importing}
+              style={{ fontSize: "0.7rem", padding: "0.1rem 0.3rem" }}
+              title="Importer vers D"
+            >
+              +
+            </button>
+          </div>
+          <span style={{ fontSize: "0.75rem", opacity: 0.55, flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", minWidth: "50px" }}>
             {activeSlot === "A"
               ? (datasetMetadata?.source_path ? datasetMetadata.source_path.split(/[\/\\]/).pop() : "A")
-              : (datasetMetadataB?.source_path ? datasetMetadataB.source_path.split(/[\/\\]/).pop() : "B")}
+              : activeSlot === "B"
+              ? (datasetMetadataB?.source_path ? datasetMetadataB.source_path.split(/[\/\\]/).pop() : "B")
+              : activeSlot === "C"
+              ? (datasetMetadataC?.source_path ? datasetMetadataC.source_path.split(/[\/\\]/).pop() : "C")
+              : (datasetMetadataD?.source_path ? datasetMetadataD.source_path.split(/[\/\\]/).pop() : "D")}
           </span>
-          <button
-            type="button"
-            className="small-button"
-            onClick={() => setImportRefModalOpen(true)}
-            disabled={importing}
-            title="Charger un dataset de référence dans le slot B"
-          >
-            + Ref
-          </button>
         </div>
       </div>
 
@@ -604,8 +676,20 @@ export default function ImportPanel({
           importing={importing}
           initialMatPath={matPath}
           telDataConfigs={telDataConfigs}
-          onImport={onImportToSlotB}
-          onImportFromPath={onImportFromPathToSlotB}
+          onImport={
+            importRefTargetSlot === "B"
+              ? onImportToSlotB
+              : importRefTargetSlot === "C"
+              ? onImportToSlotC
+              : onImportToSlotD
+          }
+          onImportFromPath={
+            importRefTargetSlot === "B"
+              ? onImportFromPathToSlotB
+              : importRefTargetSlot === "C"
+              ? onImportFromPathToSlotC
+              : onImportFromPathToSlotD
+          }
           onClose={() => setImportRefModalOpen(false)}
         />
       ) : null}
