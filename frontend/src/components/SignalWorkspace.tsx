@@ -6,7 +6,6 @@ import { queryDataset, calculateMapTuning, computeMathChannel } from "../api";
 import { evaluateMathChannel } from "../mathChannels";
 import { useTelemetryStore } from "../store/telemetryStore";
 import { ConfigManager } from "../store/ConfigManager";
-import { useSyncedConfig } from "../hooks/useConfig";
 import type { DatasetMetadata, DistanceRange, SignalSeries, TrackMapResponse, MapTuningData, SoftBlock, SoftLutOp, SoftMathOp } from "../types";
 import MapTuning from "./MapTuning";
 import SoftTab, { type BlockStatus } from "./SoftTab";
@@ -158,6 +157,51 @@ const ANALYSIS_TAB_ID = "tab-analysis";
 const SOFT_TAB_ID = "tab-soft";
 const TRAJECTORY_SIGNALS = ["xCar", "yCar", "xRef", "yRef", "xTrack", "yTrack"] as const;
 const BRAKING_NAME_SIGNAL = 'MBrakeR';
+
+// ── Distributed soft-block calculation lock ────────────────────────────────
+// Ensures only one browser tab runs calculateAllSoftBlocks at a time.
+// Multiple tabs sharing the same dataset would otherwise POST to the same
+// backend endpoint concurrently and corrupt intermediate computed signals.
+// Uses raw localStorage (not ConfigManager) — it is a technical coordination
+// primitive, not user data, and intentionally does not dispatch StorageEvents.
+const CALC_LOCK_LS_KEY = "_sw_calc_lock";
+const CALC_LOCK_TTL_MS = 45_000; // generous: covers slow backends + large block sequences
+
+function isCalcLockHeldByOther(ownTabId: string): boolean {
+  try {
+    const raw = window.localStorage.getItem(CALC_LOCK_LS_KEY);
+    if (!raw) return false;
+    const lock = JSON.parse(raw) as { tabId: string; startedAt: number };
+    if (Date.now() - lock.startedAt >= CALC_LOCK_TTL_MS) return false; // expired TTL
+    return lock.tabId !== ownTabId;
+  } catch { return false; }
+}
+
+/** Write-then-verify lock acquisition (last-writer-wins, 80 ms settle window). */
+async function tryAcquireCalcLock(ownTabId: string): Promise<boolean> {
+  try {
+    if (isCalcLockHeldByOther(ownTabId)) return false; // fast bail
+    window.localStorage.setItem(
+      CALC_LOCK_LS_KEY,
+      JSON.stringify({ tabId: ownTabId, startedAt: Date.now() })
+    );
+    // Allow any other tab that was also writing to finish, then verify we won
+    await new Promise<void>((resolve) => setTimeout(resolve, 80));
+    const verify = window.localStorage.getItem(CALC_LOCK_LS_KEY);
+    if (!verify) return false;
+    const winner = JSON.parse(verify) as { tabId: string; startedAt: number };
+    return winner.tabId === ownTabId;
+  } catch { return true; } // graceful degradation if localStorage unavailable
+}
+
+function releaseCalcLock(ownTabId: string): void {
+  try {
+    const raw = window.localStorage.getItem(CALC_LOCK_LS_KEY);
+    if (!raw) return;
+    const lock = JSON.parse(raw) as { tabId: string; startedAt: number };
+    if (lock.tabId === ownTabId) window.localStorage.removeItem(CALC_LOCK_LS_KEY);
+  } catch { /* ignore */ }
+}
 
 // Empty MapTuningData to avoid errors
 const emptyMapTuningData = {
@@ -874,6 +918,13 @@ export default function SignalWorkspace({
   const [softBlocks, setSoftBlocks] = useState<SoftBlock[]>(() => ConfigManager.get<SoftBlock[]>("soft-blocks") ?? []);
   const [softBlockStatuses, setSoftBlockStatuses] = useState<Record<string, BlockStatus>>({});
   const softBlocksRef = useRef(softBlocks);
+  // Stable per-tab ID for distributed calculation lock ownership.
+  const tabInstanceIdRef = useRef<string>(`sw-${Math.random().toString(36).slice(2, 9)}`);
+  // Set to true when the last soft-blocks update came from cross-tab sync (not a local edit).
+  // Consumed by the LUT recalc effect to skip calculations already running in the origin tab.
+  const softBlocksFromCrossTabRef = useRef(false);
+  const lastSavedSoftBlocksRef = useRef<SoftBlock[]>(softBlocks);
+  const softBlocksSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const gridRef = useRef<HTMLDivElement | null>(null);
   const queryGenerationRef = useRef(0);
   const tabSwitchGenerationRef = useRef(0);
@@ -1318,12 +1369,35 @@ export default function SignalWorkspace({
   }, []);
 
   // ── Soft Blocks: persist + cross-tab sync ──────────────────────────────────
-  // useSyncedConfig handles: debounced save (150ms), stable subscription with
-  // empty deps + valueRef, and lastSavedRef to prevent self-notification echo.
-  useSyncedConfig<SoftBlock[]>("soft-blocks", softBlocks, setSoftBlocks, {
-    saveDebounceMs: 150,
-    receiveDebounceMs: 200,
-  });
+  // Manual effects (instead of useSyncedConfig) so we can track whether a change
+  // came from cross-tab sync and skip recalculation already running in that tab.
+
+  // Save: debounced 150ms; skipped for cross-tab-received values.
+  useEffect(() => {
+    if (softBlocksFromCrossTabRef.current) return; // don't re-save what we received
+    if (JSON.stringify(softBlocks) === JSON.stringify(lastSavedSoftBlocksRef.current)) return;
+    if (softBlocksSaveTimerRef.current !== null) clearTimeout(softBlocksSaveTimerRef.current);
+    softBlocksSaveTimerRef.current = setTimeout(() => {
+      lastSavedSoftBlocksRef.current = softBlocks;
+      ConfigManager.set("soft-blocks", softBlocks);
+      softBlocksSaveTimerRef.current = null;
+    }, 150);
+  }, [softBlocks]);
+
+  // Subscribe: receive updates from other tabs; flag the change as cross-tab.
+  useEffect(() => {
+    const unsubscribe = ConfigManager.subscribeDebouncedFull<SoftBlock[]>("soft-blocks", (newBlocks) => {
+      if (!newBlocks) return;
+      if (JSON.stringify(newBlocks) === JSON.stringify(softBlocksRef.current)) return;
+      lastSavedSoftBlocksRef.current = newBlocks; // prevent re-save echo
+      softBlocksFromCrossTabRef.current = true;   // flag: next recalc effect should skip
+      setSoftBlocks(newBlocks);
+    }, 200);
+    return () => {
+      unsubscribe();
+      releaseCalcLock(tabInstanceIdRef.current); // release our lock if component unmounts mid-calc
+    };
+  }, []);
 
   // ── Map Configs: sync from other tabs (MapTuning tab saves here) ────────────
   useEffect(() => {
@@ -1365,10 +1439,13 @@ export default function SignalWorkspace({
         const affectedBlocks = softBlocksRef.current.filter((b) =>
           b.operations.some((op) => op.kind === "lut2d" && changedKeys.includes((op as SoftLutOp).mapConfigKey))
         );
-        for (const blk of affectedBlocks) {
-          // Fire and forget
-          // eslint-disable-next-line @typescript-eslint/no-floating-promises
-          calculateSoftBlock(blk.id, softBlocksRef.current);
+        // Only recalculate if no other tab is currently calculating (avoids parallel backend conflicts)
+        if (!isCalcLockHeldByOther(tabInstanceIdRef.current)) {
+          for (const blk of affectedBlocks) {
+            // Fire and forget
+            // eslint-disable-next-line @typescript-eslint/no-floating-promises
+            calculateSoftBlock(blk.id, softBlocksRef.current);
+          }
         }
         timeoutId = null;
       }, 250);
@@ -1441,35 +1518,39 @@ export default function SignalWorkspace({
 
   async function calculateAllSoftBlocks(blocksSnapshot?: SoftBlock[]): Promise<void> {
     const blocks = blocksSnapshot ?? softBlocksRef.current;
-    if (!datasetId || blocks.length === 0) return;
-    // Run blocks sequentially so each block can reference outputs of the previous one
-    for (const block of blocks) {
-      if (block.enabled === false) continue;
-      await calculateSoftBlock(block.id, blocks);
+    if (!datasetIdRef.current || blocks.length === 0) return;
+    // Acquire the distributed lock — prevents two tabs from POSTing to the same
+    // backend dataset endpoints concurrently and corrupting intermediate signals.
+    if (!(await tryAcquireCalcLock(tabInstanceIdRef.current))) return;
+    try {
+      // Run blocks sequentially so each block can reference outputs of the previous one
+      for (const block of blocks) {
+        if (block.enabled === false) continue;
+        await calculateSoftBlock(block.id, blocks);
+      }
+    } finally {
+      releaseCalcLock(tabInstanceIdRef.current);
     }
   }
 
-  // Recalculate all soft blocks when dataset changes — only if outputs are missing
+  // Recalculate all soft blocks when dataset changes
   useEffect(() => {
-    if (!datasetId || !datasetMetadata || datasetMetadata.dataset_id !== datasetId) return;
-    if (softBlocksRef.current.length === 0) return;
-
-    const signalSet = new Set(datasetMetadata.signal_names);
-    const allPresent = softBlocksRef.current
-      .filter((b) => b.enabled !== false)
-      .flatMap((b) => b.operations)
-      .every((op) => op.name.trim() !== "" && signalSet.has(op.name));
-
-    if (!allPresent) {
+    if (datasetId && softBlocksRef.current.length > 0) {
       calculateAllSoftBlocks(softBlocksRef.current);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [datasetId, datasetMetadata]);
+  }, [datasetId]);
 
   // Recalculate blocks whose LUT ops changed (debounced to avoid spamming on rapid edits)
   const pendingRecalcRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(() => {
     if (!datasetId) return;
+    // If this soft-blocks change came from another tab's cross-tab sync, skip recalculation:
+    // the origin tab is already running calculateAllSoftBlocks and will hold the calc lock.
+    if (softBlocksFromCrossTabRef.current) {
+      softBlocksFromCrossTabRef.current = false; // consume the flag
+      return;
+    }
     if (pendingRecalcRef.current !== null) clearTimeout(pendingRecalcRef.current);
     pendingRecalcRef.current = setTimeout(() => {
       // Only recalculate blocks that have LUT ops (math ops are on-the-fly)
@@ -2332,7 +2413,6 @@ export default function SignalWorkspace({
             return elem;
           }
         });
-        ConfigManager.set("layouts", nextConfigs);
         return nextConfigs;
       });
     }
