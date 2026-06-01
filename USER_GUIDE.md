@@ -131,6 +131,7 @@ At the bottom of the `Import Panel` you can associate a color with a signal's na
 - Interlagos: `interlagos`
 - Portimao: `portimao`
 - Barhein: `barhein`
+- Le Mans: `lemans` or `LeMans` (as it is the case for WinTAX data)
 
 ### Tabs configuration
 
