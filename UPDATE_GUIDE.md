@@ -1,19 +1,19 @@
-# Prise en compte des mise à jour du code
+# Code's update download procedure
 
-Lors du développement de l'application, des mises à jour régulières seront disponibles avec des résolutions de bugs ou des nouvelles fonctionnalités, voici la démarche pour les récupérer:
+During the development of the application, regular updates will be available with bug fix and new features, here are the steps to correctly get them:
 
-1. Aller dans le dossier où est le code source de l'application (nommé `telemetryDisplay`) et assurez vous qu'aucune instance de l'application n'est ouverte.
-2. Clic droit dans la fenêtre et faites `Open Git Bash here`.
-3. Assurez vous d'avoir une connexion internet.
-4. Tapez dans le terminal ouvert les commandes suivantes, {nom de la branche} est indiquée dans le message de push:
+1. Go in the folder where the application's source code (named `telemetryDisplay`) and be sure no other instance of the applciation is active (no Node window opened).
+2. Right click on the folder and select `Open Git bash here`.
+3. Be sure you have an internet connexion.
+4. Type in a **Git Bash** terminal the following commands, {branch name} will be indicated in the annoucement message: 
 ```bash
 git fetch
-git checkout {nom de la branche}
+git checkout {branch name}
 git pull
 ```
-5. Relancez l'application avec le script `Telemetry Display.sh`
+5. Relaunch the application with the script `Telemetry Display.sh`
 
-**Si besoin** de mettre à jour les bibliothèques Python, depuis `telemetryDisplay`:
+**If needed** you can update Python depedencies by typing the following commands in a **Git Bash** terminal, in `telemetryDisplay`:
 
 ```bash
 source .venv/Scripts/activate
@@ -21,7 +21,8 @@ python -m pip install -r requirements.txt
 deactivate
 ```
 
-**Si besoin** de mettre à jours les dépendances Node, depuis `telemetryDisplay`:
+**If needed** you can update Node depedencies by typing the following commands in a **Git Bash** terminal, in `telemetryDisplay`:
+
 
 ```bash
 npm install
