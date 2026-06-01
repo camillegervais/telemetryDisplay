@@ -208,6 +208,8 @@ Create interpolation maps for calibration tuning.
 - Braking signal filtering option (signal active only when MBrakeR is not null)
 - Different type of interpolation: linear, round, nearest, floor
 - Different type of extrapolation: linear and clamp
+- Visualize the map in a 2D or 3D graph depending on the map dimension (click on **VIEW 3D**) to display
+- Export the breakpoints and the values by copying the data in your clipboard (to paste in Excel or TeamDB for example)
 
 These maps can be included in software blocks in the `Soft` tab. To compute their output they have to be included in a software block, whose output will be computed each time you change numerical values of the carto (gain, offset, breakpoints and value). The computation is done no matter where in the application you change the value.
 

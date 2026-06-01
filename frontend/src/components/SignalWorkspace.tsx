@@ -3303,7 +3303,7 @@ export default function SignalWorkspace({
         </div>
         <div className={`workspace-tab ${isAnalysisActive ? "workspace-tab-active" : ""}`}>
           <button className="workspace-tab-name" onClick={switchToAnalysisTab}>
-            Mpa Tuning
+            Map Tuning
           </button>
         </div>
         <div className={`workspace-tab ${isSoftActive ? "workspace-tab-active" : ""}`}>

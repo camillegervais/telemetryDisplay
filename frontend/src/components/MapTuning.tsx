@@ -2,6 +2,7 @@ import React, { useState, useMemo, useEffect, useCallback, useRef } from "react"
 
 import { ConfigManager } from "../store/ConfigManager";
 import { useHoverToLutCell } from "../hooks/useHoverToLutCell";
+import Map3DViewer from "./Map3DViewer";
 
 // ============================================================================
 // TYPES
@@ -110,6 +111,7 @@ export default function MapTuning({
   const [saveMessage, setSaveMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
   const [savedConfigs, setSavedConfigs] = useState<string[]>([]);
   const [showConfigMenu, setShowConfigMenu] = useState(false);
+  const [show3DViewer, setShow3DViewer] = useState<boolean>(false);
   const [showExportPanel, setShowExportPanel] = useState<boolean>(false);
   const [configFilter, setConfigFilter] = useState<string>("");
 
@@ -720,6 +722,38 @@ export default function MapTuning({
 
       {/* Légende et Actions */}
       <footer style={{ marginTop: "auto", display: "flex", flexDirection: "column", gap: "1rem" }}>
+        {/* Action Bar */}
+        <div style={{ display: "flex", gap: "0.5rem", alignItems: "center", justifyContent: "space-between" }}>
+          <button className="small-button" onClick={handleSave} disabled={isSaving}>
+            {isSaving ? "⏳ Loading..." : "💾 Save"}
+          </button>
+          <div style={{ display: "flex", gap: "0.5rem" }}>
+            <button
+              className="small-button"
+              onClick={() => setShow3DViewer((s) => !s)}
+              aria-expanded={show3DViewer}
+              style={{
+                background: show3DViewer ? "rgba(255, 70, 93, 0.2)" : undefined,
+                borderColor: show3DViewer ? "var(--magenta)" : undefined,
+              }}
+            >
+              {show3DViewer ? "Hide 3D" : "View 3D"}
+            </button>
+            <button
+              className="small-button"
+              onClick={() => setShowExportPanel((s) => !s)}
+              aria-expanded={showExportPanel}
+              style={{
+                background: showExportPanel ? "rgba(255, 70, 93, 0.2)" : undefined,
+                borderColor: showExportPanel ? "var(--magenta)" : undefined,
+              }}
+            >
+              {showExportPanel ? "Hide export" : "Show export"}
+            </button>
+          </div>
+        </div>
+
+        {/* Heatmap Legend */}
         <div className="map-tuning-legend">
           <span>Legend Heatmap :</span>
           <div className="map-tuning-legend-item">
@@ -737,21 +771,31 @@ export default function MapTuning({
           <span style={{ marginLeft: "auto", fontStyle: "italic", fontSize: "0.7rem" }}>Tip: Ctrl+V to paste data from Excel on a cell or an entry.</span>
         </div>
 
-        <div style={{ display: "flex", gap: "1rem", justifyContent: "flex-end", alignItems: "center" }}>
-          <div style={{ display: "flex", gap: "0.5rem", alignItems: "center" }}>
-            <button className="small-button" onClick={handleSave} disabled={isSaving}>
-              {isSaving ? "⏳ Loading..." : "💾 Save"}
-            </button>
-            <button
-              className="small-button"
-              onClick={() => setShowExportPanel((s) => !s)}
-              aria-expanded={showExportPanel}
-            >
-              {showExportPanel ? "Hide export" : "Show export"}
-            </button>
+        {/* 3D Viewer Panel */}
+        {show3DViewer && (
+          <div style={{ 
+            border: "1px solid var(--line)", 
+            borderRadius: "4px", 
+            padding: "0.5rem",
+            background: "var(--bg-2)",
+            minHeight: "400px",
+            maxHeight: "50vh",
+            overflow: "auto"
+          }}>
+            <Map3DViewer
+              gridData={gridData}
+              rowHeaders={rowHeaders}
+              colHeaders={colHeaders}
+              inputChannelX={inputChannelX}
+              inputChannelY={inputChannelY}
+              outputChannelName={outputChannelName}
+              gainVal={gainVal}
+              offsetVal={offsetVal}
+            />
           </div>
-        </div>
+        )}
 
+        {/* Export Panel */}
         {showExportPanel && (
           <div style={{ marginTop: "0.5rem" }}>
             <div style={{ display: "flex", gap: "0.5rem", marginBottom: "0.5rem", alignItems: "center" }}>
