@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type CSSProperties, type KeyboardEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type CSSProperties, type KeyboardEvent } from "react";
 
 import { queryDataset } from "../api";
 import { useTelemetryStore } from "../store/telemetryStore";
@@ -158,6 +158,19 @@ export default function ImportPanel({
   const [newConfigFreq, setNewConfigFreq] = useState("100");
   const [newConfigVCHPath, setNewConfigVCHPath] = useState("");
 
+  // Refs for tracking current state in subscription callbacks (Rule 2)
+  const mapConfigsRef = useRef(mapConfigs);
+  const telDataConfigsRef = useRef(telDataConfigs);
+
+  // Keep refs in sync with state
+  useEffect(() => {
+    mapConfigsRef.current = mapConfigs;
+  }, [mapConfigs]);
+
+  useEffect(() => {
+    telDataConfigsRef.current = telDataConfigs;
+  }, [telDataConfigs]);
+
   const allSignals = useMemo(
     () => uniqueStrings(datasetMetadata?.signal_names ?? []),
     [datasetMetadata]
@@ -170,19 +183,25 @@ export default function ImportPanel({
     return allSignals.filter((signal) => signal.toLowerCase().includes(filter));
   }, [allSignals, signalFilter]);
 
-  // Sync map configs and listen for external updates
+  // Sync map configs and listen for external updates (Rule 3: self-notification guard via subscribeDebouncedFull)
   useEffect(() => {
-    const unsubscribe = ConfigManager.subscribe<Record<string, MapTuningData>>("map-configs", (newConfigs) => {
-      setMapConfigs(newConfigs ?? {});
-    });
+    const unsubscribe = ConfigManager.subscribeDebouncedFull<Record<string, MapTuningData>>("map-configs", (newConfigs) => {
+      // subscribeDebouncedFull provides built-in lastValue guard, but we add secondary guard for extra safety
+      if (JSON.stringify(newConfigs) !== JSON.stringify(mapConfigsRef.current)) {
+        setMapConfigs(newConfigs ?? {});
+      }
+    }, 150);
     return () => unsubscribe();
   }, []);
 
-  // Sync teldata configs
+  // Sync teldata configs (Rule 3: self-notification guard via subscribeDebouncedFull)
   useEffect(() => {
-    const unsubscribe = ConfigManager.subscribe<TelDataImportConfig[]>("teldata-configs", (updated) => {
-      setTelDataConfigs(updated ?? []);
-    });
+    const unsubscribe = ConfigManager.subscribeDebouncedFull<TelDataImportConfig[]>("teldata-configs", (updated) => {
+      // subscribeDebouncedFull provides built-in lastValue guard, but we add secondary guard for extra safety
+      if (JSON.stringify(updated) !== JSON.stringify(telDataConfigsRef.current)) {
+        setTelDataConfigs(updated ?? []);
+      }
+    }, 150);
     return () => unsubscribe();
   }, []);
 

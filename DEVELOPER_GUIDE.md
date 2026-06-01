@@ -1,6 +1,6 @@
-# Developer Guide - Telemetry Display
+# Developer Guide - Map Replay
 
-Guide complet pour les développeurs reprenant l'application **Telemetry Display**. Couvre l'architecture, les patterns, la structure du projet et les fonctionnalités implémentées.
+Guide complet pour les développeurs reprenant l'application **Map Replay**. Couvre l'architecture, les patterns, la structure du projet et les fonctionnalités implémentées.
 
 ---
 
@@ -23,7 +23,7 @@ Guide complet pour les développeurs reprenant l'application **Telemetry Display
 
 ## Vue d'ensemble
 
-**Telemetry Display** est une application web légère pour visualiser et analyser les données de télémétrie sur des simulations ou des données de course.
+**Map Replay** est une application web légère pour visualiser et analyser les données de télémétrie sur des simulations ou des données de course.
 
 ### Cas d'usage
 - **Importation de données MAT** depuis simulations (Simulink), WinTAX ou données de course
@@ -50,7 +50,7 @@ La quantité importante de code rend parfois l'ajout de fonctionnalités compliq
 
 ```
 ┌─────────────────────────────────────────────────────────┐
-│                    Telemetry Display                    │
+│                    Map Replay                    │
 ├──────────────────┬──────────────────┬───────────────────┤
 │   Frontend       │   Communication  │   Backend         │
 │   (React)        │   (HTTP/REST)    │   (FastAPI)       │
@@ -164,7 +164,7 @@ npm run dev
 
 ### Option 3 : Script shell
 
-Utilisez le script `Telemetry Display.sh` depuis la racine:
+Utilisez le script `Map Replay.sh` depuis la racine:
 
 ```bash
 ./Telemetry\ Display.sh
@@ -262,7 +262,7 @@ telemetryDisplay/
 ├── USER_GUIDE.md                               # Guide fonctionnel détaillé
 ├── DEVELOPER_GUIDE.md                          # Ce fichier
 ├── requirements.txt                            # Dépendances Python globales
-└── Telemetry Display.sh                        # Script lancement global
+└── Map Replay.sh                        # Script lancement global
 ```
 
 ---
@@ -307,7 +307,7 @@ User GET /datasets/{id}/data?signals=[...]&max_points=500
 #### `backend/app/main.py`
 ```python
 # Initialisation FastAPI avec lifespan
-app = FastAPI(title="Telemetry Display API", version="0.1.0", lifespan=lifespan)
+app = FastAPI(title="Map Replay API", version="0.1.0", lifespan=lifespan)
 
 # CORS ouvert pour localhost:5173 (frontend dev)
 app.add_middleware(CORSMiddleware, allow_origins=["http://localhost:5173"], ...)

@@ -85,7 +85,7 @@ Pour une utilisation quotidienne, préférez le **démarrage complet depuis la r
 
 ### Démarrage complet depuis la racine
 
-Depuis la racine du dépôt, vous pouvez utiliser le script de dev configuré pour lancer frontend et backend ensemble appelé: `Telemetry Display.sh`. Ce mode suppose que les dépendances sont déjà installées.
+Depuis la racine du dépôt, vous pouvez utiliser le script de dev configuré pour lancer frontend et backend ensemble appelé: `Map Replay.sh`. Ce mode suppose que les dépendances sont déjà installées.
 
 Afin de simplifier l'utilisation, vous pouvez créer un raccourci de ce script sur le bureau.
 
@@ -104,7 +104,7 @@ git fetch
 git checkout {nom de la branche}
 git pull
 ```
-5. Relancez l'application avec le script `Telemetry Display.sh`
+5. Relancez l'application avec le script `Map Replay.sh`
 
 **Si besoin** de mettre à jour les bibliothèques Python, depuis `telemetryDisplay`:
 

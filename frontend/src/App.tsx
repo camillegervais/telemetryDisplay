@@ -891,14 +891,11 @@ export default function App() {
     <div className={`app-shell ${graphOnlyMode ? "graph-only-mode" : ""}`}>
       <header className="topbar">
         <div className="topbar-brand">
-          <div className="app-logo" aria-hidden="true">
-            <span className="app-logo-ring" />
-            <span className="app-logo-core">TD</span>
-          </div>
+          <img src="icon.png" style={{width: '50px'}}></img>
           <div>
-            <h1>Telemetry Display</h1>
+            <h1>Map Replay</h1>
             <p>
-              Race Telemetry Console
+              Data Visualisation and Map Tuning
               {userDisplayName.trim() ? ` - ${userDisplayName.trim()}` : ""}
             </p>
           </div>
@@ -1055,7 +1052,7 @@ export default function App() {
           <section className="panel dashboard-empty-state" role="status" aria-live="polite">
             <div className="dashboard-empty-logo" aria-hidden="true">
               <span className="app-logo-ring" />
-              <span className="app-logo-core">TD</span>
+              <span className="app-logo-core">MR</span>
             </div>
             <h2>No imported dataset</h2>
             <p>Import a telemetry file from the Data Hub panel to display graphs.</p>

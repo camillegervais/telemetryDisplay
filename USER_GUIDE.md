@@ -1,4 +1,4 @@
-# User Guide - Telemetry Display
+# User Guide - Map Replay
 
 A lightweight visualization and analysis tool for telemetry data from WinTAX, simulations (Simulink), or real vehicle tracking. Designed quickly analyze and retune vehicle functions with interactive dashboards and custom calculations.
 

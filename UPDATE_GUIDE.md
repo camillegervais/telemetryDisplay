@@ -11,9 +11,9 @@ git fetch
 git checkout {nom de la branche}
 git pull
 ```
-5. Relancez l'application avec le script `Telemetry Display.sh`
+5. Relancez l'application avec le script `Map Replay.sh`
 
-**Si besoin** de mettre à jour les bibliothèques Python, depuis `telemetryDisplay`:
+**Si besoin** de mettre à jour les bibliothèques Python, depuis `telemetryDisplay` dans un terminal **Git Bash**:
 
 ```bash
 source .venv/Scripts/activate
@@ -21,7 +21,7 @@ python -m pip install -r requirements.txt
 deactivate
 ```
 
-**Si besoin** de mettre à jours les dépendances Node, depuis `telemetryDisplay`:
+**Si besoin** de mettre à jours les dépendances Node, depuis `telemetryDisplay` dans un terminal **Git Bash**:
 
 ```bash
 npm install
