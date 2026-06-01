@@ -85,8 +85,8 @@ Once imported:
 - Drag another signal onto an existing graph to **add** it
 
 **Method 2 – Quick Actions**:
-- Press `+ Graphe` to add a time-series graph
-- Press `+ Graphe XY` to add an XY (2D scatter) graph
+- Press `+ Graph` to add a time-series graph
+- Press `+ Graph XY` to add an XY (2D scatter) graph
 
 ### Graph Types
 
@@ -139,9 +139,9 @@ You can have multiple tab configuration if you want to study part of the car. Th
 
 The following buttons help you manage your tab configurations:
 
-- `Charger` load the configuration selected in the input
-- `Sauver` save the current configuration, a nema is required: if you want to update your current configuration keep th e same name, otherwise enter a new name
-- `Suppr` delete the configuration from your computer: **cannot be undone**
+- `LOAD` load the configuration selected in the input
+- `SAVE` save the current configuration, a nema is required: if you want to update your current configuration keep th e same name, otherwise enter a new name
+- `DELETE` delete the configuration from your computer: **cannot be undone**
 
 **/!\\** The tab configuration only store and load the configuration of the graphs, cartos and software blocks (introduced further in that document) are not loaded. 
 
@@ -190,7 +190,7 @@ All signals (original and math) display:
 
 Create interpolation maps for calibration tuning.
 
-**Access**: Open the `TUNING CARTO` tab
+**Access**: Open the `MAP TUNING` tab
 
 **How it works**:
 1. Select **Input X** (columns) and **Input Y** (rows) channels
@@ -199,7 +199,7 @@ Create interpolation maps for calibration tuning.
 4. Enter header values (breakpoints for each axis, Ctrl+V from Excel is possible)
 5. Edit or paste table values (Ctrl+V from Excel is possible)
 6. Apply **Gain** and **Offset** scaling if needed
-7. Click **"💾 Sauvegarder"** to save locally
+7. Click **"💾 Save** to save locally
 
 **Features**:
 - Save multiple configurations locally
@@ -247,8 +247,8 @@ Fine-tune individual graph properties:
 
 Save your entire workspace (tabs, graphs, math channels, map configs):
 
-1. **Export**: Press on the button **"📥 Exporter"**→ downloads a `.toml` file
-2. **Import**: Press on the button **"📤 Importer"** → upload a saved `.toml` file
+1. **Export**: Press on the button **"📥 Export"**→ downloads a `.toml` file
+2. **Import**: Press on the button **"📤 Import"** → upload a saved `.toml` file
 
 Useful for sharing analysis setups or archiving configurations.
 
@@ -271,7 +271,6 @@ Useful for sharing analysis setups or archiving configurations.
 | `T` | New tab |
 | `Ctrl+S` | Export configuration |
 | `Ctrl+O` | Import configuration |
-| `Ctrl+Tab` | Switch tabs |
 | `Del` | Delete selected graph |
 
 While the application is in development, not all the keyboard shortcut are available.
