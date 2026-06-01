@@ -560,12 +560,12 @@ export default function App() {
     <section className="panel import-panel inspector-panel">
       <div className="panel-header">
         <h2>Graphe Perso</h2>
-        <span className="panel-badge">Graphes</span>
+        <span className="panel-badge">Graphs</span>
       </div>
       <div className="import-submenu-content">
         <div className="meta-grid" style={{ marginBottom: "0.6rem" }}>
           <div className="meta-item">
-            <span>Onglet actif</span>
+            <span>Active tab</span>
             <strong>{inspectorSnapshot?.activeTabName ?? "-"}</strong>
           </div>
           <div className="meta-item">
@@ -575,7 +575,7 @@ export default function App() {
         </div>
 
         {!inspectorSnapshot || inspectorSnapshot.widgets.length === 0 ? (
-          <p className="panel-text">Selectionnez un onglet avec des graphes.</p>
+          <p className="panel-text">Select a tab with graphs.</p>
         ) : (
           <>
             <div className="inspector-widget-list" role="listbox" aria-label="Widgets du dashboard">
@@ -599,7 +599,7 @@ export default function App() {
                     <strong>{activeInspectorWidget.kind === "xy" ? "XY" : "Temporel"}</strong>
                   </div>
                   <div className="meta-item">
-                    <span>Signaux</span>
+                    <span>Signals</span>
                     <strong>{activeInspectorWidget.signalsCount}</strong>
                   </div>
                   <div className="meta-item">
@@ -607,7 +607,7 @@ export default function App() {
                     <strong>L{activeInspectorWidget.row} C{activeInspectorWidget.col}</strong>
                   </div>
                   <div className="meta-item">
-                    <span>Taille</span>
+                    <span>Size</span>
                     <strong>{activeInspectorWidget.widthSpan}x{activeInspectorWidget.heightSpan}</strong>
                   </div>
                   {activeInspectorWidget.kind === "xy" ? (
@@ -617,7 +617,7 @@ export default function App() {
                     </div>
                   ) : (
                     <div className="meta-item">
-                      <span>Match axes Y</span>
+                      <span>Match Y axis</span>
                       <strong>{activeInspectorAlignModeLabel}</strong>
                     </div>
                   )}
@@ -629,7 +629,7 @@ export default function App() {
 
                 <div className="inspector-grid inspector-grid-actions">
                   <div className="meta-item inspector-actions">
-                    <span>Actions rapides</span>
+                    <span>Quick actions</span>
                     <div className="inspector-controls-row">
                       <button
                         className="small-button"
@@ -668,8 +668,8 @@ export default function App() {
                                 })
                               }
                             >
-                              <option value="origin-scale">Origine + echelle</option>
-                              <option value="origin-only">Origine seulement</option>
+                              <option value="origin-scale">Origin + scale</option>
+                              <option value="origin-only">Origin only</option>
                             </select>
                           ) : null}
                         </>
@@ -677,7 +677,7 @@ export default function App() {
                     </div>
                   </div>
                   <div className="meta-item inspector-actions">
-                    <span>Taille</span>
+                    <span>Size</span>
                     <div className="inspector-controls-row">
                       <label>
                         W
@@ -771,7 +771,7 @@ export default function App() {
                 </div>
 
                 <div className="inspector-section">
-                  <label className="inspector-field-label">Masquer valeurs positives</label>
+                  <label className="inspector-field-label">Display only negative value</label>
                   <input
                     type="checkbox"
                     checked={activeInspectorWidget.options?.hidePositive ?? false}
@@ -782,12 +782,12 @@ export default function App() {
                         hidePositive: e.target.checked,
                       })
                     }
-                    aria-label="Masquer les valeurs positives"
+                    aria-label="Display only negative value"
                   />
                 </div>
 
                 <div className="inspector-section">
-                  <label className="inspector-field-label">Masquer valeurs négatives</label>
+                  <label className="inspector-field-label">Display only positive value</label>
                   <input
                     type="checkbox"
                     checked={activeInspectorWidget.options?.hideNegative ?? false}
@@ -798,12 +798,12 @@ export default function App() {
                         hideNegative: e.target.checked,
                       })
                     }
-                    aria-label="Masquer les valeurs négatives"
+                    aria-label="Display only positive value"
                   />
                 </div>
 
                 <div className="inspector-section">
-                  <label className="inspector-field-label">Signal de freinage</label>
+                  <label className="inspector-field-label">Braking signal</label>
                   <input
                     type="checkbox"
                     checked={activeInspectorWidget.options?.filterByBraking ?? false}
@@ -814,12 +814,12 @@ export default function App() {
                         filterByBraking: e.target.checked,
                       })
                     }
-                    aria-label="Filtrer par signal de freinage"
+                    aria-label="Braking signal"
                   />
                 </div>
 
                 <div className="inspector-y-axis-inputs">
-                  <label className="inspector-field-label">Échelle Y manuelle</label>
+                  <label className="inspector-field-label">Manual Y range</label>
                   <div className="inspector-y-axis-range">
                     <DecimalNumberInput
                       value={activeInspectorWidget.options?.yAxisMin}
@@ -831,7 +831,7 @@ export default function App() {
                         })
                       }
                     />
-                    <span className="inspector-y-axis-sep">à</span>
+                    <span className="inspector-y-axis-sep">to</span>
                     <DecimalNumberInput
                       value={activeInspectorWidget.options?.yAxisMax}
                       onChange={(val) =>
@@ -846,7 +846,7 @@ export default function App() {
                 </div>
               </div>
             ) : (
-              <p className="panel-text inspector-empty">Selectionnez un widget dans la liste.</p>
+              <p className="panel-text inspector-empty">Select a widget in the list</p>
             )}
           </>
         )}
@@ -859,33 +859,30 @@ export default function App() {
       title: "Global",
       items: [
         { keys: "H", action: "Reset Home (zoom/axes)" },
-        { keys: "G", action: "Basculer mode Graphes/UI" },
-        { keys: "I", action: "Basculer Data Hub/Graphe Perso" },
-        { keys: "P", action: "Basculer panneau gauche/droite" },
+        { keys: "G", action: "Switch mode Graphes/UI" },
+        { keys: "I", action: "Switch Data Hub/Graphe Perso" },
+        { keys: "P", action: "Switch pannel left/right" },
       ],
     },
     {
       title: "Dashboard",
       items: [
-        { keys: "A", action: "Ajouter un graphe" },
-        { keys: "X", action: "Ajouter un graphe XY" },
-        { keys: "T", action: "Ajouter un onglet" },
-        { keys: "Ctrl+S", action: "Sauver configuration" },
-        { keys: "Ctrl+O", action: "Charger configuration selectionnee" },
-        { keys: "Ctrl+Tab", action: "Onglet suivant" },
-        { keys: "Ctrl+Shift+Tab", action: "Onglet precedent" },
-        { keys: "1..9", action: "Aller a l'onglet N" },
+        { keys: "A", action: "Add a graph" },
+        { keys: "X", action: "Add a graph XY" },
+        { keys: "T", action: "Add a tab" },
+        { keys: "Ctrl+S", action: "Save configuration" },
+        { keys: "Ctrl+O", action: "Load the selected configuration" },
       ],
     },
     {
       title: "Widget",
       items: [
-        { keys: "Delete", action: "Supprimer widget selectionne" },
-        { keys: "Enter", action: "Ouvrir/fermer menu widget" },
-        { keys: "F", action: "Agrandir/reduire widget" },
-        { keys: "Flèches", action: "Deplacer widget selectionne" },
-        { keys: "Shift+Flèches", action: "Redimensionner widget selectionne" },
-        { keys: "Esc", action: "Fermer menus/expand/deselection" },
+        { keys: "Delete", action: "Deleted the selected widget" },
+        { keys: "Enter", action: "Open/close menu widget" },
+        { keys: "F", action: "Full size/minimize widget" },
+        { keys: "Arrows", action: "Move the selected widget" },
+        { keys: "Shift+Arrows", action: "Resize the selected widget" },
+        { keys: "Esc", action: "Close menus/expand/deselection" },
       ],
     },
   ];
@@ -927,7 +924,7 @@ export default function App() {
             title={graphOnlyMode ? "Mode UI (G)" : "Mode Graphes (G)"}
             aria-label="Basculer mode Graphes"
           >
-            <span aria-hidden="true">GRAPHE</span>
+            <span aria-hidden="true">GRAPH</span>
           </button>
           <button
             className="small-button topbar-icon-button"
@@ -943,7 +940,7 @@ export default function App() {
             title="Aide raccourcis clavier"
             aria-label="Aide raccourcis clavier"
           >
-            <span aria-hidden="true">SHORTcut</span>
+            <span aria-hidden="true">SHORTCUT</span>
           </button>
           <div className="status-box">
             <span>Backend</span>
@@ -958,7 +955,7 @@ export default function App() {
         <div className="global-loading-overlay" role="status" aria-live="polite">
           <div className="global-loading-card">
             <span className="loading-spinner" aria-hidden="true" />
-            <span>Import en cours</span>
+            <span>Import ongoing...</span>
           </div>
         </div>
       ) : null}
@@ -969,16 +966,16 @@ export default function App() {
             className="shortcuts-modal"
             role="dialog"
             aria-modal="true"
-            aria-label="Aide raccourcis clavier"
+            aria-label="Help Shortcut"
             onClick={(event) => event.stopPropagation()}
           >
             <div className="shortcuts-modal-header">
-              <h2>Raccourcis clavier</h2>
+              <h2>Keyboard shortcuts</h2>
               <button
                 className="icon-button"
                 onClick={() => setShortcutsModalOpen(false)}
-                aria-label="Fermer"
-                title="Fermer"
+                aria-label="Close"
+                title="Close"
               >
                 ×
               </button>
@@ -998,7 +995,7 @@ export default function App() {
                 </section>
               ))}
             </div>
-            <p className="shortcuts-modal-footnote">Les raccourcis sont ignores quand vous ecrivez dans un champ.</p>
+            <p className="shortcuts-modal-footnote">Shortcuts are ignored when you type in an input.</p>
           </section>
         </div>
       ) : null}
@@ -1060,8 +1057,8 @@ export default function App() {
               <span className="app-logo-ring" />
               <span className="app-logo-core">TD</span>
             </div>
-            <h2>Aucun dataset importe</h2>
-            <p>Importez un fichier de telemetrie depuis le panneau Data Hub pour afficher les graphes.</p>
+            <h2>No imported dataset</h2>
+            <p>Import a telemetry file from the Data Hub panel to display graphs.</p>
           </section>
         )}
         {!graphOnlyMode && panelSide === "right" ? (

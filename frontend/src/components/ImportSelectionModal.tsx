@@ -304,7 +304,7 @@ export function ImportSelectionModal({ data, onConfirm, onCancel, isLoading = fa
           />
           <span>{title}</span>
           <span style={{ fontSize: "0.8rem", color: "rgba(255, 70, 93, 0.6)", marginLeft: "auto" }}>
-            ({itemCount} élément{itemCount !== 1 ? "s" : ""})
+            ({itemCount} element{itemCount !== 1 ? "s" : ""})
           </span>
         </label>
 
@@ -317,7 +317,7 @@ export function ImportSelectionModal({ data, onConfirm, onCancel, isLoading = fa
                   checked={mode === "replace"}
                   onChange={() => handleModeChange(section, "replace")}
                 />
-                <span>Remplacer</span>
+                <span>Replace</span>
               </label>
               <label style={radioGroupStyle}>
                 <input
@@ -325,7 +325,7 @@ export function ImportSelectionModal({ data, onConfirm, onCancel, isLoading = fa
                   checked={mode === "add"}
                   onChange={() => handleModeChange(section, "add")}
                 />
-                <span>Ajouter</span>
+                <span>Add</span>
               </label>
             </div>
             {children}
@@ -339,23 +339,23 @@ export function ImportSelectionModal({ data, onConfirm, onCancel, isLoading = fa
     <div style={modalOverlayStyle} onClick={onCancel}>
       <div style={modalStyle} onClick={(e) => e.stopPropagation()}>
         <div style={headerStyle}>
-          <span>📥 Importer Configuration</span>
+          <span>📥 Import Configuration</span>
         </div>
 
         {/* Preview */}
         <div style={previewStyle}>
-          <div style={{ fontWeight: "bold", marginBottom: "0.4rem" }}>Aperçu du fichier:</div>
+          <div style={{ fontWeight: "bold", marginBottom: "0.4rem" }}>File preview:</div>
           <div>
             {data.layouts.count > 0 && <div>✓ {data.layouts.count} Layout{data.layouts.count !== 1 ? "s" : ""}</div>}
             {data.mathChannels.count > 0 && (
-              <div>✓ {data.mathChannels.count} Canaux Math</div>
+              <div>✓ {data.mathChannels.count} Math Channel{data.mathChannels.count !== 1 ? "s" : ""}</div>
             )}
-            {data.mapConfigs.count > 0 && <div>✓ {data.mapConfigs.count} Carto{data.mapConfigs.count !== 1 ? "s" : ""}</div>}
+            {data.mapConfigs.count > 0 && <div>✓ {data.mapConfigs.count} Map{data.mapConfigs.count !== 1 ? "s" : ""}</div>}
             {data.softBlocks.count > 0 && (
               <div>✓ {data.softBlocks.count} Soft Block{data.softBlocks.count !== 1 ? "s" : ""}</div>
             )}
             {data.signalColors.count > 0 && (
-              <div>✓ {data.signalColors.count} Couleur{data.signalColors.count !== 1 ? "s" : ""} Signal</div>
+              <div>✓ {data.signalColors.count} Color{data.signalColors.count !== 1 ? "s" : ""} Signal</div>
             )}
             {data.telDataConfigs.count > 0 && (
               <div>✓ {data.telDataConfigs.count} Config TelData{data.telDataConfigs.count !== 1 ? "s" : ""}</div>
@@ -367,7 +367,7 @@ export function ImportSelectionModal({ data, onConfirm, onCancel, isLoading = fa
         {renderSection("Layouts", "layouts", data.layouts.count, (
           <div style={itemsListStyle}>
             <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: "0.5rem" }}>
-              <button style={smallButtonStyle} onClick={handleSelectAllLayouts}>Tout sélectionner</button>
+              <button style={smallButtonStyle} onClick={handleSelectAllLayouts}>Select all</button>
             </div>
 
             {data.layouts.items.map((layout) => (
@@ -387,7 +387,7 @@ export function ImportSelectionModal({ data, onConfirm, onCancel, isLoading = fa
         {renderSection("Cartos", "mapConfigs", data.mapConfigs.count, (
           <div style={itemsListStyle}>
             <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: "0.5rem" }}>
-              <button style={smallButtonStyle} onClick={handleSelectAllMapConfigs}>Tout sélectionner</button>
+              <button style={smallButtonStyle} onClick={handleSelectAllMapConfigs}>Select all</button>
             </div>
 
             {data.mapConfigs.keys.map((key) => (
@@ -407,7 +407,7 @@ export function ImportSelectionModal({ data, onConfirm, onCancel, isLoading = fa
         {renderSection("Soft Blocks", "softBlocks", data.softBlocks.count, (
           <div style={itemsListStyle}>
             <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: "0.5rem" }}>
-              <button style={smallButtonStyle} onClick={handleSelectAllSoftBlocks}>Tout sélectionner</button>
+              <button style={smallButtonStyle} onClick={handleSelectAllSoftBlocks}>Select all</button>
             </div>
 
             {data.softBlocks.items.map((block) => (
@@ -438,7 +438,7 @@ export function ImportSelectionModal({ data, onConfirm, onCancel, isLoading = fa
                 <span>
                   {cfg.name}
                   <span style={{ opacity: 0.55, marginLeft: "0.4rem" }}>
-                    ({cfg.channels.length} canaux — {cfg.targetFrequencyHz} Hz)
+                    ({cfg.channels.length} channel{cfg.channels.length !== 1 ? 's' : ''} — {cfg.targetFrequencyHz} Hz)
                   </span>
                 </span>
               </label>
@@ -465,7 +465,7 @@ export function ImportSelectionModal({ data, onConfirm, onCancel, isLoading = fa
               btn.style.borderColor = "rgba(255, 70, 93, 0.6)";
             }}
           >
-            Annuler
+            Return
           </button>
           <button
             style={buttonStyle("primary")}
@@ -484,7 +484,7 @@ export function ImportSelectionModal({ data, onConfirm, onCancel, isLoading = fa
               btn.style.borderColor = "rgba(52, 211, 153, 0.6)";
             }}
           >
-            {isLoading ? "Import en cours..." : "Importer"}
+            {isLoading ? "Import ongoing..." : "Import"}
           </button>
         </div>
       </div>

@@ -162,7 +162,7 @@ export function ConfigExportImport({ onImportSuccess }: ExportImportProps) {
             btn.style.borderColor = "rgba(255, 70, 93, 0.6)";
           }}
         >
-          📥 Exporter
+          📥 Export
         </button>
         <button
           onClick={handleImportClick}
@@ -178,7 +178,7 @@ export function ConfigExportImport({ onImportSuccess }: ExportImportProps) {
             btn.style.borderColor = "rgba(255, 70, 93, 0.6)";
           }}
         >
-          📤 Importer
+          📤 Import
         </button>
         <input
           ref={fileInputRef}

@@ -170,7 +170,7 @@ export function TelDataImportModal({ configs, onImportFromPath, onCancel }: TelD
       setRuns(result.runs);
       setStep("run");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Impossible d'ouvrir l'archive");
+      setError(err instanceof Error ? err.message : "Impossible to load the archive");
     } finally {
       setLoading(false);
     }
@@ -186,7 +186,7 @@ export function TelDataImportModal({ configs, onImportFromPath, onCancel }: TelD
       setLaps(result.laps);
       setStep("lap");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Impossible de charger les laps");
+      setError(err instanceof Error ? err.message : "Impossible to load the laps");
     } finally {
       setLoading(false);
     }
@@ -221,7 +221,7 @@ export function TelDataImportModal({ configs, onImportFromPath, onCancel }: TelD
       }
       setStep("validate");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Impossible de charger les channels");
+      setError(err instanceof Error ? err.message : "Impossible to load the channels");
     } finally {
       setLoading(false);
     }
@@ -250,7 +250,7 @@ export function TelDataImportModal({ configs, onImportFromPath, onCancel }: TelD
       await onImportFromPath(exportResult.mat_path);
       void closeTelDataSession(sessionId);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Echec de l'export");
+      setError(err instanceof Error ? err.message : "Impossible to export");
     } finally {
       setLoading(false);
     }
@@ -334,7 +334,7 @@ export function TelDataImportModal({ configs, onImportFromPath, onCancel }: TelD
         {step === "path" && (
           <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
             <label style={{ fontSize: "0.8rem", color: "rgba(255,255,255,0.6)" }}>
-              Chemin de l'archive TelDataX4
+              Path to the TelDataX4 archive
             </label>
             {loading ? (
               <div
@@ -347,7 +347,7 @@ export function TelDataImportModal({ configs, onImportFromPath, onCancel }: TelD
                 }}
               >
                 <span className="loading-spinner" aria-hidden="true" />
-                Ouverture de l'archive...
+                Loading...
               </div>
             ) : (
               <input
@@ -356,20 +356,20 @@ export function TelDataImportModal({ configs, onImportFromPath, onCancel }: TelD
                 value={archivePath}
                 onChange={(e) => setArchivePath(e.target.value)}
                 onKeyDown={(e) => e.key === "Enter" && void handleOpenArchive()}
-                placeholder="\\server\share\run ou C:\WinTAX4\Data\..."
+                placeholder="\\server\share\run or C:\WinTAX4\Data\..."
                 autoFocus
               />
             )}
             <div style={rowStyle}>
               <button className="small-button" onClick={onCancel} disabled={loading}>
-                Annuler
+                Return
               </button>
               <button
                 className="import-button"
                 onClick={() => void handleOpenArchive()}
                 disabled={!archivePath.trim() || loading}
               >
-                {loading ? "Ouverture..." : "Ouvrir"}
+                {loading ? "Opening..." : "Open"}
               </button>
             </div>
           </div>
@@ -381,7 +381,7 @@ export function TelDataImportModal({ configs, onImportFromPath, onCancel }: TelD
         {step === "run" && (
           <div style={{ display: "flex", flexDirection: "column", gap: "0.4rem" }}>
             <label style={{ fontSize: "0.8rem", color: "rgba(255,255,255,0.6)" }}>
-              Sélectionner un run ({runs.length})
+              Select a run ({runs.length})
             </label>
             <div
               style={{
@@ -402,11 +402,11 @@ export function TelDataImportModal({ configs, onImportFromPath, onCancel }: TelD
                     color: "var(--accent)",
                   }}
                 >
-                  <span className="loading-spinner" aria-hidden="true" /> Chargement...
+                  <span className="loading-spinner" aria-hidden="true" /> Loading...
                 </div>
               ) : runs.length === 0 ? (
                 <div style={{ color: "rgba(255,255,255,0.6)", padding: "1rem" }}>
-                  Aucun run trouvé.
+                  No run found.
                 </div>
               ) : (
                 runs.map((run) => (
@@ -422,7 +422,7 @@ export function TelDataImportModal({ configs, onImportFromPath, onCancel }: TelD
                     <span>{run.label}</span>
                     {run.lap_count > 0 && (
                       <span style={{ marginLeft: "0.5rem", opacity: 0.5, fontSize: "0.76rem" }}>
-                        {run.lap_count} tour{run.lap_count !== 1 ? "s" : ""}
+                        {run.lap_count} lap{run.lap_count !== 1 ? "s" : ""}
                       </span>
                     )}
                   </button>
@@ -431,7 +431,7 @@ export function TelDataImportModal({ configs, onImportFromPath, onCancel }: TelD
             </div>
             <div style={rowStyle}>
               <button className="small-button" onClick={handleBack} disabled={loading}>
-                Retour
+                Return
               </button>
             </div>
           </div>
@@ -443,7 +443,7 @@ export function TelDataImportModal({ configs, onImportFromPath, onCancel }: TelD
         {step === "lap" && (
           <div style={{ display: "flex", flexDirection: "column", gap: "0.4rem" }}>
             <label style={{ fontSize: "0.8rem", color: "rgba(255,255,255,0.6)" }}>
-              Sélectionner un lap ({laps.length})
+              Select a lap ({laps.length})
             </label>
             <div
               style={{
@@ -456,7 +456,7 @@ export function TelDataImportModal({ configs, onImportFromPath, onCancel }: TelD
             >
               {laps.length === 0 ? (
                 <div style={{ color: "rgba(255,255,255,0.6)", padding: "1rem" }}>
-                  Aucun tour trouvé.
+                  No lap found.
                 </div>
               ) : (
                 laps.map((lap) => (
@@ -486,7 +486,7 @@ export function TelDataImportModal({ configs, onImportFromPath, onCancel }: TelD
                         {lap.driver_name ? (
                           <strong>{lap.driver_name}</strong>
                         ) : (
-                          <span style={{ opacity: 0.55 }}>Inconnu</span>
+                          <span style={{ opacity: 0.55 }}>Unknown</span>
                         )}
                       </span>
                       <span
@@ -505,7 +505,7 @@ export function TelDataImportModal({ configs, onImportFromPath, onCancel }: TelD
             </div>
             <div style={rowStyle}>
               <button className="small-button" onClick={handleBack}>
-                Retour
+                Return
               </button>
             </div>
           </div>
@@ -518,13 +518,13 @@ export function TelDataImportModal({ configs, onImportFromPath, onCancel }: TelD
           <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
             {configs.length === 0 ? (
               <p style={{ fontSize: "0.82rem", color: "rgba(255,255,255,0.5)" }}>
-                Aucune config sauvegardée. Créez-en une dans le panneau "Configs TelData".
+                No saved config. Create one in the "Configs TelData" panel.
               </p>
             ) : (
               <>
                 <div>
                   <label style={{ fontSize: "0.8rem", color: "rgba(255,255,255,0.8)" }}>
-                    Config d'import (channels + fréquence)
+                    Import config (channels + frequency)
                   </label>
                   <div
                     style={{
@@ -550,7 +550,7 @@ export function TelDataImportModal({ configs, onImportFromPath, onCancel }: TelD
                         >
                           <strong>{cfg.name}</strong>
                           <span style={{ opacity: 0.55, fontSize: "0.76rem" }}>
-                            {cfg.channels.length} canaux — {cfg.targetFrequencyHz} Hz
+                            {cfg.channels.length} channels — {cfg.targetFrequencyHz} Hz
                           </span>
                         </span>
                       </button>
@@ -582,20 +582,20 @@ export function TelDataImportModal({ configs, onImportFromPath, onCancel }: TelD
                 }}
               >
                 <span className="loading-spinner" aria-hidden="true" />
-                Chargement des channels...
+                Channels loading...
               </div>
             )}
 
             <div style={rowStyle}>
               <button className="small-button" onClick={handleBack} disabled={loading}>
-                Retour
+                Return
               </button>
               <button
                 className="import-button"
                 onClick={() => void handleLoadChannels()}
                 disabled={!selectedConfig || loading}
               >
-                {loading ? "Chargement..." : "Charger les channels →"}
+                {loading ? "Loading..." : "Load the channels →"}
               </button>
             </div>
           </div>
@@ -616,9 +616,9 @@ export function TelDataImportModal({ configs, onImportFromPath, onCancel }: TelD
                   marginBottom: "0.35rem",
                 }}
               >
-                Canaux de la config "{selectedConfig.name}"
+                Config's channel "{selectedConfig.name}"
                 <span style={{ marginLeft: "0.4rem", opacity: 0.5 }}>
-                  ({channelStatus.present.length}/{selectedConfig.channels.length} présents)
+                  ({channelStatus.present.length}/{selectedConfig.channels.length} available)
                 </span>
               </div>
               <div
@@ -678,10 +678,10 @@ export function TelDataImportModal({ configs, onImportFromPath, onCancel }: TelD
                     marginTop: "0.25rem",
                   }}
                 >
-                  {channelStatus.missing.length} can
-                  {channelStatus.missing.length > 1 ? "aux" : "al"} introuvable
-                  {channelStatus.missing.length > 1 ? "s" : ""} — ignoré
-                  {channelStatus.missing.length > 1 ? "s" : ""} à l'export.
+                  {channelStatus.missing.length} channel
+                  {channelStatus.missing.length > 1 ? "s" : ""} unavailable
+                  {channelStatus.missing.length > 1 ? "s" : ""} — ignored
+                  {channelStatus.missing.length > 1 ? "s" : ""} in the export.
                 </div>
               )}
             </div>
@@ -697,11 +697,11 @@ export function TelDataImportModal({ configs, onImportFromPath, onCancel }: TelD
                 }}
               >
                 <div style={{ fontSize: "0.8rem", color: "rgba(255,255,255,0.6)" }}>
-                  Tous les canaux disponibles ({availableChannels.length})
+                  All channels available ({availableChannels.length})
                 </div>
                 <input
                   type="text"
-                  placeholder="Filtrer..."
+                  placeholder="Filter..."
                   value={channelFilter}
                   onChange={(e) => setChannelFilter(e.target.value)}
                   style={{ ...inputStyle, width: "45%", padding: "0.3rem 0.5rem" }}
@@ -721,7 +721,7 @@ export function TelDataImportModal({ configs, onImportFromPath, onCancel }: TelD
               >
                 {filteredAvailable.length === 0 ? (
                   <div style={{ color: "rgba(255,255,255,0.5)", fontSize: "0.8rem" }}>
-                    Aucun résultat.
+                    No result.
                   </div>
                 ) : (
                   filteredAvailable.map((ch) => {
@@ -772,7 +772,7 @@ export function TelDataImportModal({ configs, onImportFromPath, onCancel }: TelD
               }}
             >
               <strong style={{ color: "rgba(255,255,255,0.8)" }}>Export :</strong>{" "}
-              {exportChannels.length} can{exportChannels.length !== 1 ? "aux" : "al"} —{" "}
+              {exportChannels.length} channel{exportChannels.length !== 1 ? "s" : ""} —{" "}
               {selectedConfig.targetFrequencyHz} Hz
               {selectedConfig.vchPath && (
                 <div style={{ opacity: 0.55, fontSize: "0.74rem" }}>VCH : {selectedConfig.vchPath}</div>
@@ -790,13 +790,13 @@ export function TelDataImportModal({ configs, onImportFromPath, onCancel }: TelD
                 }}
               >
                 <span className="loading-spinner" aria-hidden="true" />
-                Création du fichier .mat...
+                Exporting the .mat...
               </div>
             )}
 
             <div style={rowStyle}>
               <button className="small-button" onClick={handleBack} disabled={loading}>
-                Retour
+                Return
               </button>
               <button
                 className="import-button"
@@ -809,7 +809,7 @@ export function TelDataImportModal({ configs, onImportFromPath, onCancel }: TelD
                     Export + import...
                   </span>
                 ) : (
-                  `Exporter ${exportChannels.length} can${exportChannels.length !== 1 ? "aux" : "al"}`
+                  `Export ${exportChannels.length} channel${exportChannels.length !== 1 ? "s" : ""}`
                 )}
               </button>
             </div>

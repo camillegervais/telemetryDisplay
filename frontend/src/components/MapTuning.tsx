@@ -433,7 +433,7 @@ export default function MapTuning({
     <div className="panel" style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
       
       <div className="panel-header panel-header-tight">
-        <h2>Tuning de Cartographie</h2>
+        <h2>Map tuning</h2>
         <div className="panel-badge">{outputChannelName}</div>
       </div>
 
@@ -451,21 +451,21 @@ export default function MapTuning({
 
       {/* Configuration des Channels */}
       <section className="map-tuning-section">
-        <h3>Configuration des Channels</h3>
+        <h3>Channels configuration</h3>
         <div style={{ marginBottom: "0.5rem" }}>
-          <label className="field-label">Filtrer les canaux</label>
+          <label className="field-label">Filter channels</label>
           <input
             type="text"
             className="signals-filter-input"
             value={channelFilter}
             onChange={(e) => setChannelFilter(e.target.value)}
-            placeholder="Filtrer..."
+            placeholder="Filter..."
             style={{ width: "100%" }}
           />
         </div>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: "1rem" }}>
           <div>
-            <label className="field-label">Entrée X (Colonnes)</label>
+            <label className="field-label">Entry X (Columns)</label>
             <select className="mini-select" style={{ width: "100%" }} value={inputChannelX} onChange={(e) => setInputChannelX(e.target.value)}>
               {availableSignals
                 .filter((ch) => ch.toLowerCase().includes(channelFilter.toLowerCase()))
@@ -479,7 +479,7 @@ export default function MapTuning({
             </select>
           </div>
           <div>
-            <label className="field-label">Entrée Y (Lignes)</label>
+            <label className="field-label">Entry Y (Lines)</label>
             <select className="mini-select" style={{ width: "100%" }} value={inputChannelY} onChange={(e) => setInputChannelY(e.target.value)}>
               {availableSignals
                 .filter((ch) => ch.toLowerCase().includes(channelFilter.toLowerCase()))
@@ -493,7 +493,7 @@ export default function MapTuning({
           </div>
           <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
             <div>
-              <label className="field-label">Nom de Sortie</label>
+              <label className="field-label">Output Name</label>
               <input className="topbar-user-input" style={{ width: "100%" }} type="text" value={outputChannelName} onChange={(e) => setOutputChannelName(e.target.value)} />
             </div>
             <div>
@@ -510,7 +510,7 @@ export default function MapTuning({
               </select>
             </div>
             <div>
-              <label className="field-label">Extrapolation (hors breakpoints)</label>
+              <label className="field-label">Extrapolation (outside of breakpoints)</label>
               <select
                 className="mini-select"
                 style={{ width: "100%" }}
@@ -531,7 +531,7 @@ export default function MapTuning({
                 style={{ cursor: "pointer", accentColor: "var(--cyan)" }}
               />
               <label htmlFor="isBrakeSignal" className="field-label" style={{ margin: 0, cursor: "pointer" }}>
-                Signal lié au frein ?
+                Braking signal ?
               </label>
             </div>
           </div>
@@ -542,13 +542,13 @@ export default function MapTuning({
 
       {/* Bibliothèque Locale */}
       <section className="map-tuning-section" style={{ position: "relative" }}>
-        <h3>Bibliothèque de Sauvegardes (LocalStorage)</h3>
+        <h3>Saved maps</h3>
         <button 
           className="small-button" 
           style={{ width: "100%" }} 
           onClick={() => setShowConfigMenu(!showConfigMenu)}
         >
-          📂 {savedConfigs.length} configuration(s) stockée(s) localement
+          📂 {savedConfigs.length} configuration{savedConfigs.length !==1 ? 's': ''} saved
         </button>
         
         {showConfigMenu && (
@@ -566,7 +566,7 @@ export default function MapTuning({
           }}>
             <input
               type="text"
-              placeholder="Filtrer..."
+              placeholder="Filter..."
               value={configFilter}
               onChange={(e) => setConfigFilter(e.target.value)}
               style={{
@@ -581,12 +581,12 @@ export default function MapTuning({
               }}
             />
             {savedConfigs.length === 0 ? (
-              <div style={{ padding: "1rem", textAlign: "center", fontSize: "0.8rem", color: "var(--fg-2)" }}>Aucune sauvegarde</div>
+              <div style={{ padding: "1rem", textAlign: "center", fontSize: "0.8rem", color: "var(--fg-2)" }}>No maps</div>
             ) : (
               savedConfigs
                 .filter(name => name.toLowerCase().includes(configFilter.toLowerCase()))
                 .length === 0 ? (
-                <div style={{ padding: "1rem", textAlign: "center", fontSize: "0.8rem", color: "var(--fg-2)" }}>Aucun résultat</div>
+                <div style={{ padding: "1rem", textAlign: "center", fontSize: "0.8rem", color: "var(--fg-2)" }}>No result</div>
               ) : (
                 savedConfigs
                   .filter(name => name.toLowerCase().includes(configFilter.toLowerCase()))
@@ -622,13 +622,13 @@ export default function MapTuning({
       <section className="map-tuning-section">
         <div className="map-tuning-grid-controls">
           <div style={{ display: "flex", gap: "1rem", alignItems: "center" }}>
-            <span className="field-label" style={{ margin: 0 }}>Lignes:</span>
+            <span className="field-label" style={{ margin: 0 }}>Lines:</span>
             <button className="small-button" onClick={() => handleRowsChange(numRows - 1)}>−</button>
             <span style={{ minWidth: "20px", textAlign: "center" }}>{numRows}</span>
             <button className="small-button" onClick={() => handleRowsChange(numRows + 1)}>+</button>
           </div>
           <div style={{ display: "flex", gap: "1rem", alignItems: "center" }}>
-            <span className="field-label" style={{ margin: 0 }}>Colonnes:</span>
+            <span className="field-label" style={{ margin: 0 }}>Columns:</span>
             <button className="small-button" onClick={() => handleColsChange(numCols - 1)}>−</button>
             <span style={{ minWidth: "20px", textAlign: "center" }}>{numCols}</span>
             <button className="small-button" onClick={() => handleColsChange(numCols + 1)}>+</button>
@@ -721,7 +721,7 @@ export default function MapTuning({
       {/* Légende et Actions */}
       <footer style={{ marginTop: "auto", display: "flex", flexDirection: "column", gap: "1rem" }}>
         <div className="map-tuning-legend">
-          <span>Légende Heatmap :</span>
+          <span>Legend Heatmap :</span>
           <div className="map-tuning-legend-item">
             <div className="map-tuning-legend-color" style={{ background: "rgba(34, 197, 94, 0.5)" }}></div>
             <span>Min</span>
@@ -734,20 +734,20 @@ export default function MapTuning({
             <div className="map-tuning-legend-color" style={{ background: "rgba(239, 68, 68, 0.5)" }}></div>
             <span>Max</span>
           </div>
-          <span style={{ marginLeft: "auto", fontStyle: "italic", fontSize: "0.7rem" }}>Astuce: Ctrl+V pour coller depuis Excel sur une cellule ou un en-tête.</span>
+          <span style={{ marginLeft: "auto", fontStyle: "italic", fontSize: "0.7rem" }}>Tip: Ctrl+V to paste data from Excel on a cell or an entry.</span>
         </div>
 
         <div style={{ display: "flex", gap: "1rem", justifyContent: "flex-end", alignItems: "center" }}>
           <div style={{ display: "flex", gap: "0.5rem", alignItems: "center" }}>
             <button className="small-button" onClick={handleSave} disabled={isSaving}>
-              {isSaving ? "⏳ En cours..." : "💾 Sauvegarder"}
+              {isSaving ? "⏳ Loading..." : "💾 Save"}
             </button>
             <button
               className="small-button"
               onClick={() => setShowExportPanel((s) => !s)}
               aria-expanded={showExportPanel}
             >
-              {showExportPanel ? "Masquer export" : "Afficher export"}
+              {showExportPanel ? "Hide export" : "Show export"}
             </button>
           </div>
         </div>
@@ -761,20 +761,20 @@ export default function MapTuning({
                   try {
                     const tsv = exportDataToTsv();
                     await navigator.clipboard.writeText(tsv);
-                    setSaveMessage({ type: "success", text: "Table copiée dans le presse-papiers." });
+                    setSaveMessage({ type: "success", text: "Table copied in clipboard" });
                     setTimeout(() => setSaveMessage(null), 1500);
                   } catch {
-                    setSaveMessage({ type: "error", text: "Impossible de copier la table." });
+                    setSaveMessage({ type: "error", text: "Impossible to copy the table." });
                     setTimeout(() => setSaveMessage(null), 1500);
                   }
                 }}
               >
-                Copier valeurs
+                Copy values
               </button>
 
-              <button className="small-button" onClick={copyXBreakpoints}>Copier breakpoints X</button>
-              <button className="small-button" onClick={copyYBreakpoints}>Copier breakpoints Y</button>
-              <span style={{ marginLeft: "auto", fontSize: "0.85rem", color: "var(--fg-2)" }}>Valeurs = cell * gain + offset</span>
+              <button className="small-button" onClick={copyXBreakpoints}>Copy breakpoints X</button>
+              <button className="small-button" onClick={copyYBreakpoints}>Copy breakpoints Y</button>
+              <span style={{ marginLeft: "auto", fontSize: "0.85rem", color: "var(--fg-2)" }}>Values = cell * gain + offset</span>
             </div>
 
             <div style={{ overflowX: "auto" }}>

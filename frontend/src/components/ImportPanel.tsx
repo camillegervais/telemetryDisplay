@@ -314,12 +314,12 @@ export default function ImportPanel({
           {importing ? (
             <span className="loading-inline">
               <span className="loading-spinner" aria-hidden="true" />
-              Import en cours...
+              Import ongoing...
             </span>
           ) : (
             <>
               <span className="import-cta-icon">⬇</span>
-              <span>Importer des données</span>
+              <span>Import data</span>
             </>
           )}
         </button>
@@ -437,9 +437,9 @@ export default function ImportPanel({
             />
 
             {!datasetMetadata || datasetMetadata.signal_names.length === 0 ? (
-              <p className="panel-text">Importez un dataset pour afficher les signaux.</p>
+              <p className="panel-text">Import a dataset to display signals</p>
             ) : filteredSignals.length === 0 ? (
-              <p className="panel-text">Aucun signal ne correspond au filtre.</p>
+              <p className="panel-text">No signal verify this filter.</p>
             ) : (
               <div className="sidebar-signals-list">
                 {filteredSignals.map((signal) => (
@@ -471,13 +471,13 @@ export default function ImportPanel({
           onClick={() => setAxisSectionOpen((prev) => !prev)}
         >
           <span>{axisSectionOpen ? "▾" : "▸"}</span>
-          <span>Axe X</span>
+          <span>X Axis</span>
         </button>
         {axisSectionOpen ? (
           <div className="import-submenu-content">
             <div className="meta-grid" style={{ marginBottom: "0" }}>
               <div className="meta-item">
-                <span>Axe X</span>
+                <span>X Axis</span>
                 <select
                   className="mini-select"
                   value={xAxisMode}
@@ -485,12 +485,12 @@ export default function ImportPanel({
                 >
                   <option value="distance">Distance</option>
                   <option value="time" disabled={!datasetMetadata?.has_time_axis}>
-                    Temps
+                    Time
                   </option>
                 </select>
               </div>
               <div className="meta-item">
-                <span>Frequence source</span>
+                <span>Source frequency</span>
                 <strong>
                   {datasetMetadata?.source_sample_rate_hz
                     ? `${datasetMetadata.source_sample_rate_hz.toFixed(2)} Hz`
@@ -501,10 +501,10 @@ export default function ImportPanel({
 
             <details style={{ marginTop: "0.5rem" }}>
               <summary className="panel-text" style={{ cursor: "pointer" }}>
-                Avance: ligne depart/arrivee
+                Offset: start finish/line
               </summary>
               <label className="field-label" htmlFor="start-finish-offset-input">
-                Decalage (m)
+                Offset (m)
               </label>
               <input
                 id="start-finish-offset-input"
@@ -534,19 +534,19 @@ export default function ImportPanel({
           onClick={() => setStatsSectionOpen((prev) => !prev)}
         >
           <span>{statsSectionOpen ? "▾" : "▸"}</span>
-          <span>Stats signaux</span>
+          <span>Signals stats</span>
         </button>
         {statsSectionOpen ? (
           <div className="import-submenu-content">
             {loadingStats ? (
               <p className="panel-text loading-inline">
                 <span className="loading-spinner" aria-hidden="true" />
-                Calcul des statistiques...
+                Computation ongoing...
               </p>
             ) : null}
             {statsError ? <p className="panel-text">{statsError}</p> : null}
             {!datasetMetadata || datasetMetadata.signal_names.length === 0 ? (
-              <p className="panel-text">Importez un dataset pour afficher les stats.</p>
+              <p className="panel-text">Import a dataset to display stats.</p>
             ) : null}
             {!loadingStats && !statsError && datasetMetadata && datasetMetadata.signal_names.length > 0 ? (
               <div className="signals-stats-list">
@@ -583,7 +583,7 @@ export default function ImportPanel({
         {mapsSectionOpen ? (
           <div className="import-submenu-content">
             {Object.keys(mapConfigs).length === 0 ? (
-              <p className="panel-text">Aucune carto sauvegardée.</p>
+              <p className="panel-text">No maps saved.</p>
             ) : (
               <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
                 <input
@@ -652,7 +652,7 @@ export default function ImportPanel({
                   </div>
                 ))}
                 {Object.keys(mapConfigs).length > 0 && Object.entries(mapConfigs).filter(([name]) => name.toLowerCase().includes(mapFilter.toLowerCase())).length === 0 ? (
-                  <p className="panel-text">Aucune carto ne correspond au filtre.</p>
+                  <p className="panel-text">No maps verify this filter.</p>
                 ) : null}
               </div>
             )}
@@ -702,7 +702,7 @@ export default function ImportPanel({
           onClick={() => setTelDataConfigsSectionOpen((p) => !p)}
         >
           <span>{telDataConfigsSectionOpen ? "▾" : "▸"}</span>
-          <span>Configs TelData ({telDataConfigs.length})</span>
+          <span>TelData Config ({telDataConfigs.length})</span>
         </button>
 
         {telDataConfigsSectionOpen ? (
@@ -726,18 +726,18 @@ export default function ImportPanel({
                       </button>
                     </div>
                     <div style={{ fontSize: "0.76rem", opacity: 0.55 }}>
-                      {cfg.channels.length} canaux — {cfg.targetFrequencyHz} Hz
+                      {cfg.channels.length} channels — {cfg.targetFrequencyHz} Hz
                     </div>
                   </div>
                 ))}
               </div>
             ) : (
-              <p className="panel-text">Aucune config sauvegardée.</p>
+              <p className="panel-text">No saved configs.</p>
             )}
 
             {/* Add new config form */}
             <div style={{ display: "flex", flexDirection: "column", gap: "0.4rem", borderTop: "1px solid rgba(255,70,93,0.2)", paddingTop: "0.6rem" }}>
-              <label className="field-label">Nom</label>
+              <label className="field-label">Name</label>
               <input
                 className="table-input"
                 type="text"
@@ -746,7 +746,7 @@ export default function ImportPanel({
                 placeholder="ex: ABS channels"
                 style={{ width: "100%" }}
               />
-              <label className="field-label">Canaux (un par ligne)</label>
+              <label className="field-label">Channels (one per line)</label>
               <textarea
                 className="table-input"
                 value={newConfigChannels}
@@ -755,7 +755,7 @@ export default function ImportPanel({
                 rows={4}
                 style={{ width: "100%", resize: "vertical", fontFamily: "monospace", fontSize: "0.8rem" }}
               />
-              <label className="field-label">Fréquence cible (Hz)</label>
+              <label className="field-label">Target frequency (Hz)</label>
               <input
                 className="table-input"
                 type="number"
@@ -795,7 +795,7 @@ export default function ImportPanel({
                   setNewConfigVCHPath("");
                 }}
               >
-                Sauvegarder config
+                Save
               </button>
             </div>
           </div>

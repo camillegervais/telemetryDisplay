@@ -163,7 +163,7 @@ export function SignalColorManager() {
 
   return (
     <div style={containerStyle} className="hover-border">
-      <div style={headerStyle}>🎨 Couleurs Signaux</div>
+      <div style={headerStyle}>🎨 Signals Colors</div>
 
       {/* List of existing colors */}
       {Object.keys(signalColors).length > 0 ? (
@@ -173,7 +173,7 @@ export function SignalColorManager() {
               <div style={{ position: "relative", width: "24px", height: "24px", flexShrink: 0 }}>
                 <div
                   style={{ ...swatchStyle, background: color, position: "absolute", top: 0, left: 0 }}
-                  title={`Modifier couleur pour ${signalName}`}
+                  title={`Edit color for ${signalName}`}
                 />
                 <input
                   id={`color-${signalName}`}
@@ -201,14 +201,14 @@ export function SignalColorManager() {
                   btn.style.borderColor = "rgba(255, 70, 93, 0.5)";
                 }}
               >
-                Supprimer
+                Delete
               </button>
             </div>
           ))}
         </div>
       ) : (
         <div style={{ fontSize: "0.8rem", color: "rgba(255, 70, 93, 0.6)", marginBottom: "0.6rem" }}>
-          Aucune couleur définie
+          No color defined
         </div>
       )}
 
@@ -216,7 +216,7 @@ export function SignalColorManager() {
       <div style={inputContainerStyle}>
         <input
           type="text"
-          placeholder="Nom du signal..."
+          placeholder="Signal's name..."
           value={newSignalName}
           onChange={(e) => setNewSignalName(e.target.value)}
           onKeyDown={(e) => {
@@ -231,7 +231,7 @@ export function SignalColorManager() {
           value={newSignalColor}
           onChange={(e) => setNewSignalColor(e.target.value)}
           style={colorPickerStyle}
-          title="Choisir une couleur"
+          title="Pick a color"
         />
         <button
           onClick={handleAddColor}
@@ -254,7 +254,7 @@ export function SignalColorManager() {
             btn.style.borderColor = "rgba(52, 211, 153, 0.6)";
           }}
         >
-          Ajouter
+          Add
         </button>
       </div>
     </div>

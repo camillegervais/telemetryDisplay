@@ -151,7 +151,7 @@ export default function TrackMapPanel({ trackMap }: TrackMapPanelProps) {
       </div>
       <div className="track-placeholder">
         {!mapped ? (
-          <div className="track-empty">Aucune piste</div>
+          <div className="track-empty">No Track</div>
         ) : (
           <svg viewBox={`0 0 ${mapped.width} ${mapped.height}`} className="track-svg">
             <polyline points={mapped.points} fill="none" stroke="#ffd447" strokeWidth="2.5" />

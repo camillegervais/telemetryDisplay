@@ -90,7 +90,7 @@ export function ImportDataModal({
       >
         <div className="import-data-modal">
           <div className="import-data-modal-header">
-            <h3>Importer des données</h3>
+            <h3>Import data</h3>
             <button
               className="small-button"
               type="button"
@@ -114,7 +114,7 @@ export function ImportDataModal({
               className={`import-data-modal-tab${tab === "recent" ? " active" : ""}`}
               onClick={() => setTab("recent")}
             >
-              Récents
+              Recents
             </button>
             <button
               type="button"
@@ -129,7 +129,7 @@ export function ImportDataModal({
             {tab === "mat" ? (
               <>
                 <label className="field-label" htmlFor="modal-mat-file-input">
-                  MAT file — Load un fichier une seule fois
+                  MAT file — Load one file at a time
                 </label>
                 <input
                   id="modal-mat-file-input"
@@ -151,7 +151,7 @@ export function ImportDataModal({
                     await onImport(selectedFile);
                   }}
                 >
-                  Importer le dataset
+                  Import the dataset
                 </button>
 
                 <label
@@ -159,7 +159,7 @@ export function ImportDataModal({
                   htmlFor="modal-mat-path-input"
                   style={{ marginTop: "0.5rem" }}
                 >
-                  MAT path — Permet de refresh entre les simulations
+                  MAT path — To refresh between simulations
                 </label>
                 <input
                   id="modal-mat-path-input"
@@ -180,7 +180,7 @@ export function ImportDataModal({
                     await onImportFromPath(path);
                   }}
                 >
-                  Importer depuis chemin
+                  Import from path
                 </button>
               </>
             ) : tab === "recent" ? (
@@ -199,7 +199,7 @@ export function ImportDataModal({
                 {loadingRecent ? (
                   <p className="panel-text loading-inline">
                     <span className="loading-spinner" aria-hidden="true" />
-                    Chargement...
+                    Loading...
                   </p>
                 ) : recentError ? (
                   <p className="panel-text">{recentError}</p>
@@ -299,7 +299,7 @@ export function ImportDataModal({
             ) : (
               <>
                 <p className="panel-text" style={{ marginBottom: "0.5rem" }}>
-                  Ouvrez une archive TelData pour importer un dataset.
+                  Open a TelData archive to import a dataset.
                 </p>
                 <img src="./../public/marelli_logo.png" style={{width: '30%', alignSelf: 'center', marginBottom: '1rem'}}></img>
                 <button
@@ -307,7 +307,7 @@ export function ImportDataModal({
                   type="button"
                   onClick={() => setTelDataModalOpen(true)}
                 >
-                  Ouvrir archive TelData…
+                  Open TelData archive…
                 </button>
               </>
             )}

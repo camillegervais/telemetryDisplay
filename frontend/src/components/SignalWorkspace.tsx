@@ -609,7 +609,7 @@ function buildChartConfig(
     font: { color: "#e5e7eb" },
     margin: graphOnlyMode ? { l: 26, r: 26, t: 8, b: 22 } : { l: 36, r: 36, t: 30, b: 28 },
     xaxis: {
-      title: graphOnlyMode ? undefined : useTimeAxis ? "Temps (s)" : "Distance (m)",
+      title: graphOnlyMode ? undefined : useTimeAxis ? "Time (s)" : "Distance (m)",
       gridcolor: "rgba(255, 93, 120, 0.22)",
       zeroline: false,
       ...(!useTimeAxis && xRange
@@ -622,7 +622,7 @@ function buildChartConfig(
           }),
     },
     yaxis: {
-      title: graphOnlyMode ? undefined : useSharedYAxis ? "Valeur" : selectedSignals[0],
+      title: graphOnlyMode ? undefined : useSharedYAxis ? "Value" : selectedSignals[0],
       gridcolor: "rgba(255, 93, 120, 0.22)",
       zeroline: true,
       zerolinecolor: "rgba(255, 255, 255, 0.45)",
@@ -1037,8 +1037,8 @@ export default function SignalWorkspace({
 
     const activeTabName =
       activeTabId === TRAJECTORY_TAB_ID
-        ? "Trajectoire"
-        : tabs.find((tab) => tab.id === activeTabId)?.name ?? "Onglet";
+        ? "TrackMap"
+        : tabs.find((tab) => tab.id === activeTabId)?.name ?? "Tab";
 
     const widgetSummaries: InspectorWidgetSummary[] = widgets.map((widget) => ({
       id: widget.id,
@@ -1478,7 +1478,7 @@ export default function SignalWorkspace({
           const latestMapCfgs = mapConfigsRef.current ?? mapConfigs;
           const mapCfg = latestMapCfgs[lutOp.mapConfigKey];
           if (!mapCfg) {
-            throw new Error(`Map "${lutOp.mapConfigKey}" introuvable. Sauvegardez-la d'abord dans l'onglet Rejeu Cartos.`);
+            throw new Error(`Map "${lutOp.mapConfigKey}" unknown. Save it first in Map Tuning tab.`);
           }
           await calculateMapTuning({
             datasetId: currentDatasetId,
@@ -1511,7 +1511,7 @@ export default function SignalWorkspace({
       // Refresh metadata so new signals appear in the signal list
       onRefreshDatasetMetadata?.();
     } catch (err) {
-      const msg = err instanceof Error ? err.message : "Erreur calcul";
+      const msg = err instanceof Error ? err.message : "Error in computation";
       setSoftBlockStatuses((prev) => ({ ...prev, [blockId]: { state: "error", error: msg } }));
     }
   }
@@ -1996,7 +1996,7 @@ export default function SignalWorkspace({
     );
     if (!requestedSignals.includes("xCar") || !requestedSignals.includes("yCar")) {
       setTrajectorySeries({});
-      setTrajectoryError("Signaux trajectoire manquants: xCar/yCar");
+      setTrajectoryError("Missing signals: xCar/yCar");
       return;
     }
 
@@ -2023,7 +2023,7 @@ export default function SignalWorkspace({
         if (!alive || isAbortError(error)) {
           return;
         }
-        setTrajectoryError(error instanceof Error ? error.message : "Impossible de charger la trajectoire");
+        setTrajectoryError(error instanceof Error ? error.message : "Impossible to load the TrackMap");
       })
       .finally(() => {
         if (!alive) {
@@ -2120,7 +2120,7 @@ export default function SignalWorkspace({
     }
 
     const layout: Record<string, unknown> = {
-      title: graphOnlyMode ? undefined : "Trajectoire vs Reference",
+      title: graphOnlyMode ? undefined : "Path vs Reference",
       autosize: true,
       paper_bgcolor: "#14080b",
       plot_bgcolor: "#1b0a0e",
@@ -2337,7 +2337,7 @@ export default function SignalWorkspace({
   }
 
   function addTab() {
-    const newTab = createEmptyTab(`Onglet ${tabs.length + 1}`);
+    const newTab = createEmptyTab(`Tab ${tabs.length + 1}`);
     setTabs((prev) => [...prev, newTab]);
     setActiveTabId(newTab.id);
     setGridCols(newTab.gridCols);
@@ -2374,7 +2374,7 @@ export default function SignalWorkspace({
     if (!tab) {
       return;
     }
-    const nextName = window.prompt("Nom de l'onglet", tab.name);
+    const nextName = window.prompt("Tab's name", tab.name);
     if (!nextName) {
       return;
     }
@@ -2385,7 +2385,7 @@ export default function SignalWorkspace({
     // Create a default name for the prompt
     const defaultName = savedConfigs.find(elem => elem.id === currentConfigId)?.name || `Configuration ${savedConfigs.length + 1}`;
     // Get the new name from the user
-    const nextName = window.prompt("Nom de la configuration", defaultName);
+    const nextName = window.prompt("Configuration's name", defaultName);
     // If no name entered we abort
     if (!nextName) {
       return;
@@ -3100,7 +3100,7 @@ export default function SignalWorkspace({
             value={selectedConfigId}
             onChange={(event) => setSelectedConfigId(event.target.value)}
           >
-            <option value="">Config locale...</option>
+            {savedConfigs.length == 0 && <option value="">Local config...</option>}
             {savedConfigs.map((config) => (
               <option key={config.id} value={config.id}>
                 {config.name}
@@ -3112,20 +3112,20 @@ export default function SignalWorkspace({
             disabled={!selectedConfigId}
             onClick={() => loadConfiguration(selectedConfigId)}
           >
-            Charger
+            Load
           </button>
           <button className="small-button" onClick={saveCurrentConfiguration}>
-            Sauver
+            Save
           </button>
           <button
             className="small-button"
             disabled={!selectedConfigId}
             onClick={() => deleteConfiguration(selectedConfigId)}
           >
-            Suppr
+            Delete
           </button>
           <label>
-            Colonnes
+            Columns
             <select
               className="mini-select"
               value={gridCols}
@@ -3140,7 +3140,7 @@ export default function SignalWorkspace({
             </select>
           </label>
           <label>
-            Lignes
+            Lines
             <select
               className="mini-select"
               value={gridRows}
@@ -3155,10 +3155,10 @@ export default function SignalWorkspace({
             </select>
           </label>
           <button className="small-button" onClick={addWidget}>
-            + Graphe
+            + Graph
           </button>
           <button className="small-button" onClick={addXYWidget}>
-            + Graphe XY
+            + Graph XY
           </button>
         </div>
       </div>
@@ -3169,13 +3169,13 @@ export default function SignalWorkspace({
             {focusSignalsOpen ? "Masquer signaux" : "Montrer signaux"}
           </button>
           <button className="small-button" onClick={addWidget}>
-            + Graphe
+            + Graph
           </button>
           <button className="small-button" onClick={addXYWidget}>
-            + Graphe XY
+            + Graph XY
           </button>
           <label>
-            Col
+            Columns
             <select
               className="mini-select"
               value={gridCols}
@@ -3188,7 +3188,7 @@ export default function SignalWorkspace({
             </select>
           </label>
           <label>
-            Lig
+            Lines
             <select
               className="mini-select"
               value={gridRows}
@@ -3201,7 +3201,7 @@ export default function SignalWorkspace({
             </select>
           </label>
           <label>
-            Cible
+            Target
             <select
               className="mini-select"
               value={focusTargetWidgetId}
@@ -3221,8 +3221,8 @@ export default function SignalWorkspace({
               type="text"
               value={focusSignalFilter}
               onChange={(event) => setFocusSignalFilter(event.target.value)}
-              placeholder="Filtrer les signaux..."
-              aria-label="Filtrer les signaux"
+              placeholder="Filter the signals..."
+              aria-label="Filter the signals"
             />
             <div className="focus-signal-list" aria-label="Signaux disponibles">
               {filteredFocusSignals.map((signal) => (
@@ -3236,13 +3236,13 @@ export default function SignalWorkspace({
                   }}
                   onClick={() => addSignalFromFocusToolbar(signal)}
                   disabled={!canQuery}
-                  title={`Cliquer ou glisser: ${signal}`}
+                  title={`Click ou drag: ${signal}`}
                 >
                   {signal}
                 </button>
               ))}
               {filteredFocusSignals.length === 0 ? (
-                <span className="focus-signal-empty">Aucun signal</span>
+                <span className="focus-signal-empty">No signals</span>
               ) : null}
             </div>
           </div>
@@ -3289,7 +3289,7 @@ export default function SignalWorkspace({
             <button
               className="workspace-tab-action"
               onClick={() => removeTab(tab.id)}
-              title="Fermer onglet"
+              title="Close tab"
               disabled={tabs.length <= 1}
             >
               ×
@@ -3298,12 +3298,12 @@ export default function SignalWorkspace({
         ))}
         <div className={`workspace-tab ${isTrajectoryActive ? "workspace-tab-active" : ""}`}>
           <button className="workspace-tab-name" onClick={switchToTrajectoryTab}>
-            Trajectoire
+            TrackMap
           </button>
         </div>
         <div className={`workspace-tab ${isAnalysisActive ? "workspace-tab-active" : ""}`}>
           <button className="workspace-tab-name" onClick={switchToAnalysisTab}>
-            Tuning Cartos
+            Mpa Tuning
           </button>
         </div>
         <div className={`workspace-tab ${isSoftActive ? "workspace-tab-active" : ""}`}>
@@ -3312,7 +3312,7 @@ export default function SignalWorkspace({
           </button>
         </div>
         <button className="workspace-tab-add" onClick={addTab} title="Nouvel onglet">
-          + Onglet
+          + Tab
         </button>
       </div>
 
@@ -3322,15 +3322,15 @@ export default function SignalWorkspace({
             {trajectoryLoading ? (
               <div className="loading-plot loading-plot-overlay">
                 <span className="loading-spinner" aria-hidden="true" />
-                Chargement...
+                Loading...
               </div>
             ) : null}
             {trajectoryError ? <p className="panel-text">{trajectoryError}</p> : null}
             {!trajectoryLoading && !trajectoryError && !trajectoryChart.hasCar ? (
-              <div className="placeholder-graph" aria-label="Trajectoire indisponible">
+              <div className="placeholder-graph" aria-label="Path unavailable">
                 <div className="placeholder-graph-mark">!</div>
-                <div className="placeholder-graph-text">Trajectoire indisponible</div>
-                <div className="placeholder-graph-help">Signaux requis: xCar et yCar</div>
+                <div className="placeholder-graph-text">Path unavailable</div>
+                <div className="placeholder-graph-help">Required signals: xCar and yCar</div>
               </div>
             ) : !trajectoryLoading && !trajectoryError ? (
               <div className="plot-fill">
@@ -3377,7 +3377,7 @@ export default function SignalWorkspace({
           <article className="graph-tile" style={{ gridColumn: "1 / span 1", gridRow: "1 / span 1" }}>
             <div className="loading-plot">
               <span className="loading-spinner" aria-hidden="true" />
-              Changement d'onglet...
+              Tab loading...
             </div>
           </article>
         </div>
@@ -3456,7 +3456,7 @@ export default function SignalWorkspace({
                     setDragFromId(widget.id);
                   }}
                   onDragEnd={() => setDragFromId(null)}
-                  title="Déplacer"
+                  title="Move"
                 >
                   ↕
                 </button>
@@ -3472,7 +3472,7 @@ export default function SignalWorkspace({
                       )
                     );
                   }}
-                  title="Paramètres"
+                  title="Settings"
                 >
                   ⚙
                 </button>
@@ -3482,7 +3482,7 @@ export default function SignalWorkspace({
                     e.stopPropagation();
                     duplicateWidget(widget.id);
                   }}
-                  title="Dupliquer"
+                  title="Duplicate"
                 >
                   ⧉
                 </button>
@@ -3492,7 +3492,7 @@ export default function SignalWorkspace({
                     e.stopPropagation();
                     removeWidget(widget.id);
                   }}
-                  title="Supprimer"
+                  title="Delete"
                 >
                   ×
                 </button>
@@ -3503,7 +3503,7 @@ export default function SignalWorkspace({
                     updateSelectedWidgetId(widget.id);
                     setExpandedWidgetId((prev) => (prev === widget.id ? null : widget.id));
                   }}
-                  title={expandedWidgetId === widget.id ? "Réduire" : "Plein écran"}
+                  title={expandedWidgetId === widget.id ? "Minimize" : "Full screen"}
                 >
                   {expandedWidgetId === widget.id ? "⤡" : "⛶"}
                 </button>
@@ -3513,25 +3513,25 @@ export default function SignalWorkspace({
                 type="button"
                 className="graph-resize-handle handle-nw"
                 onMouseDown={(event) => startResize(event, widget, "nw")}
-                title="Redimensionner"
+                title="Resize"
               />
               <button
                 type="button"
                 className="graph-resize-handle handle-ne"
                 onMouseDown={(event) => startResize(event, widget, "ne")}
-                title="Redimensionner"
+                title="Resize"
               />
               <button
                 type="button"
                 className="graph-resize-handle handle-sw"
                 onMouseDown={(event) => startResize(event, widget, "sw")}
-                title="Redimensionner"
+                title="Resize"
               />
               <button
                 type="button"
                 className="graph-resize-handle handle-se"
                 onMouseDown={(event) => startResize(event, widget, "se")}
-                title="Redimensionner"
+                title="Resize"
               />
 
               {widget.menuOpen ? (
@@ -3552,7 +3552,7 @@ export default function SignalWorkspace({
                           );
                         }}
                       >
-                        <option value="">Selectionner X...</option>
+                        <option value="">Select X...</option>
                         {availableSignals.map((signal) => (
                           <option key={`x-${widget.id}-${signal}`} value={signal}>
                             {signal}
@@ -3562,7 +3562,7 @@ export default function SignalWorkspace({
                     </>
                   ) : null}
 
-                  <p className="field-label">Signaux</p>
+                  <p className="field-label">Signals</p>
                   <div className="signal-grid">
                     {widget.signals.map((signal, idx) => (
                       <label key={`${widget.id}-${signal}`} className="signal-checkbox">
@@ -3616,7 +3616,7 @@ export default function SignalWorkspace({
                           }}
                         />
                         <span className="signal-badge" style={{ borderColor: "#e5e7eb" }}>
-                          Match axes Y
+                          Match Y axis
                         </span>
                       </label>
 
@@ -3646,17 +3646,17 @@ export default function SignalWorkspace({
                               );
                             }}
                           >
-                            <option value="origin-scale">Origine + echelle</option>
-                            <option value="origin-only">Origine seulement</option>
+                            <option value="origin-scale">Origin + scale</option>
+                            <option value="origin-only">Origin only</option>
                           </select>
                         </div>
                       ) : null}
                     </>
                   ) : null}
 
-                  <p className="menu-help">Taille du graphe</p>
+                  <p className="menu-help">Graph's size</p>
                   <div className="size-selector">
-                    <label htmlFor={`width-${widget.id}`}>Largeur</label>
+                    <label htmlFor={`width-${widget.id}`}>Width</label>
                     <select
                       id={`width-${widget.id}`}
                       className="mini-select"
@@ -3678,16 +3678,16 @@ export default function SignalWorkspace({
                       value={widget.heightSpan}
                       onChange={(event) => changeWidgetSize(widget.id, widget.widthSpan, Number(event.target.value))}
                     >
-                      <option value={1}>1 ligne</option>
-                      <option value={2}>2 lignes</option>
-                      <option value={3}>3 lignes</option>
-                      <option value={4}>4 lignes</option>
+                      <option value={1}>1 line</option>
+                      <option value={2}>2 lines</option>
+                      <option value={3}>3 lines</option>
+                      <option value={4}>4 lines</option>
                     </select>
                   </div>
 
                   <p className="menu-help">Position</p>
                   <div className="position-selector">
-                    <label htmlFor={`row-${widget.id}`}>Ligne</label>
+                    <label htmlFor={`row-${widget.id}`}>Line</label>
                     <select
                       id={`row-${widget.id}`}
                       className="mini-select"
@@ -3703,7 +3703,7 @@ export default function SignalWorkspace({
                   </div>
 
                   <div className="position-selector">
-                    <label htmlFor={`col-${widget.id}`}>Colonne</label>
+                    <label htmlFor={`col-${widget.id}`}>Column</label>
                     <select
                       id={`col-${widget.id}`}
                       className="mini-select"
@@ -3718,25 +3718,25 @@ export default function SignalWorkspace({
                     </select>
                   </div>
 
-                  <p className="menu-help">Déplacez les graphes en glissant la tuile ou utilisez les contrôles ci-dessus.</p>
+                  <p className="menu-help">Move the graphe by dragging the tile or use the controls of this menu.</p>
                 </div>
               ) : null}
 
               {loadingById[widget.id] ? (
                 <div className="loading-plot loading-plot-overlay">
                   <span className="loading-spinner" aria-hidden="true" />
-                  Chargement...
+                  Loading...
                 </div>
               ) : null}
 
               {loadingById[widget.id] ? null : ((widgetKind === "xy" && (!widget.xSignal || widget.signals.length === 0)) ||
               (widgetKind === "timeseries" && widget.signals.length === 0)) ? (
-                <div className="placeholder-graph" aria-label="Aucun signal sélectionné">
+                <div className="placeholder-graph" aria-label="No signal selected">
                   <div className="placeholder-graph-mark">+</div>
                   <div className="placeholder-graph-text">
-                    {widgetKind === "xy" ? "Choisissez X et ajoutez Y" : "Ajoutez un signal"}
+                    {widgetKind === "xy" ? "Choose X et add Y" : "Add a signal"}
                   </div>
-                  <div className="placeholder-graph-help">Glissez un signal ici ou ouvrez les paramètres</div>
+                  <div className="placeholder-graph-help">Drag a signal here</div>
                 </div>
               ) : (
                 <div className="plot-fill">
@@ -3834,7 +3834,7 @@ export default function SignalWorkspace({
         <article className="graph-tile graph-tile-track" style={{ gridColumn: `${gridCols} / span 1`, gridRow: `${gridRows} / span 1` }}>
           <div className="graph-track-head">Track</div>
           {!trackMapped ? (
-            <div className="track-empty">Aucune piste</div>
+            <div className="track-empty">No Track</div>
           ) : (
             <svg viewBox={`0 0 ${trackMapped.width} ${trackMapped.height}`} className="track-svg">
               <polyline points={trackMapped.points} fill="none" stroke="#ffd447" strokeWidth="2.4" />
@@ -3866,7 +3866,7 @@ export default function SignalWorkspace({
       </div>
       )}
 
-      {!canQuery ? <p className="panel-text">Import requis.</p> : null}
+      {!canQuery ? <p className="panel-text">Import required.</p> : null}
     </section>
   );
 }

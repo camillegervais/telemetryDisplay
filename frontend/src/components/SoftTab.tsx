@@ -118,7 +118,7 @@ const LutRefEditor: React.FC<{
           Aucune map sauvegardée.{" "}
           {onSwitchToMapTuning && (
             <button className="link-btn" onClick={onSwitchToMapTuning}>
-              Aller à Tuning Cartos →
+              Go to Map Tuning →
             </button>
           )}
         </p>
@@ -130,7 +130,7 @@ const LutRefEditor: React.FC<{
             value={op.mapConfigKey}
             onChange={(e) => onUpdate({ mapConfigKey: e.target.value })}
           >
-            <option value="">— choisir une map —</option>
+            <option value="">— choose a map —</option>
             {mapKeys.map((k) => <option key={k} value={k}>{k}</option>)}
           </select>
         </label>
@@ -143,20 +143,20 @@ const LutRefEditor: React.FC<{
             {"  ·  "}
             Y: <strong>{selected.inputChannelY || "—"}</strong>
             {"  ·  "}
-            Grille: <strong>{selected.rowHeaders.length} × {selected.colHeaders.length}</strong>
+            Grid: <strong>{selected.rowHeaders.length} × {selected.colHeaders.length}</strong>
             {"  ·  "}
             Gain: <strong>{selected.gainVal}</strong>
             {"  ·  "}
             Offset: <strong>{selected.offsetVal}</strong>
           </span>
           {selected.braking_signal && (
-            <span className="soft-deps" style={{ color: "#ff8a33" }}>⚠ filtrage freinage actif</span>
+            <span className="soft-deps" style={{ color: "#ff8a33" }}>⚠ active braking filtering</span>
           )}
         </div>
       )}
 
       {op.mapConfigKey && !selected && (
-        <p className="soft-expr-error-msg">Map "{op.mapConfigKey}" introuvable — elle a peut-être été supprimée.</p>
+        <p className="soft-expr-error-msg">Map "{op.mapConfigKey}" unavailable — might be deleted.</p>
       )}
     </div>
   );
@@ -171,7 +171,7 @@ const MathHelpPanel: React.FC = () => {
   return (
     <div className="soft-help-panel">
       <div className="soft-help-section">
-        <span className="soft-help-section-title">Fonctions</span>
+        <span className="soft-help-section-title">Functions</span>
         <table className="soft-help-table">
           <tbody>
             {functions.map(({ name, description }) => (
@@ -184,7 +184,7 @@ const MathHelpPanel: React.FC = () => {
         </table>
       </div>
       <div className="soft-help-section">
-        <span className="soft-help-section-title">Opérateurs</span>
+        <span className="soft-help-section-title">Operators</span>
         <table className="soft-help-table">
           <tbody>
             {operators.map(({ symbol, description }) => (
@@ -246,7 +246,7 @@ const MathOpEditor: React.FC<{
       </div>
       {exprError && <p className="soft-expr-error-msg">{exprError}</p>}
       {op.dependencies.length > 0 && !exprError && (
-        <p className="soft-deps">Dépendances: {op.dependencies.join(", ")}</p>
+        <p className="soft-deps">Dependencies: {op.dependencies.join(", ")}</p>
       )}
       {showHelp && <MathHelpPanel />}
     </div>
@@ -292,7 +292,7 @@ const OperationRow: React.FC<{
     <div className={`soft-op-row ${expanded ? "soft-op-row-expanded" : ""}`}>
       <div className="soft-op-header">
         <span className={`soft-op-badge soft-op-badge-${op.kind}`}>
-          {op.kind === "math" ? "MATH" : "LUT2D"}
+          {op.kind === "math" ? "MATH" : "MAP"}
         </span>
         <span className="soft-op-index">{opIndex + 1}</span>
         <input
@@ -308,17 +308,17 @@ const OperationRow: React.FC<{
           <span className="soft-op-preview" title={op.expression}>= {op.expression || "…"}</span>
         )}
         {op.kind === "lut2d" && (
-          <span className="soft-op-preview" title={op.mapConfigKey || "non lié"}>
-            {op.mapConfigKey || "— non lié —"}
+          <span className="soft-op-preview" title={op.mapConfigKey || "not linked"}>
+            {op.mapConfigKey || "— not linked —"}
           </span>
         )}
         <div className="soft-op-actions">
-          <button className="soft-icon-btn" onClick={onMoveUp} disabled={isFirst} title="Monter">↑</button>
-          <button className="soft-icon-btn" onClick={onMoveDown} disabled={isLast} title="Descendre">↓</button>
-          <button className="soft-icon-btn" onClick={() => setExpanded((p) => !p)} title="Éditer">
+          <button className="soft-icon-btn" onClick={onMoveUp} disabled={isFirst} title="Go up">↑</button>
+          <button className="soft-icon-btn" onClick={onMoveDown} disabled={isLast} title="Go down">↓</button>
+          <button className="soft-icon-btn" onClick={() => setExpanded((p) => !p)} title="Edit">
             {expanded ? "▲" : "▼"}
           </button>
-          <button className="soft-icon-btn soft-icon-btn-danger" onClick={onDelete} title="Supprimer">×</button>
+          <button className="soft-icon-btn soft-icon-btn-danger" onClick={onDelete} title="Delete">×</button>
         </div>
       </div>
 
@@ -404,12 +404,12 @@ const BlockCard: React.FC<{
           className="soft-block-enable-checkbox"
           checked={enabled}
           onChange={(e) => onUpdate({ enabled: e.target.checked })}
-          title={enabled ? "Désactiver ce bloc" : "Activer ce bloc"}
+          title={enabled ? "Deactivate this bloc" : "Activate this bloc"}
         />
         <button
           className="soft-block-collapse-btn"
           onClick={() => setCollapsed((p) => !p)}
-          title={collapsed ? "Déployer" : "Réduire"}
+          title={collapsed ? "Expand" : "Minimize"}
         >
           {collapsed ? "▶" : "▼"}
         </button>
@@ -433,18 +433,18 @@ const BlockCard: React.FC<{
           className="small-button soft-run-btn"
           onClick={onCalculate}
           disabled={!enabled || status.state === "running" || block.operations.length === 0}
-          title={enabled ? "Calculer ce bloc" : "Bloc désactivé"}
+          title={enabled ? "Compute this bloc" : "Bloc deactivated"}
         >
           {status.state === "running" ? "…" : "▶ Run"}
         </button>
-        <button className="soft-icon-btn" onClick={onDuplicate} title="Dupliquer le bloc">⧉</button>
-        <button className="soft-icon-btn soft-icon-btn-danger" onClick={onDelete} title="Supprimer le bloc">×</button>
+        <button className="soft-icon-btn" onClick={onDuplicate} title="Duplicate this bloc">⧉</button>
+        <button className="soft-icon-btn soft-icon-btn-danger" onClick={onDelete} title="Delete this bloc">×</button>
       </div>
 
       {!collapsed && (
         <div className="soft-block-body">
           {block.operations.length === 0 && (
-            <p className="soft-empty-msg">Aucune opération — ajoutez-en une ci-dessous.</p>
+            <p className="soft-empty-msg">No operation — add one below.</p>
           )}
           {block.operations.map((op, opIndex) => {
             const sigsBefore = signalsBeforeOp(baseSignals, block, opIndex, allBlocks, blockIndex);
@@ -471,8 +471,8 @@ const BlockCard: React.FC<{
           )}
 
           <div className="soft-add-op-row">
-            <button className="small-button" onClick={addMathOp}>+ Math</button>
-            <button className="small-button" onClick={addLutOp}>+ LUT 2D</button>
+            <button className="small-button" onClick={addMathOp}>+ MATH</button>
+            <button className="small-button" onClick={addLutOp}>+ MAP</button>
           </div>
         </div>
       )}
@@ -641,8 +641,8 @@ export default function SoftTab({
     <div className="soft-tab">
       <div className="soft-tab-header">
         <div className="soft-tab-title">
-          <h3>Blocs Soft</h3>
-          {!datasetId && <span className="soft-no-dataset">Dataset requis pour calculer</span>}
+          <h3>Software blocs</h3>
+          {!datasetId && <span className="soft-no-dataset">Dataset required to compute</span>}
         </div>
         <div className="soft-tab-actions">
           <button
@@ -651,7 +651,7 @@ export default function SoftTab({
             disabled={!datasetId || softBlocks.length === 0}
             title="Calculer tous les blocs"
           >
-            ▶▶ Tout calculer
+            ▶▶ Compute all
           </button>
           <button className="small-button" onClick={addBlock}>
             + Bloc
@@ -661,9 +661,9 @@ export default function SoftTab({
 
       {softBlocks.length === 0 ? (
         <div className="soft-empty-state">
-          <p>Aucun bloc soft défini.</p>
-          <p>Créez un bloc pour définir un pipeline de calcul (expressions math et/ou LUT 2D).</p>
-          <button className="small-button" onClick={addBlock}>+ Créer un bloc</button>
+          <p>No software bloc defined.</p>
+          <p>Create a bloc to define a computation pipeline (Math epxression and/or MAP).</p>
+          <button className="small-button" onClick={addBlock}>+ Create a bloc</button>
         </div>
       ) : (
         <div className="soft-block-list">

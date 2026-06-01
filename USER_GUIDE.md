@@ -1,7 +1,6 @@
 # User Guide - Telemetry Display
 
-A lightweight visualization and analysis tool for telemetry data from WinTAX, simulations (Simulink), or real vehicle tracking. Designed for performance engineers to quickly analyze and retune vehicle functions with interactive dashboards and custom calculations.
-
+A lightweight visualization and analysis tool for telemetry data from WinTAX, simulations (Simulink), or real vehicle tracking. Designed quickly analyze and retune vehicle functions with interactive dashboards and custom calculations.
 
 ## Main functionalities
 
@@ -11,9 +10,9 @@ This tool helps you analyze vehicle telemetry data by:
 - **Compare signals** – View multiple signals simultaneously across different graphs, zoom in/out, and filter by lap sections
 - **Create custom channels** – Build new signals from existing ones using math expressions (e.g., `sqrt(gLong^2 + gLat^2)` for G-force)
 - **Tune vehicle maps** – Edit 2D lookup tables and generate optimized output signals for tuning systems behaviour
-- **Recreate Software block** - Allow the engineer to recreate software behaviour to easily evaluate the change occured by carto tuning
-- **Save your work** – Export and import complete analysis setups in a single file
-- **Real-time sync** – Keep multiple browser tabs in sync with your latest configurations
+- **Recreate Software block** - Recreate software behaviour to easily evaluate the change occured by carto tuning
+- **Save your work** – Export and import complete configuration setups in a single file
+- **Real-time sync** – Keep multiple browser tabs in sync with your updated data
 
 
 ## Application Layout
@@ -42,12 +41,11 @@ The interface consists of four main areas:
 
 **Topbar** – Quick access to: import mode, panel swap, graph-only view, settings
 
-
 ## 1. Importing & Managing Data 
 
 ### Importing a Dataset
 
-Click the **"⬆ IMPORTER DES DONNÉES"** button in the left panel to open the import modal. It has three tabs:
+Click the **"⬆ IMPORT DATA"** button in the left panel to open the import modal. It has three tabs:
 
 **Import MAT**
 - **Browse**: Select a `.mat` file directly from your computer
@@ -55,11 +53,11 @@ Click the **"⬆ IMPORTER DES DONNÉES"** button in the left panel to open the i
 
 **Récents**
 - Lists the last 15 imported datasets
-- Click **Charger** to reload a previous dataset instantly
+- Click **Load** to reload a previous dataset instantly
 - Click **✕** next to an entry to remove it from the history
 
 **TelData**
-- Click **Ouvrir archive TelData…** to import from a TelData archive using a saved configuration
+- Click **Open TelData… archive** to import from a TelData archive using a saved configuration
 
 The application expects `.mat` files in the format specified in `MAT_FORMAT.md`.
 

@@ -11,17 +11,31 @@ Application web de visualisation de télémétrie pour circuit, avec import de f
 
 ## Prérequis
 
-- **Python 3.14+** pour le backend
+- **Python 3.8+** pour le backend
 - **Node.js** pour le frontend
 - Un navigateur moderne (**Chrome** de préférence)
 
 Pour vérifier que les prérequis sont validés vous pouvez taper les commandes suivantes dans un terminal bash:
 - `python --version` et vous verrez la version de votre Python apparaître.
-- `npm --version` et vous verrez également la version de votre Node.js apparaître.
+- `npm --version` et vous verrez également la version de votre Node.js apparaître, ou une fenêtre s'ouvrir rapidement. Si l'installation n'est pas bonne, npm ne sera pas reconnue en tant commande interne.
 
 Pour installer Node.js, rendez vous sur https://nodejs.org/en/download/current et téléchargez le Windows Installer. Suivez les étapes d'installation.
 
 ## Installation
+
+### Git
+
+Vous devez clone le git dans le dossier de votre choix. Pour cela: `git clone https://github.com/camillegervais/telemetryDisplay.git`.
+
+Une fois le git installé, vous pouvez ouvrir un terminal Git Bash dans ce dossier et faire les opérations suivantes:
+
+```bash
+git fetch
+git checkout prod
+git pull
+```
+
+Le repo est maintenant à jour et les dépendances sont prêtes à être installées.
 
 ### Python
 
@@ -38,24 +52,28 @@ Après l'installation, vous pouvez vérifier la version de python comme mentionn
 
 Dans le cas où votre Python est fonctionnel, vous pouvez:
 
-1. Ouvrir un git bash dans `telemetryDisplay`.
-2. Créer l’environnement virtuel si besoin: `python -m venv .venv`
-3. Activer l’environnement virtuel.
-4. Installer les dépendances: `pip install -r requirements.txt`
+Ouvrez un git bash dans `telemetryDisplay` et tapez les commandes suivantes:
+
+```bash
+python -m venv .venv
+source .venv/Scripts/activate
+python -m pip install -r requirements.txt
+```
 
 ### Node
 
 Dans le cas où votre installation de Node est fonctionnelle, vous pouvez:
 
-#### Frontend
 
-1. Ouvrir un git bash dans `telemetryDisplay/frontend/`.
-2. Installer les dépendances: `npm install`
+Ouvrez un git bash dans `telemetryDisplay` et tapez les commandes suivantes:
 
-#### Lanceur global
+```bash
+npm install
+cd frontend
+npm install
+cd ..
+```
 
-1. Retourner dans `telemetryDisplay`.
-2. Installer les dépendances: `npm install`.
 
 ### **/!\\** Remarque installation Python
 
@@ -71,27 +89,7 @@ Depuis la racine du dépôt, vous pouvez utiliser le script de dev configuré po
 
 Afin de simplifier l'utilisation, vous pouvez créer un raccourci de ce script sur le bureau.
 
-### Lancer le backend
-
-1. Aller dans `backend/`.
-2. Activer `.venv`.
-3. Lancer l’API: `uvicorn app.main:app --reload --port 8001`
-
-L’API est disponible sur `http://localhost:8001`.
-
-### Lancer le frontend
-
-1. Aller dans `frontend/`.
-2. Lancer l’interface: `npm run dev`
-
-L’application est disponible sur `http://localhost:5173` et s’attend à trouver l’API sur `http://localhost:8001`.
-
-### Démarrage simultané du frontend et du backend
-
-1. Aller dans `telemetryDisplay`.
-2. Lancer l'application au complet avec la commande: `npm run dev`
-
-Vous verrez alors se lancer une fenêtre Node où les informations du frontend seront en cyan et celles du backend en vert.
+> D'autres façons de démarrer l'application sont listées à la fin de ce document et sont réservées à des usgaes plus avancés de l'application
 
 ## Prise en compte des mise à jour du code
 
@@ -100,24 +98,30 @@ Lors du développement de l'application, des mises à jour régulières seront d
 1. Aller dans le dossier où est le code source de l'application (nommé `telemetryDisplay`) et assurez vous qu'aucune instance de l'application n'est ouverte.
 2. Clic droit dans la fenêtre et faites `Open Git Bash here`.
 3. Assurez vous d'avoir une connexion internet.
-4. Tapez dans le terminal ouvert les commandes suivantes:
-5. `git fetch`
-6. `git checkout {nom de la branche}` avec le nom de la branche donné dans le message indiquant la mise à jour (étape souvent optionnelle)
-7. `git pull` 
-8. Relancez l'application avec le script `Telemetry Display.sh`
+4. Tapez dans le terminal ouvert les commandes suivantes, {nom de la branche} est indiquée dans le message de push:
+```bash
+git fetch
+git checkout {nom de la branche}
+git pull
+```
+5. Relancez l'application avec le script `Telemetry Display.sh`
 
-Si besoin de mettre à jour les bibliothèques Python:
+**Si besoin** de mettre à jour les bibliothèques Python, depuis `telemetryDisplay`:
 
-1. `source .venv/Scripts/activate`
-2. `python -m pip install -r requirements.txt`
-3. `deactivate`
+```bash
+source .venv/Scripts/activate
+python -m pip install -r requirements.txt
+deactivate
+```
 
-Si besoin de mettre à jours les dépendances Node:
+**Si besoin** de mettre à jours les dépendances Node, depuis `telemetryDisplay`:
 
-1. `npm install`
-2. `cd frontend`
-3. `npm install`
-4. `cd ..`
+```bash
+npm install
+cd frontend
+npm install
+cd ..
+```
 
 ## Utilisation basique
 
@@ -156,3 +160,27 @@ Cette application vise à offrir un outil pratique pour analyser des données de
 1. Copier le fichier `exportDataMATLAB.m` dans le dossier de votre projet Simulink.
 2. Le configurer comme callback `StopFcn` de la simulation.
 3. Ajouter des blocs `To Workspace` sur les signaux que vous voulez analyser dans l’application.
+
+## Autres démarrages
+
+### Lancer le backend
+
+1. Aller dans `backend/`.
+2. Activer `.venv`, depuis `telemetryDisplay`: `source .venv/Scripts/activate`.
+3. Lancer l’API: `uvicorn app.main:app --reload --port 8001`
+
+L’API est disponible sur `http://localhost:8001`.
+
+### Lancer le frontend
+
+1. Aller dans `frontend/`.
+2. Lancer l’interface: `npm run dev`
+
+L’application est disponible sur `http://localhost:5173` et s’attend à trouver l’API sur `http://localhost:8001`.
+
+### Démarrage simultané du frontend et du backend
+
+1. Aller dans `telemetryDisplay`.
+2. Lancer l'application au complet avec la commande: `npm run dev`
+
+Vous verrez alors se lancer une fenêtre Node où les informations du frontend seront en cyan et celles du backend en vert.
