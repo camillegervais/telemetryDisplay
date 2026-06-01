@@ -137,7 +137,7 @@ Fonctions utiles de l’interface:
 - Les blocs de soft sont conservés au rechargement de la page.
 - Le mode `Graph Only` masque les panneaux latéraux pour se concentrer sur les graphes.
 - Le panneau Graphe Perso sert à modifier widgets, tailles et positions.
-- L’aide des raccourcis clavier est accessible depuis le bouton `SHORTCUT` en haut à droite.
+
 - L'onglet `Trajectoire` permet de visualiser la trajectoire de la voiture dans le plan quand les signaux `xCar`, `yCar`, `xTrack` et `yTrack` sont présents.
 - L'onglet `Tuning Cartos` permet de créer des LUT qui prennent en entrées des canaux existants et qui pourront être utilisé dans des blocs de soft.
 - L'onglet `Soft` permet de gérer les différents blocs de soft dans l'application.

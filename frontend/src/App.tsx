@@ -123,7 +123,6 @@ export default function App() {
   const [inspectorSnapshot, setInspectorSnapshot] = useState<InspectorSnapshot | null>(null);
   const [inspectorSelectedWidgetId, setInspectorSelectedWidgetId] = useState<number | null>(null);
   const [inspectorCommand, setInspectorCommand] = useState<InspectorCommand | null>(null);
-  const [shortcutsModalOpen, setShortcutsModalOpen] = useState(false);
 
   const { setXRange, setCursorDistance, triggerHomeReset } = useTelemetryStore();
 
@@ -329,55 +328,6 @@ export default function App() {
     });
     return () => unsubscribe();
   }, [activeSlot]);
-
-  useEffect(() => {
-    function onGlobalKeyDown(event: Event): void {
-      const kbEvent = event as KeyboardEvent;
-      if (isEditableElement(kbEvent.target)) {
-        return;
-      }
-
-      if (shortcutsModalOpen) {
-        if (kbEvent.code === "Escape") {
-          kbEvent.preventDefault();
-          setShortcutsModalOpen(false);
-        }
-        return;
-      }
-
-      if (kbEvent.ctrlKey || kbEvent.metaKey || kbEvent.altKey) {
-        return;
-      }
-
-      if (kbEvent.code === "KeyH") {
-        kbEvent.preventDefault();
-        resetAllGraphsToHome();
-        return;
-      }
-
-      if (kbEvent.code === "KeyG") {
-        kbEvent.preventDefault();
-        setGraphOnlyMode((prev) => !prev);
-        return;
-      }
-
-      if (kbEvent.code === "KeyI") {
-        kbEvent.preventDefault();
-        setPanelMode((prev) => (prev === "data" ? "inspector" : "data"));
-        return;
-      }
-
-      if (kbEvent.code === "KeyP") {
-        kbEvent.preventDefault();
-        setPanelSide((prev) => (prev === "left" ? "right" : "left"));
-      }
-    }
-
-    window.addEventListener("keydown", onGlobalKeyDown);
-    return () => {
-      window.removeEventListener("keydown", onGlobalKeyDown);
-    };
-  }, [shortcutsModalOpen]);
 
   async function handleImport(file: File) {
     setImporting(true);
@@ -854,38 +804,7 @@ export default function App() {
     </section>
   );
 
-  const shortcutGroups: Array<{ title: string; items: Array<{ keys: string; action: string }> }> = [
-    {
-      title: "Global",
-      items: [
-        { keys: "H", action: "Reset Home (zoom/axes)" },
-        { keys: "G", action: "Switch mode Graphes/UI" },
-        { keys: "I", action: "Switch Data Hub/Graphe Perso" },
-        { keys: "P", action: "Switch pannel left/right" },
-      ],
-    },
-    {
-      title: "Dashboard",
-      items: [
-        { keys: "A", action: "Add a graph" },
-        { keys: "X", action: "Add a graph XY" },
-        { keys: "T", action: "Add a tab" },
-        { keys: "Ctrl+S", action: "Save configuration" },
-        { keys: "Ctrl+O", action: "Load the selected configuration" },
-      ],
-    },
-    {
-      title: "Widget",
-      items: [
-        { keys: "Delete", action: "Deleted the selected widget" },
-        { keys: "Enter", action: "Open/close menu widget" },
-        { keys: "F", action: "Full size/minimize widget" },
-        { keys: "Arrows", action: "Move the selected widget" },
-        { keys: "Shift+Arrows", action: "Resize the selected widget" },
-        { keys: "Esc", action: "Close menus/expand/deselection" },
-      ],
-    },
-  ];
+
 
   return (
     <div className={`app-shell ${graphOnlyMode ? "graph-only-mode" : ""}`}>
@@ -907,13 +826,13 @@ export default function App() {
           <ConfigExportImport
                   onImportSuccess={refreshDatasetMetadata}
                 />
-          <button className="small-button topbar-icon-button" onClick={resetAllGraphsToHome} title="Home (H)" aria-label="Home">
+          <button className="small-button topbar-icon-button" onClick={resetAllGraphsToHome} title="Home" aria-label="Home">
             <span aria-hidden="true">HOME</span>
           </button>
           <button
             className="small-button topbar-icon-button"
             onClick={() => setPanelSide((prev) => (prev === "left" ? "right" : "left"))}
-            title={`Changer cote panneau (P) - ${panelSide === "left" ? "Gauche" : "Droite"}`}
+            title={`Changer cote panneau - ${panelSide === "left" ? "Gauche" : "Droite"}`}
             aria-label="Changer cote panneau"
           >
             <span aria-hidden="true">SWITCH</span>
@@ -921,7 +840,7 @@ export default function App() {
           <button
             className="small-button topbar-icon-button"
             onClick={() => setGraphOnlyMode((prev) => !prev)}
-            title={graphOnlyMode ? "Mode UI (G)" : "Mode Graphes (G)"}
+            title={graphOnlyMode ? "Mode UI" : "Mode Graphes"}
             aria-label="Basculer mode Graphes"
           >
             <span aria-hidden="true">GRAPH</span>
@@ -929,19 +848,12 @@ export default function App() {
           <button
             className="small-button topbar-icon-button"
             onClick={() => setPanelMode((prev) => (prev === "data" ? "inspector" : "data"))}
-            title={panelMode === "data" ? "Ouvrir Graphe Perso (I)" : "Ouvrir Data Hub (I)"}
+            title={panelMode === "data" ? "Ouvrir Graphe Perso" : "Ouvrir Data Hub"}
             aria-label="Basculer Data Hub Graphe Perso"
           >
             <span aria-hidden="true">PANEL MODE</span>
           </button>
-          <button
-            className="small-button topbar-icon-button"
-            onClick={() => setShortcutsModalOpen(true)}
-            title="Aide raccourcis clavier"
-            aria-label="Aide raccourcis clavier"
-          >
-            <span aria-hidden="true">SHORTCUT</span>
-          </button>
+
           <div className="status-box">
             <span>Backend</span>
             <strong>{loadingAppInfo ? "Connecting" : error ? "Error" : "Ready"}</strong>
@@ -960,45 +872,7 @@ export default function App() {
         </div>
       ) : null}
 
-      {shortcutsModalOpen ? (
-        <div className="shortcuts-modal-overlay" onClick={() => setShortcutsModalOpen(false)}>
-          <section
-            className="shortcuts-modal"
-            role="dialog"
-            aria-modal="true"
-            aria-label="Help Shortcut"
-            onClick={(event) => event.stopPropagation()}
-          >
-            <div className="shortcuts-modal-header">
-              <h2>Keyboard shortcuts</h2>
-              <button
-                className="icon-button"
-                onClick={() => setShortcutsModalOpen(false)}
-                aria-label="Close"
-                title="Close"
-              >
-                ×
-              </button>
-            </div>
-            <div className="shortcuts-modal-body">
-              {shortcutGroups.map((group) => (
-                <section className="shortcuts-group" key={group.title}>
-                  <h3>{group.title}</h3>
-                  <ul className="shortcuts-list">
-                    {group.items.map((item) => (
-                      <li key={`${group.title}-${item.keys}`}>
-                        <kbd>{item.keys}</kbd>
-                        <span>{item.action}</span>
-                      </li>
-                    ))}
-                  </ul>
-                </section>
-              ))}
-            </div>
-            <p className="shortcuts-modal-footnote">Shortcuts are ignored when you type in an input.</p>
-          </section>
-        </div>
-      ) : null}
+
 
       <main className={`dashboard-grid ${panelSide === "right" ? "dashboard-grid-panel-right" : ""}`}>
         {!graphOnlyMode && panelSide === "left" ? (

@@ -196,8 +196,8 @@ Create interpolation maps for calibration tuning.
 1. Select **Input X** (columns) and **Input Y** (rows) channels
 2. Select the interpolation method and extrapolation method in case we hit breakpoints out of bounds.
 3. Define grid dimensions (5×5, 10×10, etc.)
-4. Enter header values (breakpoints for each axis, Ctrl+V from Excel is possible)
-5. Edit or paste table values (Ctrl+V from Excel is possible)
+4. Enter header values (breakpoints for each axis)
+5. Edit or paste table values
 6. Apply **Gain** and **Offset** scaling if needed
 7. Click **"💾 Save** to save locally
 
@@ -257,23 +257,6 @@ Useful for sharing analysis setups or archiving configurations.
 - All changes sync automatically across open browser tabs
 - Configurations persist in localStorage
 - Close and reopen the app to restore your last session
-
-## Keyboard Shortcuts
-
-| Key | Function |
-|-----|----------|
-| `H` | Home |
-| `G` | Graph-only mode (fullscreen) |
-| `I` | Toggle Inspector |
-| `P` | Swap panel (left/right) |
-| `A` | Add time-series graph |
-| `X` | Add XY graph |
-| `T` | New tab |
-| `Ctrl+S` | Export configuration |
-| `Ctrl+O` | Import configuration |
-| `Del` | Delete selected graph |
-
-While the application is in development, not all the keyboard shortcut are available.
 
 
 ## Tips & Best Practices

@@ -768,7 +768,6 @@ export default function MapTuning({
             <div className="map-tuning-legend-color" style={{ background: "rgba(239, 68, 68, 0.5)" }}></div>
             <span>Max</span>
           </div>
-          <span style={{ marginLeft: "auto", fontStyle: "italic", fontSize: "0.7rem" }}>Tip: Ctrl+V to paste data from Excel on a cell or an entry.</span>
         </div>
 
         {/* 3D Viewer Panel */}
