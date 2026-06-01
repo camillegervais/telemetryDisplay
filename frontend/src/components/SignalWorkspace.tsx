@@ -1909,9 +1909,13 @@ export default function SignalWorkspace({
       const selectedSignals = getWidgetQuerySignals(widget).filter(
         (signal) => datasetSignalSet.has(signal) || softMathOpByName[signal] !== undefined
       );
-      const querySignals = expandSignalsForQuery(selectedSignals).filter((signal) =>
+      let querySignals = expandSignalsForQuery(selectedSignals).filter((signal) =>
         datasetSignalSet.has(signal)
       );
+      // Add MBrakeR if braking filter is enabled
+      if (widget.options?.filterByBraking && datasetSignalSet.has(BRAKING_NAME_SIGNAL)) {
+        querySignals = Array.from(new Set([...querySignals, BRAKING_NAME_SIGNAL]));
+      }
       return querySignals.length > 0;
     });
     if (activeWidgets.length === 0) {
@@ -1928,9 +1932,13 @@ export default function SignalWorkspace({
       const selectedSignals = getWidgetQuerySignals(widget).filter(
         (signal) => datasetSignalSet.has(signal) || softMathOpByName[signal] !== undefined
       );
-      const querySignals = expandSignalsForQuery(selectedSignals).filter((signal) =>
+      let querySignals = expandSignalsForQuery(selectedSignals).filter((signal) =>
         datasetSignalSet.has(signal)
       );
+      // Add MBrakeR if braking filter is enabled
+      if (widget.options?.filterByBraking && datasetSignalSet.has(BRAKING_NAME_SIGNAL)) {
+        querySignals = Array.from(new Set([...querySignals, BRAKING_NAME_SIGNAL]));
+      }
 
       if (querySignals.length === 0) {
         setSeriesById((prev) => ({ ...prev, [widget.id]: null }));
