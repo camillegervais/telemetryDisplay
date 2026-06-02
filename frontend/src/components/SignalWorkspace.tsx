@@ -7,6 +7,7 @@ import { evaluateMathChannel } from "../mathChannels";
 import { useTelemetryStore } from "../store/telemetryStore";
 import { ConfigManager } from "../store/ConfigManager";
 import type { DatasetMetadata, DistanceRange, SignalSeries, TrackMapResponse, MapTuningData, SoftBlock, SoftLutOp, SoftMathOp } from "../types";
+import type { InspectorSnapshot, InspectorWidgetSummary } from "../types/ConfigTypes";
 import MapTuning from "./MapTuning";
 import SoftTab, { type BlockStatus } from "./SoftTab";
 
@@ -20,31 +21,6 @@ type SignalWorkspaceProps = {
   onInspectorSnapshotChange?: (snapshot: InspectorSnapshot) => void;
   inspectorCommand?: InspectorCommand | null;
   onRefreshDatasetMetadata?: () => Promise<void>;
-};
-
-export type InspectorWidgetSummary = {
-  id: number;
-  title: string;
-  kind: "timeseries" | "xy";
-  signalsCount: number;
-  xSignal: string | null;
-  row: number;
-  col: number;
-  widthSpan: number;
-  heightSpan: number;
-  alignZero: boolean;
-  alignMode: "off" | "origin-scale" | "origin-only";
-  menuOpen: boolean;
-  options?: WidgetOptions;
-};
-
-export type InspectorSnapshot = {
-  activeTabId: string;
-  activeTabName: string;
-  gridCols: number;
-  gridRows: number;
-  widgets: InspectorWidgetSummary[];
-  selectedWidgetId: number | null;
 };
 
 export type InspectorCommand = {
@@ -62,6 +38,9 @@ export type InspectorCommand = {
   yAxisMin?: number;
   yAxisMax?: number;
 };
+
+// Re-export inspector types for backward compatibility
+export type { InspectorSnapshot, InspectorWidgetSummary } from "../types/ConfigTypes";
 
 type YAxisMatchMode = "origin-scale" | "origin-only";
 
@@ -1879,13 +1858,19 @@ export default function SignalWorkspace({
     );
   }, [datasetMetadata, availableSignals, widgets.length]);
 
-  // Create a stable dependency key based only on widget signals, not on UI state like menuOpen
+  // Create a stable dependency key based on widget signals and filter options
+  // (but not UI state like menuOpen)
   const widgetSignalsKey = useMemo(() => {
     return JSON.stringify(
       widgets.map((w) => ({
         id: w.id,
         signals: w.signals,
         xSignal: w.xSignal,
+        options: {
+          hidePositive: w.options?.hidePositive,
+          hideNegative: w.options?.hideNegative,
+          filterByBraking: w.options?.filterByBraking,
+        },
       }))
     );
   }, [widgets]);

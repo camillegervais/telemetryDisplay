@@ -329,6 +329,48 @@ export default function App() {
     return () => unsubscribe();
   }, [activeSlot]);
 
+  // Sync inspector snapshot to ConfigManager
+  useEffect(() => {
+    if (inspectorSnapshot) {
+      ConfigManager.set("inspector-snapshot", inspectorSnapshot);
+    }
+  }, [inspectorSnapshot]);
+
+  // Sync inspector selected widget ID to ConfigManager
+  useEffect(() => {
+    if (inspectorSelectedWidgetId !== null) {
+      ConfigManager.set("inspector-selected-widget-id", inspectorSelectedWidgetId);
+    }
+  }, [inspectorSelectedWidgetId]);
+
+  // Cross-tab: listen for inspector snapshot changes
+  useEffect(() => {
+    const unsubscribe = ConfigManager.subscribeDebouncedFull<InspectorSnapshot | null>(
+      "inspector-snapshot",
+      (newSnapshot) => {
+        if (newSnapshot && JSON.stringify(newSnapshot) !== JSON.stringify(inspectorSnapshot)) {
+          setInspectorSnapshot(newSnapshot);
+        }
+      },
+      150
+    );
+    return () => unsubscribe();
+  }, [inspectorSnapshot]);
+
+  // Cross-tab: listen for inspector selected widget ID changes
+  useEffect(() => {
+    const unsubscribe = ConfigManager.subscribeDebouncedFull<number | null>(
+      "inspector-selected-widget-id",
+      (newWidgetId) => {
+        if (newWidgetId !== inspectorSelectedWidgetId) {
+          setInspectorSelectedWidgetId(newWidgetId);
+        }
+      },
+      150
+    );
+    return () => unsubscribe();
+  }, [inspectorSelectedWidgetId]);
+
   async function handleImport(file: File) {
     setImporting(true);
     setError(null);

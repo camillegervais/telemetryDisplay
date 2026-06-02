@@ -100,6 +100,37 @@ export type UserPreferences = {
 };
 
 /**
+ * Widget summary for inspector display
+ */
+export type InspectorWidgetSummary = {
+  id: number;
+  title: string;
+  kind: "timeseries" | "xy";
+  signalsCount: number;
+  xSignal: string | null;
+  row: number;
+  col: number;
+  widthSpan: number;
+  heightSpan: number;
+  alignZero: boolean;
+  alignMode: "off" | "origin-scale" | "origin-only";
+  menuOpen: boolean;
+  options?: WidgetOptions;
+};
+
+/**
+ * Inspector snapshot - state of the widget inspector panel
+ */
+export type InspectorSnapshot = {
+  activeTabId: string;
+  activeTabName: string;
+  gridCols: number;
+  gridRows: number;
+  widgets: InspectorWidgetSummary[];
+  selectedWidgetId: number | null;
+};
+
+/**
  * Named channel selection config for TelData COM imports.
  * Several configs can be saved and reused across sessions.
  */
@@ -141,6 +172,10 @@ export type ConfigStorage = {
   "signal-colors": Record<string, string>;
   /** Named channel configs for TelData COM imports */
   "teldata-configs": TelDataImportConfig[];
+  /** Inspector panel snapshot (widget state for cross-tab sync) */
+  "inspector-snapshot": InspectorSnapshot | null;
+  /** Currently selected widget ID in inspector panel */
+  "inspector-selected-widget-id": number | null;
 };
 
 /**
@@ -165,6 +200,8 @@ export const CONFIG_DEFAULTS: ConfigStorage = {
   "soft-blocks": [],
   "signal-colors": {},
   "teldata-configs": [],
+  "inspector-snapshot": null,
+  "inspector-selected-widget-id": null,
 };
 
 /**

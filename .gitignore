@@ -6,3 +6,4 @@ import_cache
 *.mat
 .vscode
 *.db
+log.txt
