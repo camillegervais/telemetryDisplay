@@ -29,6 +29,13 @@ from app.schemas import (
 )
 from app.services.mat_loader import MatLoader, MatValidationError
 from app.services.lut_2D import LUT2D
+from app.services.signal_filters import (
+    derivative,
+    ratelimit,
+    integral,
+    lowpass_butterworth,
+    highpass_butterworth,
+)
 
 router = APIRouter(prefix="/api/datasets", tags=["datasets"])
 
@@ -459,6 +466,7 @@ async def calculate_map_output(payload: MapTuningRequest):
 
 # Allowed math functions for expression evaluation (numpy-backed, no builtins)
 _MATH_NAMESPACE = {
+    # Basic math functions
     "abs": np.abs,
     "sign": np.sign,
     "min": np.minimum,   # element-wise 2-arg
@@ -478,6 +486,17 @@ _MATH_NAMESPACE = {
     "norm2":  lambda a, b: np.sqrt(a**2 + b**2),
     "and_":   lambda a, b: np.where((a != 0) & (b != 0), 1.0, 0.0),
     "or_":    lambda a, b: np.where((a != 0) | (b != 0), 1.0, 0.0),
+    
+    # Filtering functions (signal processing)
+    "deriv": derivative,                                          # deriv(signal) or deriv(signal, dt)
+    "derivative": derivative,                                     # alias
+    "ratelimit": ratelimit,                                       # ratelimit(signal, max_rate)
+    "integral": integral,                                         # integral(signal) or integral(signal, dt)
+    "lowpass": lowpass_butterworth,                               # lowpass(signal) or lowpass(signal, order, freq)
+    "lowpass_butterworth": lowpass_butterworth,                   # explicit name
+    "highpass": highpass_butterworth,                             # highpass(signal) or highpass(signal, order, freq)
+    "highpass_butterworth": highpass_butterworth,                 # explicit name
+    
     "__builtins__": {},  # block all Python builtins
 }
 

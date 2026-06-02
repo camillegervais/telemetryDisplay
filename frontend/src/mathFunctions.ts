@@ -27,6 +27,17 @@ export const FUNCTIONS = {
   or_: { arity: 2 as const, description: "OU logique: or_(a, b) — 1 si au moins un non-zéro" },
   xor_: { arity: 2 as const, description: "OU exclusif: xor_(a, b) — 1 si exactement un non-zéro" },
   not_: { arity: 1 as const, description: "NON logique: not_(a) — 1 si zéro, 0 sinon" },
+
+  // Filtering functions (signal processing) - these are backend-only
+  // Frontend stores min arity for parsing; actual implementation varies on backend
+  deriv: { arity: 1 as const, description: "Dérivée du signal: deriv(signal) ou deriv(signal, dt)" },
+  derivative: { arity: 1 as const, description: "Alias pour deriv: derivative(signal) ou derivative(signal, dt)" },
+  ratelimit: { arity: 2 as const, description: "Limite le taux de changement: ratelimit(signal, max_rate)" },
+  integral: { arity: 1 as const, description: "Intégrale cumulative: integral(signal) ou integral(signal, dt)" },
+  lowpass: { arity: 1 as const, description: "Filtre passe-bas Butterworth: lowpass(signal) ou lowpass(signal, order, normalized_freq)" },
+  lowpass_butterworth: { arity: 1 as const, description: "Filtre passe-bas Butterworth: lowpass_butterworth(signal, order, normalized_freq)" },
+  highpass: { arity: 1 as const, description: "Filtre passe-haut Butterworth: highpass(signal) ou highpass(signal, order, normalized_freq)" },
+  highpass_butterworth: { arity: 1 as const, description: "Filtre passe-haut Butterworth: highpass_butterworth(signal, order, normalized_freq)" },
 } as const;
 
 export type FunctionName = keyof typeof FUNCTIONS;
@@ -156,35 +167,42 @@ export function getOperatorDocumentation(): Array<{ symbol: string; description:
 
 export const USAGE_GUIDE = `
 Fonctions disponibles:
+
+ARITHMÉTIQUE & LOGIQUE:
 - gain(signal, factor): Multiplie signal par factor
 - sqrt(signal): Racine carrée
 - abs(signal): Valeur absolue
 - min(a, b) / max(a, b): Min/Max de deux signaux
 - sign(signal): Retourne 1 (positif), -1 (négatif), 0 (zéro)
-- norm2(a, b): Retourne la norme euclidienne du vecteur constitué des deux signaux
-- sat(signla, max, min): Retourne le signal saturé par les deux bornes indiquées
-- satdyn(signal, max, min):  Retourne le signal saturé par les deux bornes indiquées
+- norm2(a, b): Norme euclidienne du vecteur (a, b)
+- sat(signal, max, min): Saturation avec bornes fixes
+- satdyn(signal, max, min): Saturation avec bornes dynamiques
+
+FILTRAGE DE SIGNAUX (Exécution backend):
+- deriv(signal) ou deriv(signal, dt): Dérivée (taux de changement)
+- integral(signal) ou integral(signal, dt): Intégrale cumulative
+- ratelimit(signal, max_rate): Limite le taux de changement
+- lowpass(signal) ou lowpass(signal, order, freq): Filtre passe-bas
+  * Paramètres: order=2 (défaut), freq=0.5 (normalisé, 0-1)
+- highpass(signal) ou highpass(signal, order, freq): Filtre passe-haut
+  * Paramètres: order=2 (défaut), freq=0.1 (normalisé, 0-1)
 
 Opérateurs:
 - Arithmétiques: + - * /
 - Comparaisons: > < >= <= == !=
-  Résultat: 1 (vrai) ou 0 (faux)
+- Logiques: and_(a, b), or_(a, b), xor_(a, b), not_(a)
+- Conditionnel: where(cond, a, b)
 
-Logique (0=faux, non-zéro=vrai):
-- and(a, b): ET logique
-- or(a, b): OU logique
-- xor(a, b): OU exclusif
-- not(a): NON logique
+EXEMPLES AVEC FILTRES:
+- deriv(speed): Taux d'accélération
+- integral(accel, 0.01): Vitesse intégrée (dt=10ms)
+- ratelimit(throttle, 0.05): Lisse les ordres de commande
+- lowpass(sensor, 2, 0.1): Supprime le bruit haute fréquence
+- highpass(raw, 2, 0.05): Supprime la dérive basse fréquence
 
-Conditionnel:
-- where(cond, a, b): Retourne a si cond != 0, sinon b
-  Exemples: where(speed > 100, torque_high, torque_low)
-            where(and(engine_on, not(fault)), nominal, 0)
+COMBINAISON:
+- Commande lissée: ratelimit(lowpass(throttle, 2, 0.2), 0.1)
+- Signal nettoyé: lowpass(highpass(sensor, 2, 0.05), 2, 0.1)
 
-Exemples:
-- speed_filtered: gain(speed, 0.95)
-- braking: sign(accel) * -1
-- is_high_speed: speed > 100
-- is_active: and(engine_on, not(is_fault))
-- condition: xor(left_on, right_on)
+Note: Les filtres s'exécutent sur l'ensemble du signal côté serveur.
 `;

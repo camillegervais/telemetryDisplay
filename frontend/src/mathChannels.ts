@@ -24,6 +24,18 @@ type RpnToken =
   | { type: "operator"; value: OperatorName }
   | { type: "function"; name: FunctionName; arity: 1 | 2 | 3 };
 
+// Functions that require full sequence access and can only run on backend
+const BACKEND_ONLY_FUNCTIONS = new Set([
+  "deriv",
+  "derivative",
+  "integral",
+  "lowpass",
+  "lowpass_butterworth",
+  "highpass",
+  "highpass_butterworth",
+  "ratelimit",
+]);
+
 function getSupportedFunctions(): Record<string, 1 | 2 | 3> {
   const result: Record<string, 1 | 2 | 3> = {};
   Object.entries(FUNCTIONS).forEach(([name, def]) => {
@@ -339,6 +351,21 @@ export function analyzeMathExpression(
 export function evaluateMathChannel(channel: MathChannel, signalValues: Record<string, number[]>): number[] {
   const tokens = tokenize(channel.expression);
   const { rpn } = toRpn(tokens);
+
+  // Check if expression contains backend-only functions
+  const backendOnlyFound = rpn.filter(
+    (t) => t.type === "function" && BACKEND_ONLY_FUNCTIONS.has(t.name)
+  );
+  
+  if (backendOnlyFound.length > 0) {
+    const funcNames = backendOnlyFound
+      .filter((t) => t.type === "function")
+      .map((t) => (t as any).name);
+    throw new Error(
+      `Les fonctions de filtrage (${funcNames.join(", ")}) doivent être calculées côté serveur. ` +
+      `Utilisez l'API /compute-math pour créer ce channel.`
+    );
+  }
 
   const lengths = channel.dependencies
     .map((dep) => signalValues[dep]?.length ?? 0)
