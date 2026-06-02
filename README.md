@@ -64,7 +64,6 @@ python -m pip install -r requirements.txt
 
 Dans le cas où votre installation de Node est fonctionnelle, vous pouvez:
 
-
 Ouvrez un git bash dans `telemetryDisplay` et tapez les commandes suivantes:
 
 ```bash
@@ -74,6 +73,19 @@ npm install
 cd ..
 ```
 
+### Lancer l'application en background
+
+Il est possible de lancer l'application en background, une fois l'application lancée aucune fenêtre ne sera visible et il suffit de taper `localhost:5173` pour accéder à l'application.
+
+Pour cela il faut lancer les commandes suivantes, depuis un terminal **Git Bash** dans le dossier `telemetryDisplay` et avec **les droits administrateurs**:
+
+```bash
+npm install pm2@latest -g
+pm2 start 'Telemetry Display.sh' --name telemetryDisplay --log log.txt
+pm2 save
+```
+
+Vous pouvez alors fermer le terminal et accéder à l'application.
 
 ### **/!\\** Remarque installation Python
 
@@ -82,6 +94,10 @@ L'installation de Python 3.14.5 faite pour cette application peut interférer av
 ## Démarrage
 
 Pour une utilisation quotidienne, préférez le **démarrage complet depuis la racine**.
+
+### Démarrage de l'application en background
+
+Pour lancer l'application en background (pas de fenêtres supplémentaires) vous pouvez lancer un terminal **Git Bash** avec **les droits administrateurs** et tapez la commande `pm2 resurrect`. This must be done when the PC reboot, once it is done the app is working as long as the PC is not completely shutdown.
 
 ### Démarrage complet depuis la racine
 
