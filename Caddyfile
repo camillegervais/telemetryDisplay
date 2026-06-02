@@ -1,0 +1,7 @@
+mapreplay.app {
+    # Redirige toutes les requêtes commençant par /api vers le Back
+    reverse_proxy /api/* node-app:8001
+
+    # Redirige le reste du trafic vers le Front
+    reverse_proxy node-app:5173
+}

@@ -1,0 +1,26 @@
+services:
+  # L'application globale (Node.js + Python + Frontend)
+  node-app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    environment:
+      - NODE_ENV=development
+    volumes:
+      - .:/app
+      - /app/node_modules
+      - /app/frontend/node_modules
+      # Conserve le venv Python interne de Docker pour éviter qu'il soit écrasé par ton PC
+      - /opt/venv
+
+  # Le Proxy pour l'URL propre en http://mon-site.localhost
+  gateway:
+    image: caddy:latest
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile
+    depends_on:
+      - node-app

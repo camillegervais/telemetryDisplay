@@ -1,5 +1,9 @@
-import win32com.client
-import pythoncom
+"""Sample TelData script — STUB VERSION (pywin32 removed).
+
+This is a stub implementation that demonstrates the API without requiring
+pywin32 or TelDataX4. It generates dummy data instead.
+"""
+
 import numpy as np
 from scipy.io import savemat
 from scipy.interpolate import interp1d
@@ -8,48 +12,33 @@ import os
 
 
 # ---------------------------------------------------------------------------
-# Archive opening
+# Archive opening (STUB)
 # ---------------------------------------------------------------------------
 
 def open_archive(archivePath):
-    mainOBJ = win32com.client.Dispatch('TelDataX4.TelRun3')
-    result = mainOBJ.Open2(archivePath, 0)
-    if result != 0:
-        print(f'Cannot open archive (error {result}): {archivePath}')
-        return None
-    return mainOBJ
+    """Stub: Return a dummy archive object."""
+    print(f"Stub: Opening archive: {archivePath}")
+    return {"path": archivePath, "status": "dummy"}
 
 
 # ---------------------------------------------------------------------------
-# Run helpers
+# Run helpers (STUB)
 # ---------------------------------------------------------------------------
 
 def _get_run_label(run):
-    """Return a human-readable label for a run using its local properties."""
-    localProp = 1
-    propCount = run.GetPropertyCount(localProp)
-    for p in range(propCount):
-        name = run.GetPropertyName(p)
-        if re.search(r'name|description|label|title', name, re.IGNORECASE):
-            val = run.GetPropertyData(p)
-            if val:
-                return str(val)
-    return '(no name)'
+    """Stub: Return a dummy run label."""
+    return "(stub run)"
 
 
 def _collect_runs(run, flat_list, level=0):
-    """Recursively collect all child runs into flat_list as (idx, label, obj)."""
-    runCount = run.GetRunCount()
-    for r in range(runCount):
-        child = run.GetRun(r)
-        child = win32com.client.Dispatch(child.QueryInterface(pythoncom.IID_IDispatch))
-        label = _get_run_label(child)
-        idx = len(flat_list)
-        flat_list.append((idx, label, child, level))
-        _collect_runs(child, flat_list, level + 1)
+    """Stub: Collect dummy runs."""
+    if level == 0:
+        flat_list.append((0, "Run 1 (stub)", run, level))
+        flat_list.append((1, "Run 2 (stub)", run, level))
 
 
 def select_run(mainOBJ):
+    """Stub: Select a dummy run."""
     flat_list = []
     _collect_runs(mainOBJ, flat_list)
 
@@ -57,7 +46,7 @@ def select_run(mainOBJ):
         print('No child runs found in this archive.')
         return None
 
-    print('\n=== Available Runs ===')
+    print('\n=== Available Runs (STUB DATA) ===')
     for idx, label, _obj, level in flat_list:
         indent = '  ' * level
         print(f'  [{idx:>3}] {indent}{label}')
@@ -74,67 +63,63 @@ def select_run(mainOBJ):
 
 
 # ---------------------------------------------------------------------------
-# Lap helpers
+# Lap helpers (STUB)
 # ---------------------------------------------------------------------------
 
 def _get_lap_label(lap):
-    localProp = 1
-    parts = []
-    propCount = lap.GetPropertyCount(localProp)
-    for p in range(propCount):
-        pname = lap.GetPropertyName(p)
-        if re.search(r'name|lap|time|number', pname, re.IGNORECASE):
-            parts.append(f'{pname}={lap.GetPropertyData(p)}')
-    return '  '.join(parts) if parts else '(no info)'
+    """Stub: Return a dummy lap label."""
+    return "Lap (stub)"
 
 
 def select_lap(run):
-    lapCount = run.GetLapCount()
+    """Stub: Select a dummy lap."""
+    lapCount = 3  # Return 3 dummy laps
     if lapCount == 0:
         print('No laps found in this run.')
         return None
 
-    print('\n=== Available Laps ===')
+    print('\n=== Available Laps (STUB DATA) ===')
     for l in range(lapCount):
-        lap = run.GetLap(l)
-        lap = win32com.client.Dispatch(lap.QueryInterface(pythoncom.IID_IDispatch))
-        print(f'  [{l:>3}] {_get_lap_label(lap)}')
+        print(f'  [{l:>3}] Lap {l} (stub) 00:02:05.123')
 
     while True:
         choice = input(f'\nSelect lap ID [0-{lapCount-1}]: ').strip()
         try:
             i = int(choice)
             if 0 <= i < lapCount:
-                lap = run.GetLap(i)
-                return win32com.client.Dispatch(lap.QueryInterface(pythoncom.IID_IDispatch))
+                return {"lap_id": i}
         except ValueError:
             pass
         print(f'  Please enter a number between 0 and {lapCount-1}.')
 
 
 # ---------------------------------------------------------------------------
-# Channel helpers
+# Channel helpers (STUB)
 # ---------------------------------------------------------------------------
 
 def list_channels(lap):
-    """Return list of (idx, name, sample_rate, sample_count, chan_obj)."""
-    chanCount = lap.GetChanCount()
-    channels = []
-    for c in range(chanCount):
-        chan = lap.GetChan(c)
-        chan = win32com.client.Dispatch(chan.QueryInterface(pythoncom.IID_IDispatch))
-        channels.append((c, chan.Name, int(chan.SampleRate), chan.SampleCount, chan))
-    return channels
+    """Stub: Return list of dummy channels."""
+    dummy_channels = [
+        (0, "Speed", 100, 12000),
+        (1, "Throttle", 100, 12000),
+        (2, "Brake", 100, 12000),
+        (3, "Steering", 100, 12000),
+        (4, "RPM", 100, 12000),
+        (5, "Gear", 100, 12000),
+        (6, "Lap Distance", 100, 12000),
+    ]
+    return dummy_channels
 
 
 def select_channels(lap):
+    """Stub: Select dummy channels."""
     channels = list_channels(lap)
     if not channels:
         print('No channels found in this lap.')
         return []
 
-    print('\n=== Available Channels ===')
-    for idx, name, rate, count, _ in channels:
+    print('\n=== Available Channels (STUB DATA) ===')
+    for idx, name, rate, count in channels:
         print(f'  [{idx:>4}] {name:<40} {rate:>6} Hz   {count:>8} samples')
 
     print('\nEnter channel names to export (comma-separated), or "all" for all channels:')
@@ -162,17 +147,14 @@ def select_channels(lap):
 
 
 # ---------------------------------------------------------------------------
-# Reading & resampling
+# Reading & resampling (STUB)
 # ---------------------------------------------------------------------------
 
 def read_channel(chan_obj, sample_count, sample_rate):
-    """Read raw values and build a time axis (seconds from lap start)."""
-    buffer = win32com.client.VARIANT(
-        pythoncom.VT_ARRAY | pythoncom.VT_R8,
-        [0.0] * sample_count
-    )
-    data = chan_obj.GetValues(0, buffer, sample_count, sample_count)
-    values = np.array(data[0], dtype=np.float64)
+    """Stub: Generate dummy channel data."""
+    # Generate synthetic signal
+    values = 50.0 + 20.0 * np.sin(2 * np.pi * 0.1 * np.arange(sample_count) / sample_rate)
+    values += np.random.normal(0, 2, sample_count)
     t = np.arange(len(values)) / sample_rate
     return t, values
 
@@ -215,10 +197,11 @@ def name_to_matlab_var(name):
 # ---------------------------------------------------------------------------
 
 def export_to_mat(channels, target_freq, output_path):
-    print(f'\nReading {len(channels)} channel(s)...')
+    """Stub: Export dummy channels to .mat file."""
+    print(f'\nReading {len(channels)} channel(s) (stub data)...')
     channel_data = []
-    for idx, name, rate, count, chan_obj in channels:
-        t, values = read_channel(chan_obj, count, rate)
+    for idx, name, rate, count in channels:
+        t, values = read_channel(None, count, rate)
         channel_data.append((name, t, values))
         print(f'  {name}: {count} samples @ {rate} Hz')
 
