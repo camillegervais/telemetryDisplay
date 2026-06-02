@@ -864,7 +864,7 @@ export default function MapTuning({
                         color: "var(--fg-1)",
                         fontWeight: "500",
                         width: "100%",
-                        height: `${50 * Number(stat.usagePercentage.toFixed(1)) / 100 + 2}rem`
+                        height: `${20 * Number(stat.usagePercentage.toFixed(1)) / 100 + 2}rem`
                       }}>
                         {stat.usagePercentage.toFixed(1)}%
                       </div>
@@ -874,7 +874,7 @@ export default function MapTuning({
                         color: "var(--fg-1)",
                         textAlign: "center",
                       }}>
-                        {gridData[is1DByRows ? 0 : stat.cellIndex]?.[is1DByRows ? stat.cellIndex : 0]?.toFixed(2) ?? "-"}
+                        {is1DByRows ? colHeaders[stat.cellIndex] : rowHeaders[stat.cellIndex].toFixed(2)}
                       </div>
                     </div>
                   );
