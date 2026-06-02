@@ -1,7 +1,9 @@
 import React, { useState, useMemo, useEffect, useCallback, useRef } from "react";
 
+import { queryDataset } from "../api";
 import { ConfigManager } from "../store/ConfigManager";
 import { useHoverToLutCell } from "../hooks/useHoverToLutCell";
+import { use1DMapUsageStats } from "../hooks/use1DMapUsageStats";
 import Map3DViewer from "./Map3DViewer";
 
 // ============================================================================
@@ -103,6 +105,10 @@ export default function MapTuning({
   const [rowHeaders, setRowHeaders] = useState<number[]>([20.0, 40.0, 60.0, 80.0, 100.0]);
   const [colHeaders, setColHeaders] = useState<number[]>([1000.0, 2000.0, 3000.0, 4000.0, 5000.0]);
 
+  // State: 1D Map sLap Range Filter
+  const [sLapMin, setSLapMin] = useState<number>(0);
+  const [sLapMax, setSLapMax] = useState<number>(5000);
+
   // Ref: debounce timer for the live auto-save to ConfigManager.
   const autoSaveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -133,6 +139,22 @@ export default function MapTuning({
     colHeaders,
   });
 
+  // Detect if this is a 1D map
+  const is1DMap = numRows === 1 || numCols === 1;
+  const is1DByRows = numRows === 1;
+  const breakpoints1D = is1DByRows ? colHeaders : rowHeaders;
+  const inputChannel1D = is1DByRows ? inputChannelY : inputChannelX;
+
+  // Hook to calculate 1D map usage statistics
+  const usageStats = use1DMapUsageStats({
+    datasetId,
+    inputChannel: inputChannel1D,
+    breakpoints: breakpoints1D,
+    minSLap: sLapMin,
+    maxSLap: sLapMax,
+    enabled: is1DMap,
+  });
+
   // Charger les noms de configs au montage
   useEffect(() => {
     const configs = ConfigManager.get<Record<string, MapTuningData>>("map-configs") ?? {};
@@ -141,6 +163,42 @@ export default function MapTuning({
     const lastConfig = ConfigManager.get<string | null>("current-map-config");
     handleLoadConfig(lastConfig ? lastConfig : "");
   }, []);
+
+  // Load max sLap from dataset for default sLap range
+  useEffect(() => {
+    if (!datasetId) {
+      setSLapMax(5000);
+      return;
+    }
+    
+    let alive = true;
+    
+    (async () => {
+      try {
+        const response = await queryDataset({
+          datasetId,
+          signals: [],
+          startDistance: 0,
+          endDistance: 100000,
+          maxPoints: 1,
+        });
+        
+        if (alive && response.lap_distance && response.lap_distance.length > 0) {
+          const maxDist = Math.max(...response.lap_distance);
+          setSLapMax(maxDist);
+        }
+      } catch (e) {
+        // Fallback to default
+        if (alive) {
+          setSLapMax(5000);
+        }
+      }
+    })();
+    
+    return () => {
+      alive = false;
+    };
+  }, [datasetId]);
 
 
   // Dégradé Vert -> Orange -> Rouge
@@ -719,6 +777,137 @@ export default function MapTuning({
           </tbody>
         </table>
       </section>
+
+      {/* 1D Map Usage Coverage Panel */}
+      {is1DMap && (
+        <section className="map-tuning-section">
+          {usageStats.loading && (
+            <div style={{ padding: "1rem", fontSize: "0.8rem", color: "var(--fg-2)" }}>
+              ⏳ Calculating usage statistics...
+            </div>
+          )}
+
+          {usageStats.error && (
+            <div style={{ 
+              padding: "0.5rem", 
+              fontSize: "0.8rem", 
+              border: "1px solid var(--magenta)", 
+              background: "rgba(255, 43, 79, 0.1)",
+              color: "var(--magenta)",
+              borderRadius: "4px"
+            }}>
+              Error: {usageStats.error}
+            </div>
+          )}
+
+          {usageStats.stats && usageStats.stats.length > 0 && (
+            <>
+              <div style={{
+                display: "flex",
+                flexDirection: is1DByRows ? "row" : "column",
+                gap: "0.5rem",
+                alignItems: is1DByRows ? "flex-end" : "center",
+                justifyContent: "space-between",
+                borderRadius: "4px",
+                marginBottom: "1rem",
+                width: "100%",
+                boxSizing: "border-box"
+              }}>
+                <div  
+                  key='def'
+                  style={{
+                    display: "flex",
+                    flexDirection: "column",
+                    alignItems: "center",
+                    gap: "0.25rem",
+                    flexGrow: '1'
+                  }}></div>
+                {usageStats.stats.map((stat) => {
+                  const maxPercent = Math.max(...usageStats.stats!.map(s => s.usagePercentage));
+                  const normalized = maxPercent > 0 ? stat.usagePercentage / maxPercent : 0;
+                  
+                  // Gradient: green (low) -> orange (mid) -> red (high)
+                  let bgColor: string;
+                  if (normalized < 0.5) {
+                    const t = normalized * 2;
+                    const r = Math.round(34 + (249 - 34) * t);
+                    const g = Math.round(197 + (115 - 197) * t);
+                    const b = Math.round(94 + (22 - 94) * t);
+                    bgColor = `rgb(${r}, ${g}, ${b})`;
+                  } else {
+                    const t = (normalized - 0.5) * 2;
+                    const r = Math.round(249 + (239 - 249) * t);
+                    const g = Math.round(115 + (68 - 115) * t);
+                    const b = Math.round(22 + (68 - 22) * t);
+                    bgColor = `rgb(${r}, ${g}, ${b})`;
+                  }
+                  
+                  return (
+                    <div
+                      key={stat.cellIndex}
+                      style={{
+                        display: "flex",
+                        flexDirection: "column",
+                        alignItems: "center",
+                        gap: "0.25rem",
+                        flex: '1 0 0'
+                      }}
+                    >
+                      <div style={{
+                        padding: "0.5rem",
+                        background: bgColor,
+                        border: "1px solid var(--line)",
+                        borderRadius: "2px",
+                        minWidth: "50px",
+                        textAlign: "center",
+                        fontSize: "0.75rem",
+                        color: "var(--fg-1)",
+                        fontWeight: "500",
+                        width: "100%",
+                        height: `${50 * Number(stat.usagePercentage.toFixed(1)) / 100 + 2}rem`
+                      }}>
+                        {stat.usagePercentage.toFixed(1)}%
+                      </div>
+                      <div style={{
+                        fontSize: "0.7rem",
+                        fontWeight: "bold",
+                        color: "var(--fg-1)",
+                        textAlign: "center",
+                      }}>
+                        {gridData[is1DByRows ? 0 : stat.cellIndex]?.[is1DByRows ? stat.cellIndex : 0]?.toFixed(2) ?? "-"}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </>
+          )}
+
+          {usageStats.stats && usageStats.stats.length === 0 && !usageStats.loading && (
+            <div style={{ padding: "1rem", fontSize: "0.8rem", color: "var(--fg-2)", textAlign: "center" }}>
+              No data in the selected sLap range
+            </div>
+          )}
+          <h3>1D Map Usage Coverage</h3>
+          
+          <div style={{ display: "flex", gap: "1rem", marginBottom: "1rem", alignItems: "center" }}>
+            <div>
+              <label className="field-label">sLap Min (m)</label>
+              <NumberInput 
+                value={sLapMin}
+                onChange={(val) => setSLapMin(Math.max(0, val))}
+              />
+            </div>
+            <div>
+              <label className="field-label">sLap Max (m)</label>
+              <NumberInput 
+                value={sLapMax}
+                onChange={(val) => setSLapMax(Math.max(sLapMin, val))}
+              />
+            </div>
+          </div>
+        </section>
+      )}
 
       {/* Légende et Actions */}
       <footer style={{ marginTop: "auto", display: "flex", flexDirection: "column", gap: "1rem" }}>
