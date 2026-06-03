@@ -496,7 +496,7 @@ const BlockCard: React.FC<{
               <GapBetweenOps index={opIndex} />
             </div>
             )
-          })};
+          })}
 
           {status.state === "error" && status.error && (
             <p className="soft-block-error">{status.error}</p>
