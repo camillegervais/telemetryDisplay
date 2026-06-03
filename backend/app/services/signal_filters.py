@@ -5,6 +5,7 @@ All functions work on numpy arrays and return numpy arrays.
 
 import logging
 import numpy as np
+import scipy.signal as signal
 from scipy.signal import butter, filtfilt
 
 logger = logging.getLogger(__name__)
@@ -112,8 +113,6 @@ def ratelimit_dyn(signal: np.ndarray, tLap: np.ndarray, min_rate: np.ndarray, ma
     logger.debug(f"ratelimit: min_rate={min_rate}, max_rate={max_rate}, output range=[{result.min():.4f}, {result.max():.4f}]")
     return result
 
-
-
 def integral(signal: np.ndarray, tLap: np.ndarray) -> np.ndarray:
     """
     Compute cumulative integral using trapezoidal rule.
@@ -138,120 +137,213 @@ def integral(signal: np.ndarray, tLap: np.ndarray) -> np.ndarray:
     logger.debug(f"integral: dt={np.mean(dt):.4f}, output range=[{result.min():.4f}, {result.max():.4f}]")
     return result
 
+def lowpass_butterworth(signal_in: np.ndarray, *args, order: int = 2) -> np.ndarray:
+    """Low-pass filter with flexible calling conventions.
 
-def lowpass_butterworth(signal: np.ndarray, tLap: np.ndarray, order: int = 2, cutoff_hz: float = 0.5) -> np.ndarray:
+    Calling options supported:
+      - lowpass(signal, cutoff_hz)                         # scalar cutoff in Hz (no tLap provided)
+      - lowpass(signal, order, cutoff_hz)                  # order (int), scalar cutoff (Hz)
+      - lowpass(signal, tLap_array, cutoff_hz)            # tLap provided, cutoff scalar or array
+
+    If `tLap` is provided (array-like matching signal length) the sampling
+    frequency is inferred from median(dt). If only scalar cutoff is provided
+    without `tLap`, the cutoff is interpreted as a normalized frequency in
+    fraction-of-Nyquist (legacy behaviour).
     """
-    Apply Butterworth low-pass filter using filtfilt (zero-phase filtering).
-    
-    Args:
-        signal: Input signal array
-        tLap: Time or distance step array (must be same length as signal, can be non-uniform)
-        order: Filter order (default 2, higher = steeper cutoff)
-        normalized_freq: Normalized cutoff frequency (0 < freq < 1, where 1 = Nyquist)
-                         Default 0.5 means cutoff at Nyquist/2
-    
-    Returns:
-        Filtered signal
-        
-    Raises:
-        ValueError: If signal is too short or parameters invalid
-    """
-    signal = np.asarray(signal, dtype=np.float64)
-    tLap = np.asarray(tLap, dtype=np.float64)
-    if len(signal) != len(tLap):
-        raise ValueError("lowpass_butterworth: signal and tLap must have the same length")
-    
-    # Validate signal length
-    min_length = 2 * order + 1
-    if len(signal) < min_length:
-        logger.warning(
-            f"lowpass_butterworth: signal too short ({len(signal)} samples) "
-            f"for order={order} (min: {min_length}). Skipping filter."
-        )
-        return signal
-    
-    # Estimate sampling frequency from tLap (median dt)
-    if len(tLap) < 2:
-        raise ValueError("lowpass_butterworth: tLap must contain at least two samples to infer sampling rate")
-    dt = np.diff(tLap)
-    median_dt = np.median(dt)
-    if median_dt <= 0:
-        raise ValueError("lowpass_butterworth: non-positive time steps in tLap")
-    fs = 1.0 / median_dt
+    signal_in = np.asarray(signal_in, dtype=np.float64)
 
-    # Convert cutoff in Hz to normalized frequency (0..1 where 1 = Nyquist)
-    normalized_freq = (cutoff_hz) / (fs / 2.0)
-    # Clamp normalized frequency to valid range
-    normalized_freq = float(np.clip(normalized_freq, 0.01, 0.99))
-    
-    # Clamp order to reasonable range
-    order = int(np.clip(order, 1, 8))
-    
-    try:
-        logger.debug(f"lowpass_butterworth: order={order}, cutoff_hz={cutoff_hz:.4f}, fs={fs:.4f}, normalized_freq={normalized_freq:.4f}")
-        b, a = butter(order, normalized_freq, btype='low')
-        result = filtfilt(b, a, signal)
-        logger.debug(f"lowpass_butterworth: applied successfully, output range=[{result.min():.4f}, {result.max():.4f}]")
-        return result
-    except Exception as e:
-        logger.error(f"lowpass_butterworth failed: {e}. Signal length: {len(signal)}, order: {order}, cutoff_hz: {cutoff_hz}")
-        raise ValueError(f"Low-pass filter failed: {str(e)}")
+    # Parse flexible args
+    tLap = None
+    cutoff_hz = None
+    if len(args) == 1:
+        cutoff_hz = args[0]
+    elif len(args) == 2:
+        # Could be (order, cutoff) or (tLap, cutoff)
+        a1, a2 = args
+        a1_arr = np.asarray(a1)
+        if a1_arr.ndim > 0 and a1_arr.size == signal_in.size:
+            tLap = a1_arr
+            cutoff_hz = a2
+        else:
+            # treat as (order, cutoff)
+            order = int(a1)
+            cutoff_hz = a2
+    elif len(args) > 2:
+        raise ValueError("lowpass_butterworth: too many positional arguments")
 
+    # Normalize cutoff into numpy array or scalar
+    if cutoff_hz is None:
+        raise ValueError("lowpass_butterworth: cutoff frequency required")
+    cutoff_arr = np.asarray(cutoff_hz)
 
-def highpass_butterworth(signal: np.ndarray, tLap: np.ndarray, order: int = 2, cutoff_hz: float = 0.1) -> np.ndarray:
-    """
-    Apply Butterworth high-pass filter using filtfilt (zero-phase filtering).
-    
-    Args:
-        signal: Input signal array
-        tLap: Time or distance step array (must be same length as signal, can be non-uniform)
-        order: Filter order (default 2, higher = steeper cutoff)
-        normalized_freq: Normalized cutoff frequency (0 < freq < 1, where 1 = Nyquist)
-                         Default 0.1 means cutoff at Nyquist/10
-    
-    Returns:
-        Filtered signal
-        
-    Raises:
-        ValueError: If signal is too short or parameters invalid
-    """
-    signal = np.asarray(signal, dtype=np.float64)
-    
-    # Validate signal length
-    min_length = 2 * order + 1
-    if len(signal) < min_length:
-        logger.warning(
-            f"highpass_butterworth: signal too short ({len(signal)} samples) "
-            f"for order={order} (min: {min_length}). Skipping filter."
-        )
-        return signal
-    
-    # Estimate sampling frequency from tLap (median dt)
-    if len(tLap) < 2:
-        raise ValueError("highpass_butterworth: tLap must contain at least two samples to infer sampling rate")
-    dt = np.diff(tLap)
-    median_dt = np.median(dt)
-    if median_dt <= 0:
-        raise ValueError("highpass_butterworth: non-positive time steps in tLap")
-    fs = 1.0 / median_dt
+    # If tLap provided, validate and compute sampling frequency
+    fs = None
+    if tLap is not None:
+        tLap = np.asarray(tLap, dtype=np.float64)
+        if len(tLap) != len(signal_in):
+            raise ValueError("lowpass_butterworth: tLap must match signal length")
+        if len(tLap) < 2:
+            raise ValueError("lowpass_butterworth: tLap must contain at least two samples")
+        dt = np.diff(tLap)
+        median_dt = np.median(dt)
+        if median_dt <= 0:
+            raise ValueError("lowpass_butterworth: non-positive time steps in tLap")
+        fs = 1.0 / median_dt
 
-    # Convert cutoff in Hz to normalized frequency (0..1 where 1 = Nyquist)
-    normalized_freq = (cutoff_hz) / (fs / 2.0)
-    # Clamp normalized frequency to valid range
-    normalized_freq = float(np.clip(normalized_freq, 0.01, 0.99))
-    
-    # Clamp order to reasonable range
-    order = int(np.clip(order, 1, 8))
-    
-    # Clamp order to reasonable range
     order = int(np.clip(order, 1, 8))
 
-    try:
-        logger.debug(f"highpass_butterworth: order={order}, cutoff_hz={cutoff_hz:.4f}, fs={fs:.4f}, normalized_freq={normalized_freq:.4f}")
-        b, a = butter(order, normalized_freq, btype='high')
-        result = filtfilt(b, a, signal)
-        logger.debug(f"highpass_butterworth: applied successfully, output range=[{result.min():.4f}, {result.max():.4f}]")
-        return result
-    except Exception as e:
-        logger.error(f"highpass_butterworth failed: {e}. Signal length: {len(signal)}, order: {order}, cutoff_hz: {cutoff_hz}")
-        raise ValueError(f"High-pass filter failed: {str(e)}")
+    # Scalar cutoff path
+    if cutoff_arr.ndim == 0:
+        scalar_cutoff = float(cutoff_arr)
+        # If we have fs, treat cutoff as Hz, else interpret as normalized freq
+        if fs is not None:
+            normalized = float(np.clip(scalar_cutoff / (fs / 2.0), 0.001, 0.999))
+        else:
+            normalized = float(np.clip(scalar_cutoff, 0.001, 0.999))
+
+        min_length = 2 * order + 1
+        if len(signal_in) < min_length:
+            logger.warning(f"lowpass_butterworth: signal too short ({len(signal_in)} samples). Skipping filter.")
+            return signal_in
+
+        try:
+            b, a = signal.butter(order, normalized, btype='low')
+            return signal.filtfilt(b, a, signal_in)
+        except Exception as e:
+            logger.error(f"lowpass_butterworth failed: {e}")
+            raise ValueError(f"Low-pass filter failed: {e}")
+
+    # Array cutoff path: dynamic cutoff over time — requires tLap
+    if cutoff_arr.ndim == 1:
+        if fs is None:
+            raise ValueError("lowpass_butterworth: dynamic (array) cutoff requires tLap to be provided")
+        if cutoff_arr.size != signal_in.size:
+            raise ValueError("lowpass_butterworth: cutoff_hz array must match signal length")
+
+        nperseg = min(256, len(signal_in))
+        noverlap = nperseg // 2
+        try:
+            f, t_stft, Zxx = signal.stft(signal_in, fs=fs, nperseg=nperseg, noverlap=noverlap)
+            cutoff_at_t = np.interp(t_stft, tLap, cutoff_arr)
+
+            for col_idx, current_cutoff in enumerate(cutoff_at_t):
+                idx = np.where(f > current_cutoff)[0]
+                Zxx[idx, col_idx] = 0.0
+
+            _, filtered_signal = signal.istft(Zxx, fs=fs, nperseg=nperseg, noverlap=noverlap)
+            if len(filtered_signal) >= len(signal_in):
+                return filtered_signal[:len(signal_in)]
+            else:
+                return np.pad(filtered_signal, (0, len(signal_in) - len(filtered_signal)), 'edge')
+        except Exception as e:
+            logger.error(f"lowpass_butterworth dynamic failed: {e}")
+            raise ValueError(f"Dynamic low-pass filter failed: {e}")
+
+    raise ValueError("lowpass_butterworth: unsupported cutoff_hz shape")
+
+
+def highpass_butterworth(signal_in: np.ndarray, *args, order: int = 2) -> np.ndarray:
+    """High-pass filter with flexible calling conventions (see lowpass docstring).
+    Supports scalar or array cutoff. If array cutoff is used, a `tLap` array
+    must be provided as the second positional argument.
+    """
+    signal_in = np.asarray(signal_in, dtype=np.float64)
+
+    # Parse flexible args similar to lowpass
+    tLap = None
+    cutoff_hz = None
+    if len(args) == 1:
+        cutoff_hz = args[0]
+    elif len(args) == 2:
+        a1, a2 = args
+        a1_arr = np.asarray(a1)
+        if a1_arr.ndim > 0 and a1_arr.size == signal_in.size:
+            tLap = a1_arr
+            cutoff_hz = a2
+        else:
+            order = int(a1)
+            cutoff_hz = a2
+    elif len(args) > 2:
+        raise ValueError("highpass_butterworth: too many positional arguments")
+
+    if cutoff_hz is None:
+        raise ValueError("highpass_butterworth: cutoff frequency required")
+    cutoff_arr = np.asarray(cutoff_hz)
+
+    fs = None
+    if tLap is not None:
+        tLap = np.asarray(tLap, dtype=np.float64)
+        if len(tLap) != len(signal_in):
+            raise ValueError("highpass_butterworth: tLap must match signal length")
+        if len(tLap) < 2:
+            raise ValueError("highpass_butterworth: tLap must contain at least two samples")
+        dt = np.diff(tLap)
+        median_dt = np.median(dt)
+        if median_dt <= 0:
+            raise ValueError("highpass_butterworth: non-positive time steps in tLap")
+        fs = 1.0 / median_dt
+
+    order = int(np.clip(order, 1, 8))
+
+    # Scalar cutoff
+    if cutoff_arr.ndim == 0:
+        scalar_cutoff = float(cutoff_arr)
+        if fs is not None:
+            normalized = float(np.clip(scalar_cutoff / (fs / 2.0), 0.001, 0.999))
+        else:
+            normalized = float(np.clip(scalar_cutoff, 0.001, 0.999))
+
+        min_length = 2 * order + 1
+        if len(signal_in) < min_length:
+            logger.warning(f"highpass_butterworth: signal too short ({len(signal_in)} samples). Skipping filter.")
+            return signal_in
+
+        try:
+            b, a = signal.butter(order, normalized, btype='high')
+            result = signal.filtfilt(b, a, signal_in)
+            return result
+        except Exception as e:
+            logger.error(f"highpass_butterworth failed: {e}")
+            raise ValueError(f"High-pass filter failed: {e}")
+
+    # Array cutoff
+    if cutoff_arr.ndim == 1:
+        if fs is None:
+            raise ValueError("highpass_butterworth: dynamic (array) cutoff requires tLap to be provided")
+        if cutoff_arr.size != signal_in.size:
+            raise ValueError("highpass_butterworth: cutoff_hz array must match signal length")
+
+        nperseg = min(256, len(signal_in))
+        noverlap = nperseg // 2
+        try:
+            f, t_stft, Zxx = signal.stft(signal_in, fs=fs, nperseg=nperseg, noverlap=noverlap)
+            cutoff_at_t = np.interp(t_stft, tLap, cutoff_arr)
+
+            for col_idx, current_cutoff in enumerate(cutoff_at_t):
+                idx = np.where(f < current_cutoff)[0]
+                Zxx[idx, col_idx] = 0.0
+
+            _, filtered_signal = signal.istft(Zxx, fs=fs, nperseg=nperseg, noverlap=noverlap)
+            if len(filtered_signal) >= len(signal_in):
+                return filtered_signal[:len(signal_in)]
+            else:
+                return np.pad(filtered_signal, (0, len(signal_in) - len(filtered_signal)), 'edge')
+        except Exception as e:
+            logger.error(f"highpass_butterworth dynamic failed: {e}")
+            raise ValueError(f"Dynamic high-pass filter failed: {e}")
+
+    raise ValueError("highpass_butterworth: unsupported cutoff_hz shape")
+    
+if __name__ == "__main__":
+    
+    # Create a sample signal (sine wave + noise)
+    fs = 100.0  # Sampling frequency
+    t = np.arange(0, 10, 1/fs)  # 10 seconds duration
+    signal_in = np.sin(2 * np.pi * 1.0 * t) + 0.5 * np.random.normal(size=t.shape)
+    
+    # Apply low-pass filter with a cutoff of 2 Hz
+    cutoff = np.full_like(signal_in, 2.0)  # Dynamic cutoff (constant in this case)
+    filtered_signal = lowpass_butterworth(signal_in, t, cutoff, order=4)
+    
+    print("Original signal (first 10 samples):", signal_in[:10])
+    print("Filtered signal (first 10 samples):", filtered_signal[:10])

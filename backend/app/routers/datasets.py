@@ -34,6 +34,7 @@ from app.services.lut_2D import LUT2D
 from app.services.signal_filters import (
     derivative,
     ratelimit,
+    ratelimit_dyn,
     integral,
     lowpass_butterworth,
     highpass_butterworth,
@@ -495,6 +496,7 @@ _MATH_NAMESPACE = {
     "deriv": derivative,                                          # deriv(signal) or deriv(signal, dt)
     "derivative": derivative,                                     # alias
     "ratelimit": ratelimit,                                       # ratelimit(signal, max_rate)
+    "ratelimit_dyn": ratelimit_dyn,                               # ratelimit_dyn(signal, tLap, min_rate_array, max_rate_array)
     "integral": integral,                                         # integral(signal) or integral(signal, dt)
     "lowpass": lowpass_butterworth,                               # lowpass(signal) or lowpass(signal, order, freq)
     "lowpass_butterworth": lowpass_butterworth,                   # explicit name
