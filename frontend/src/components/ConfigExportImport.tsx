@@ -2,7 +2,7 @@ import { useRef, useState } from "react";
 import { ConfigManager } from "../store/ConfigManager";
 import { ImportSelectionModal } from "./ImportSelectionModal";
 import type { CSSProperties } from "react";
-import type { ParsedTomlData, ImportSelection } from "../types/ConfigTypes";
+import type { ParsedTomlData, ImportSelection, WorkspaceSessionSnapshot, SavedWorkspaceConfig } from "../types/ConfigTypes";
 
 type ExportImportProps = {
   onImportSuccess?: () => void;
@@ -17,6 +17,33 @@ export function ConfigExportImport({ onImportSuccess }: ExportImportProps) {
 
   const handleExport = () => {
     try {
+      // Ensure any current session edits are persisted into the saved layouts
+      try {
+        const session = ConfigManager.get<WorkspaceSessionSnapshot | null>("session");
+        const layouts = ConfigManager.get<SavedWorkspaceConfig[]>("layouts") ?? [];
+
+        if (session && session.currentConfigId) {
+          const idx = layouts.findIndex((l) => l.id === session.currentConfigId);
+          if (idx !== -1) {
+            const sessionTabs = (session.tabs ?? []).map((tab) => ({
+              ...tab,
+              widgets: (tab.widgets ?? []).map((w) => ({ ...w, menuOpen: false })),
+            }));
+
+            const serializedLayout = JSON.stringify(layouts[idx].tabs || []);
+            const serializedSession = JSON.stringify(sessionTabs);
+            if (serializedLayout !== serializedSession) {
+              const nextLayouts = [...layouts];
+              nextLayouts[idx] = { ...nextLayouts[idx], tabs: sessionTabs, activeTabId: session.activeTabId };
+              ConfigManager.set("layouts", nextLayouts);
+            }
+          }
+        }
+      } catch (err) {
+        // Non-fatal: log and continue with export using stored layouts
+        console.error("Failed to sync session to layouts before export:", err);
+      }
+
       const tomlContent = ConfigManager.exportToToml();
       const blob = new Blob([tomlContent], { type: "text/plain" });
       const url = URL.createObjectURL(blob);

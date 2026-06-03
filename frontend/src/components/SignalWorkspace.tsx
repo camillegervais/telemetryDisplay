@@ -2412,10 +2412,10 @@ export default function SignalWorkspace({
     }));
 
     // If the name is already saved, we update the saved configuration
-    if(savedConfigs.find(e => e.name === nextName)) {
+    if (savedConfigs.find((e) => e.name === nextName)) {
       setSavedConfigs((prev) => {
         const nextConfigs = prev.map((elem) => {
-          if(elem.name === nextName) {
+          if (elem.name === nextName) {
             return {
               id: elem.id,
               name: elem.name,
@@ -2427,6 +2427,19 @@ export default function SignalWorkspace({
             return elem;
           }
         });
+        // Persist updated layouts
+        try {
+          ConfigManager.set("layouts", nextConfigs);
+        } catch (err) {
+          console.error("Failed to persist updated layouts:", err);
+        }
+        // Persist session so other tabs see the updated widget state immediately
+        try {
+          const sessionSnapshot = buildSessionSnapshot(normalizedTabs, activeTabId, currentConfigId, selectedConfigId);
+          ConfigManager.set("session", sessionSnapshot);
+        } catch (err) {
+          console.error("Failed to persist session after saving existing config:", err);
+        }
         return nextConfigs;
       });
     }
@@ -2452,6 +2465,13 @@ export default function SignalWorkspace({
         ConfigManager.set("layouts", nextConfigs);
         return nextConfigs;
       });
+      // Persist session immediately to reflect new currentConfigId
+      try {
+        const sessionSnapshot = buildSessionSnapshot(normalizedTabs, activeTabId, newId, newId);
+        ConfigManager.set("session", sessionSnapshot);
+      } catch (err) {
+        console.error("Failed to persist session after creating new config:", err);
+      }
     }
     
     
@@ -2481,19 +2501,38 @@ export default function SignalWorkspace({
     setLoadingById({});
     setDragFromId(null);
     setMapTuningData(config.mapTuning ?? null);
+    // Persist session immediately so other tabs reflect the loaded config
+    try {
+      const sessionSnapshot = buildSessionSnapshot(clonedTabs, activeTab.id, config.id, config.id);
+      ConfigManager.set("session", sessionSnapshot);
+    } catch (err) {
+      console.error("Failed to persist session after loadConfiguration:", err);
+    }
   }
 
   function deleteConfiguration(configId: string) {
+    const nextCurrentConfigId = currentConfigId === configId ? null : currentConfigId;
+    const nextSelectedConfigId = selectedConfigId === configId ? "" : selectedConfigId;
+
     setSavedConfigs((prev) => {
       const nextConfigs = prev.filter((cfg) => cfg.id !== configId);
-      ConfigManager.set("layouts", nextConfigs);
+      try {
+        ConfigManager.set("layouts", nextConfigs);
+      } catch (err) {
+        console.error("Failed to persist layouts after deleteConfiguration:", err);
+      }
       return nextConfigs;
     });
-    if (currentConfigId === configId) {
-      setCurrentConfigId(null);
-    }
-    if (selectedConfigId === configId) {
-      setSelectedConfigId("");
+
+    setCurrentConfigId(nextCurrentConfigId);
+    setSelectedConfigId(nextSelectedConfigId);
+
+    // Persist session immediately so other tabs don't keep referencing deleted config
+    try {
+      const sessionSnapshot = buildSessionSnapshot(tabs, activeTabId, nextCurrentConfigId, nextSelectedConfigId);
+      ConfigManager.set("session", sessionSnapshot);
+    } catch (err) {
+      console.error("Failed to persist session after deleteConfiguration:", err);
     }
   }
 
