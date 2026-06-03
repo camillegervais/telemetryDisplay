@@ -387,6 +387,34 @@ const BlockCard: React.FC<{
   const addMathOp = () => onUpdate({ operations: [...block.operations, defaultMathOp()] });
   const addLutOp = () => onUpdate({ operations: [...block.operations, defaultLutOp()] });
 
+  // Insert a math op just after the given op index
+  const insertMathAfter = (opIndex: number) => {
+    const ops = [...block.operations];
+    ops.splice(opIndex + 1, 0, defaultMathOp());
+    onUpdate({ operations: ops });
+  };
+
+  // Append a LUT op at the end of the block
+  const appendLutAtEnd = () => onUpdate({ operations: [...block.operations, defaultLutOp()] });
+
+  const GapBetweenOps: React.FC<{ index: number }> = ({ index }) => {
+    const [hover, setHover] = useState(false);
+    return (
+      <div
+        className="soft-op-gap"
+        onMouseEnter={() => setHover(true)}
+        onMouseLeave={() => setHover(false)}
+        style={{ display: "flex", justifyContent: "center", padding: 4 }}
+      >
+        {hover && (
+          <div className="gap-operation">
+            <button className="small-button" onClick={() => insertMathAfter(index)} style={{ marginRight: 8 }}>+ Math after</button>
+            <button className="small-button" onClick={appendLutAtEnd}>+ LUT 2D after</button>
+          </div>
+        )}
+      </div>
+    );
+  };
   const statusLabel = status.state === "running" ? "…"
     : status.state === "done" ? "✓"
     : status.state === "error" ? "!"
@@ -449,6 +477,8 @@ const BlockCard: React.FC<{
           {block.operations.map((op, opIndex) => {
             const sigsBefore = signalsBeforeOp(baseSignals, block, opIndex, allBlocks, blockIndex);
             return (
+
+            <div key={op.id}> 
               <OperationRow
                 key={op.id}
                 op={op}
@@ -463,8 +493,10 @@ const BlockCard: React.FC<{
                 mapConfigs={mapConfigs}
                 onSwitchToMapTuning={onSwitchToMapTuning}
               />
-            );
-          })}
+              <GapBetweenOps index={opIndex} />
+            </div>
+            )
+          })};
 
           {status.state === "error" && status.error && (
             <p className="soft-block-error">{status.error}</p>
