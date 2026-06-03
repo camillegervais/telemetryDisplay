@@ -3,7 +3,7 @@ import type { MouseEvent as ReactMouseEvent } from "react";
 import Plot from "react-plotly.js";
 
 import { queryDataset, calculateMapTuning, computeMathChannel } from "../api";
-import { evaluateMathChannel } from "../mathChannels";
+import { evaluateMathChannel, hasBackendOnlyFunctions } from "../mathChannels";
 import { useTelemetryStore } from "../store/telemetryStore";
 import { ConfigManager } from "../store/ConfigManager";
 import type { DatasetMetadata, DistanceRange, SignalSeries, TrackMapResponse, MapTuningData, SoftBlock, SoftLutOp, SoftMathOp } from "../types";
@@ -1258,7 +1258,21 @@ export default function SignalWorkspace({
 
       const softMath = softMathOpByName[name];
       if (softMath) {
-        // Expand dependencies first
+        // If this soft math op requires backend-only functions, request the
+        // computed channel itself from the backend instead of expanding
+        // its dependencies (they may not be evaluable client-side).
+        // Otherwise, expand dependencies so raw signals are fetched.
+        try {
+          // hasBackendOnlyFunctions is imported above
+          if (hasBackendOnlyFunctions(softMath.expression)) {
+            expanded.add(name);
+            return;
+          }
+        } catch {
+          // On parse errors, fall back to expanding dependencies
+        }
+
+        // Expand dependencies first for client-evaluable math ops
         for (const dep of softMath.dependencies) {
           visit(dep);
         }
@@ -1283,6 +1297,13 @@ export default function SignalWorkspace({
       for (const op of block.operations) {
         if (op.kind !== "math") continue;
         if (merged[op.name] !== undefined) continue; // LUT result already in dataset
+        
+        // Skip evaluation if expression has backend-only functions
+        // (they should already be computed and in the dataset)
+        if (hasBackendOnlyFunctions(op.expression)) {
+          continue;
+        }
+        
         const hasDeps = op.dependencies.every((dep) => merged[dep] !== undefined);
         if (!hasDeps) continue;
         try {
