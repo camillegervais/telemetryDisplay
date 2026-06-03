@@ -35,10 +35,10 @@ export const FUNCTIONS = {
   ratelimit: { arity: 2 as const, description: "Limite le taux de changement: ratelimit(signal, tLap, min_rate, max_rate)" },
   ratelimit_dyn: { arity: 2 as const, description: "Limite le taux de changement du signal avec des bornes dynamiques: ratelimit_dyn(signal, tLap, min_rate, max_rate)"},
   integral: { arity: 1 as const, description: "Intégrale cumulative: integral(signal, tLap)" },
-  lowpass: { arity: 1 as const, description: "Filtre passe-bas Butterworth: lowpass(signal, tLap, order, normalized_freq)" },
-  lowpass_butterworth: { arity: 1 as const, description: "Filtre passe-bas Butterworth: lowpass_butterworth(signal, tLap, order, normalized_freq)" },
-  highpass: { arity: 1 as const, description: "Filtre passe-haut Butterworth: highpass(signal, tLap order, normalized_freq)" },
-  highpass_butterworth: { arity: 1 as const, description: "Filtre passe-haut Butterworth: highpass_butterworth(signal, tLap, order, normalized_freq)" },
+  lowpass: { arity: 1 as const, description: "Filtre passe-bas Butterworth: lowpass_butterworth(signal, tLap, cutoff_freq (scalar or signal)) or lowpass_butterworth(signal, order, cutoff_freq(scalar)) or lowpass_butterworth(signal, cutoff_freq(scalar))" },
+  lowpass_butterworth: { arity: 1 as const, description: "Filtre passe-bas Butterworth: lowpass_butterworth(signal, tLap, cutoff_freq (scalar or signal)) or lowpass_butterworth(signal, order, cutoff_freq(scalar)) or lowpass_butterworth(signal, cutoff_freq(scalar))" },
+  highpass: { arity: 1 as const, description: "Filtre passe-haut Butterworth: highpass_butterworth(signal, tLap, cutoff_freq (scalar or signal)) or highpass_butterworth(signal, order, cutoff_freq(scalar)) or highpass_butterworth(signal, cutoff_freq(scalar))" },
+  highpass_butterworth: { arity: 1 as const, description: "Filtre passe-haut Butterworth: highpass_butterworth(signal, tLap, cutoff_freq (scalar or signal)) or highpass_butterworth(signal, order, cutoff_freq(scalar)) or highpass_butterworth(signal, cutoff_freq(scalar))" },
 } as const;
 
 export type FunctionName = keyof typeof FUNCTIONS;
@@ -183,10 +183,11 @@ FILTRAGE DE SIGNAUX (Exécution backend):
 - deriv(signal, tLap): Dérivée (taux de changement)
 - integral(signal , tLap): Intégrale cumulative
 - ratelimit(signal, tLap, min_rate, max_rate): Limite le taux de changement
-- lowpass(signal, tLap, order, freq): Filtre passe-bas
-  * Paramètres: order=2 (défaut), freq=50 (Hz)
+- ratelimit_dyn(signal, min_rate, max_rate): Limite le taux de changement avec des bornes dynamiques
+- lowpass(signal, tLap, freq): Filtre passe-bas
+  * Paramètres: freq=50 (Hz)
 - highpass(signal, tLap, order, freq): Filtre passe-haut
-  * Paramètres: order=2 (défaut), freq=50 (Hz)
+  * Paramètres: freq=50 (Hz)
 
 Opérateurs:
 - Arithmétiques: + - * /
@@ -198,12 +199,10 @@ EXEMPLES AVEC FILTRES:
 - deriv(speed, tLap): Taux d'accélération
 - integral(accel, tLap): Vitesse intégrée
 - ratelimit(throttle, tLap, -0.05, 0.05): Lisse les ordres de commande
-- lowpass(sensor, tLap, 2, 0.1): Supprime le bruit haute fréquence
-- highpass(raw, tLap, 2, 0.05): Supprime la dérive basse fréquence
+- lowpass(sensor, tLap, 0.1): Supprime le bruit haute fréquence
+- highpass(raw, tLap, 0.05): Supprime la dérive basse fréquence
 
 COMBINAISON:
-- Commande lissée: ratelimit(lowpass(throttle, tLap, 2, 0.2), tLap, 0.1)
-- Signal nettoyé: lowpass(highpass(sensor, tLap, 2, 0.05), tLap, 2, 0.1)
-
-Note: Les filtres s'exécutent sur l'ensemble du signal côté serveur.
+- Commande lissée: ratelimit(lowpass(throttle, tLap, 0.2), tLap, 0.1)
+- Signal nettoyé: lowpass(highpass(sensor, tLap, 0.05), tLap, 0.1)
 `;
