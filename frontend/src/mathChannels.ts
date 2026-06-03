@@ -383,3 +383,16 @@ export function evaluateMathChannel(channel: MathChannel, signalValues: Record<s
 
   return output;
 }
+
+export function hasBackendOnlyFunctions(expression: string): boolean {
+  try {
+    const tokens = tokenize(expression);
+    const { rpn } = toRpn(tokens);
+    const backendOnlyFound = rpn.filter(
+      (t) => t.type === "function" && BACKEND_ONLY_FUNCTIONS.has(t.name)
+    );
+    return backendOnlyFound.length > 0;
+  } catch {
+    return false;
+  }
+}

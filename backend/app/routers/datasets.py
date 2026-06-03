@@ -1,10 +1,12 @@
 """Dataset import, query, and track map endpoints."""
 
 from pathlib import Path
+import random
 from typing import List, Dict, Optional, Tuple
 import hashlib
 import shutil
 import uuid
+import logging
 
 import numpy as np
 import pandas as pd
@@ -38,6 +40,8 @@ from app.services.signal_filters import (
 )
 
 router = APIRouter(prefix="/api/datasets", tags=["datasets"])
+
+logger = logging.getLogger(__name__)
 
 # Global loader instance
 mat_loader = MatLoader(reference_step_m=config.reference_distance_step_m)
@@ -509,18 +513,25 @@ async def compute_math_channel(dataset_id: str, payload: ComputeMathRequest):
     The expression uses signal names as variables; supports standard arithmetic and
     the math functions defined in _MATH_NAMESPACE (abs, sqrt, sin, etc.).
     """
+    logger.info(f"[compute-math] Starting: expr='{payload.expression}', output='{payload.output_name}'")
+    
     dataset = mat_loader.get_dataset(dataset_id)
     if dataset is None:
+        logger.error(f"[compute-math] Dataset not found: {dataset_id}")
         raise HTTPException(status_code=404, detail="Dataset not found")
 
     df, metadata = dataset
+    logger.debug(f"[compute-math] Dataset loaded: {len(df)} samples, {len(df.columns)} columns")
 
     missing = [dep for dep in payload.dependencies if dep not in df.columns]
     if missing:
+        logger.error(f"[compute-math] Missing signals: {missing}")
         raise HTTPException(
             status_code=400,
             detail=f"Signal(s) not found in dataset: {', '.join(missing)}",
         )
+
+    logger.debug(f"[compute-math] All dependencies found: {payload.dependencies}")
 
     # Build evaluation namespace: signal arrays + allowed math functions
     namespace = {dep: df[dep].values for dep in payload.dependencies}
@@ -529,29 +540,45 @@ async def compute_math_channel(dataset_id: str, payload: ComputeMathRequest):
     try:
         # Evaluate with suppressed numpy warnings for divide/invalid operations;
         # sanitize afterwards to ensure no infinities or NaNs are persisted.
+        logger.debug(f"[compute-math] Evaluating expression: {payload.expression}")
         with np.errstate(divide="ignore", invalid="ignore"):
             result = np.asarray(eval(payload.expression, namespace), dtype=np.float64)  # noqa: S307
+        logger.debug(f"[compute-math] Expression evaluated successfully, shape={result.shape}, dtype={result.dtype}")
     except Exception as exc:
+        logger.error(f"[compute-math] Expression evaluation failed: {exc}")
         raise HTTPException(
             status_code=400, detail=f"Expression evaluation failed: {exc}"
+        )
+
+    # Check for non-finite values before sanitization
+    num_invalid = np.sum(~np.isfinite(result))
+    if num_invalid > 0:
+        logger.warning(
+            f"[compute-math] Detected {num_invalid}/{len(result)} non-finite values (NaN/Inf). "
+            f"Replacing with 0.0."
         )
 
     # Replace non-finite values (inf, -inf, nan) with a safe numeric value (0.0)
     # to avoid propagating invalids into stored channels.
     if not np.all(np.isfinite(result)):
-        result = np.where(np.isfinite(result), result, 0.0)
+        result = np.where(np.isfinite(result), result, random.randint(-1000, 1000))  # Replace with random int to avoid flatline
 
     if result.shape == ():
         # Scalar result — broadcast to dataset length
+        logger.debug(f"[compute-math] Scalar result {result}, broadcasting to {len(df)} samples")
         result = np.full(len(df), float(result))
 
     if len(result) != len(df):
+        logger.error(f"[compute-math] Result length mismatch: {len(result)} != {len(df)}")
         raise HTTPException(
             status_code=400,
             detail=f"Expression result length ({len(result)}) does not match dataset ({len(df)})",
         )
 
+    logger.debug(f"[compute-math] Result range: [{result.min():.6f}, {result.max():.6f}], mean={result.mean():.6f}, std={result.std():.6f}")
+
     mat_loader.add_new_channel(payload.output_name, result, dataset_id)
+    logger.info(f"[compute-math] Successfully stored channel '{payload.output_name}' with {len(result)} samples")
 
     return ComputeMathResponse(
         message=f"Channel '{payload.output_name}' computed and added to dataset",

@@ -30,14 +30,15 @@ export const FUNCTIONS = {
 
   // Filtering functions (signal processing) - these are backend-only
   // Frontend stores min arity for parsing; actual implementation varies on backend
-  deriv: { arity: 1 as const, description: "Dérivée du signal: deriv(signal) ou deriv(signal, dt)" },
-  derivative: { arity: 1 as const, description: "Alias pour deriv: derivative(signal) ou derivative(signal, dt)" },
-  ratelimit: { arity: 2 as const, description: "Limite le taux de changement: ratelimit(signal, max_rate)" },
-  integral: { arity: 1 as const, description: "Intégrale cumulative: integral(signal) ou integral(signal, dt)" },
-  lowpass: { arity: 1 as const, description: "Filtre passe-bas Butterworth: lowpass(signal) ou lowpass(signal, order, normalized_freq)" },
-  lowpass_butterworth: { arity: 1 as const, description: "Filtre passe-bas Butterworth: lowpass_butterworth(signal, order, normalized_freq)" },
-  highpass: { arity: 1 as const, description: "Filtre passe-haut Butterworth: highpass(signal) ou highpass(signal, order, normalized_freq)" },
-  highpass_butterworth: { arity: 1 as const, description: "Filtre passe-haut Butterworth: highpass_butterworth(signal, order, normalized_freq)" },
+  deriv: { arity: 1 as const, description: "Dérivée du signal: deriv(signal, tLap)" },
+  derivative: { arity: 1 as const, description: "Alias pour deriv: derivative(signal, tLap)" },
+  ratelimit: { arity: 2 as const, description: "Limite le taux de changement: ratelimit(signal, tLap, min_rate, max_rate)" },
+  ratelimit_dyn: { arity: 2 as const, description: "Limite le taux de changement du signal avec des bornes dynamiques: ratelimit_dyn(signal, tLap, min_rate, max_rate)"},
+  integral: { arity: 1 as const, description: "Intégrale cumulative: integral(signal, tLap)" },
+  lowpass: { arity: 1 as const, description: "Filtre passe-bas Butterworth: lowpass(signal, tLap, order, normalized_freq)" },
+  lowpass_butterworth: { arity: 1 as const, description: "Filtre passe-bas Butterworth: lowpass_butterworth(signal, tLap, order, normalized_freq)" },
+  highpass: { arity: 1 as const, description: "Filtre passe-haut Butterworth: highpass(signal, tLap order, normalized_freq)" },
+  highpass_butterworth: { arity: 1 as const, description: "Filtre passe-haut Butterworth: highpass_butterworth(signal, tLap, order, normalized_freq)" },
 } as const;
 
 export type FunctionName = keyof typeof FUNCTIONS;
@@ -179,13 +180,13 @@ ARITHMÉTIQUE & LOGIQUE:
 - satdyn(signal, max, min): Saturation avec bornes dynamiques
 
 FILTRAGE DE SIGNAUX (Exécution backend):
-- deriv(signal) ou deriv(signal, dt): Dérivée (taux de changement)
-- integral(signal) ou integral(signal, dt): Intégrale cumulative
-- ratelimit(signal, max_rate): Limite le taux de changement
-- lowpass(signal) ou lowpass(signal, order, freq): Filtre passe-bas
-  * Paramètres: order=2 (défaut), freq=0.5 (normalisé, 0-1)
-- highpass(signal) ou highpass(signal, order, freq): Filtre passe-haut
-  * Paramètres: order=2 (défaut), freq=0.1 (normalisé, 0-1)
+- deriv(signal, tLap): Dérivée (taux de changement)
+- integral(signal , tLap): Intégrale cumulative
+- ratelimit(signal, tLap, min_rate, max_rate): Limite le taux de changement
+- lowpass(signal, tLap, order, freq): Filtre passe-bas
+  * Paramètres: order=2 (défaut), freq=50 (Hz)
+- highpass(signal, tLap, order, freq): Filtre passe-haut
+  * Paramètres: order=2 (défaut), freq=50 (Hz)
 
 Opérateurs:
 - Arithmétiques: + - * /
@@ -194,15 +195,15 @@ Opérateurs:
 - Conditionnel: where(cond, a, b)
 
 EXEMPLES AVEC FILTRES:
-- deriv(speed): Taux d'accélération
-- integral(accel, 0.01): Vitesse intégrée (dt=10ms)
-- ratelimit(throttle, 0.05): Lisse les ordres de commande
-- lowpass(sensor, 2, 0.1): Supprime le bruit haute fréquence
-- highpass(raw, 2, 0.05): Supprime la dérive basse fréquence
+- deriv(speed, tLap): Taux d'accélération
+- integral(accel, tLap): Vitesse intégrée
+- ratelimit(throttle, tLap, -0.05, 0.05): Lisse les ordres de commande
+- lowpass(sensor, tLap, 2, 0.1): Supprime le bruit haute fréquence
+- highpass(raw, tLap, 2, 0.05): Supprime la dérive basse fréquence
 
 COMBINAISON:
-- Commande lissée: ratelimit(lowpass(throttle, 2, 0.2), 0.1)
-- Signal nettoyé: lowpass(highpass(sensor, 2, 0.05), 2, 0.1)
+- Commande lissée: ratelimit(lowpass(throttle, tLap, 2, 0.2), tLap, 0.1)
+- Signal nettoyé: lowpass(highpass(sensor, tLap, 2, 0.05), tLap, 2, 0.1)
 
 Note: Les filtres s'exécutent sur l'ensemble du signal côté serveur.
 `;
