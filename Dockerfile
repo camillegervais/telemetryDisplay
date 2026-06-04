@@ -35,6 +35,7 @@ RUN chmod +x /start.sh
 
 # Exposer le port de ton API Back (8001)
 EXPOSE 8001
+EXPOSE 5173
 
 # Lancer la commande qui démarre tout d'un coup (via start.sh)
 CMD ["/start.sh"]
