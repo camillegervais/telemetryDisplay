@@ -1,7 +1,3 @@
-mapreplay.localhost {
-    # Redirige toutes les requêtes commençant par /api vers le Back
-    reverse_proxy /api/* node-app:8001
-
-    # Redirige le reste du trafic vers le Front
+localhost:80 {
     reverse_proxy node-app:5173
 }

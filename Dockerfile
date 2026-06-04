@@ -29,8 +29,12 @@ RUN npm set strict-ssl false && npm install --prefix frontend --verbose
 # 6. Copier le reste du code source
 COPY . .
 
+# Add start script and make executable
+COPY start.sh /start.sh
+RUN chmod +x /start.sh
+
 # Exposer le port de ton API Back (8001)
 EXPOSE 8001
 
-# Lancer la commande qui démarre tout d'un coup
-CMD ["npm", "run", "dev"]
+# Lancer la commande qui démarre tout d'un coup (via start.sh)
+CMD ["/start.sh"]
