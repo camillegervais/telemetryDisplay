@@ -1,18 +1,32 @@
 {
-    auto_https off
+    # Allow Caddy to issue a local dev certificate using its internal CA
+    # Keep other hosts using automatic HTTPS.
 }
 
-http://localhost:80 {
-    reverse_proxy /api/* node-app:8001 {
-        header_up Host localhost
-        header_up X-Forwarded-Host {host}
-        header_up X-Forwarded-For {remote_host}
+# Serve the app over HTTPS at https://mapreplay.localhost
+mapreplay.localhost {
+    tls internal
+
+    # API proxy for paths starting with /api/
+    handle_path /api/* {
+        reverse_proxy node-app:8001 {
+            header_up Host {host}
+            header_up X-Forwarded-Host {host}
+            header_up X-Forwarded-For {remote_host}
+        }
     }
 
-    # Redirige le reste du trafic vers le Front
-    reverse_proxy node-app:5173 {
-        header_up Host localhost
-        header_up X-Forwarded-Host {host}
-        header_up X-Forwarded-For {remote_host}
+    # All other traffic -> frontend dev server
+    handle {
+        reverse_proxy node-app:5173 {
+            header_up Host {host}
+            header_up X-Forwarded-Host {host}
+            header_up X-Forwarded-For {remote_host}
+        }
     }
+}
+
+# Keep a plain localhost entry for backward compatibility (HTTP redirect to HTTPS)
+http://localhost {
+    redir https://mapreplay.localhost{uri} permanent
 }
