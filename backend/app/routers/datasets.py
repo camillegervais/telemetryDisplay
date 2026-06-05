@@ -33,6 +33,7 @@ from app.services.mat_loader import MatLoader, MatValidationError
 from app.services.lut_2D import LUT2D
 from app.services.signal_filters import (
     derivative,
+    latch_time,
     ratelimit,
     ratelimit_dyn,
     integral,
@@ -502,6 +503,7 @@ _MATH_NAMESPACE = {
     "lowpass_butterworth": lowpass_butterworth,                   # explicit name
     "highpass": highpass_butterworth,                             # highpass(signal) or highpass(signal, order, freq)
     "highpass_butterworth": highpass_butterworth,                 # explicit name
+    "latch_time": latch_time,  # latch_time(signal, tLap, hold_time)
     
     "__builtins__": {},  # block all Python builtins
 }

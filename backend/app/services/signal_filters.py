@@ -333,6 +333,42 @@ def highpass_butterworth(signal_in: np.ndarray, *args, order: int = 2) -> np.nda
             raise ValueError(f"Dynamic high-pass filter failed: {e}")
 
     raise ValueError("highpass_butterworth: unsupported cutoff_hz shape")
+
+def latch_time(signal_in: np.ndarray, tLap: np.ndarray, hold_time: float) -> np.ndarray:
+    """
+    Latch the last input > 0 for a duration hold_time seconds.
+    Args:
+    signal_in: input signal array
+    tLap: time array (same length)
+    hold_time: non-negative hold duration in seconds
+    Returns:
+    array of same length with 1.0 when latched, 0.0 otherwise
+    """
+    signal_in = np.asarray(signal_in, dtype=np.float64)
+    tLap = np.asarray(tLap, dtype=np.float64)
+    if hold_time is None:
+        raise ValueError("latch_time: hold_time must be provided")
+    hold_time = float(hold_time)
+    if hold_time < 0:
+        raise ValueError("latch_time: hold_time must be >= 0")
+    if signal_in.size == 0:
+        return np.array([], dtype=np.float64)
+    if signal_in.size != tLap.size:
+        raise ValueError("latch_time: signal and tLap must have same length")
+    out = np.zeros_like(signal_in, dtype=np.float64)
+    current_hold_end = -np.inf
+    activations = 0
+    new_end = 0
+    for i, (s, t) in enumerate(zip(signal_in, tLap)):
+        if s > 0:
+            new_end = t + hold_time
+        if new_end > current_hold_end:
+            current_hold_end = new_end
+            activations += 1
+        if t < current_hold_end:
+            out[i] = 1.0
+    logger.debug(f"latch_time: activations={activations}, hold_time={hold_time}, output_mask_sum={out.sum()}")
+    return out
     
 if __name__ == "__main__":
     

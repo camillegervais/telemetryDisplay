@@ -39,6 +39,7 @@ export const FUNCTIONS = {
   lowpass_butterworth: { arity: 1 as const, description: "Filtre passe-bas Butterworth: lowpass_butterworth(signal, tLap, cutoff_freq (scalar or signal)) or lowpass_butterworth(signal, order, cutoff_freq(scalar)) or lowpass_butterworth(signal, cutoff_freq(scalar))" },
   highpass: { arity: 1 as const, description: "Filtre passe-haut Butterworth: highpass_butterworth(signal, tLap, cutoff_freq (scalar or signal)) or highpass_butterworth(signal, order, cutoff_freq(scalar)) or highpass_butterworth(signal, cutoff_freq(scalar))" },
   highpass_butterworth: { arity: 1 as const, description: "Filtre passe-haut Butterworth: highpass_butterworth(signal, tLap, cutoff_freq (scalar or signal)) or highpass_butterworth(signal, order, cutoff_freq(scalar)) or highpass_butterworth(signal, cutoff_freq(scalar))" },
+  latch_time: { arity: 2 as const, description: "Latch: latch_time(signal, tLap, hold_time) — 1 pour hold_time après dernier input>0" },
 } as const;
 
 export type FunctionName = keyof typeof FUNCTIONS;

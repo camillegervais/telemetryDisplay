@@ -35,6 +35,7 @@ const BACKEND_ONLY_FUNCTIONS = new Set([
   "highpass_butterworth",
   "ratelimit",
   "ratelimit_dyn",
+  "latch_time"
 ]);
 
 function getSupportedFunctions(): Record<string, 1 | 2 | 3> {
