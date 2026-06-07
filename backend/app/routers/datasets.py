@@ -18,6 +18,9 @@ from app.schemas import (
     DatasetImportResponse,
     DatasetImportFromPathRequest,
     DatasetMetadataResponse,
+    SignalMetadataResponse,
+    SignalMetadataUpdateRequest,
+    SignalCategoryRenameRequest,
     DatasetQueryRequest,
     DatasetQueryResponse,
     TrackMapResponse,
@@ -301,11 +304,63 @@ def get_dataset_metadata(dataset_id: str) -> DatasetMetadataResponse:
         lap_distance_min=metadata.lap_distance_range[0],
         lap_distance_max=metadata.lap_distance_range[1],
         signal_names=metadata.signal_names,
+        signal_metadata=[
+            SignalMetadataResponse(
+                name=meta.name,
+                display_signal=meta.display_signal,
+                category_signal=meta.category_signal,
+            )
+            for meta in metadata.signal_metadata
+        ],
         source_sample_rate_hz=metadata.source_sample_rate_hz,
         has_time_axis=metadata.has_time_axis,
         interpolation_method=metadata.interpolation_method,
         enrichment_factor=metadata.enrichment_factor,
     )
+
+
+@router.patch("/{dataset_id}/signals/{signal_name}/metadata", response_model=SignalMetadataResponse)
+def update_signal_metadata(dataset_id: str, signal_name: str, payload: SignalMetadataUpdateRequest) -> SignalMetadataResponse:
+    """Update display/category metadata for a specific signal."""
+    try:
+        mat_loader.set_signal_metadata(
+            dataset_id,
+            signal_name,
+            display_signal=payload.display_signal,
+            category_signal=payload.category_signal,
+        )
+    except MatValidationError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+
+    dataset = mat_loader.get_dataset(dataset_id)
+    if dataset is None:
+        raise HTTPException(status_code=404, detail="Dataset not found")
+
+    _, metadata = dataset
+    signal_meta = next((m for m in metadata.signal_metadata if m.name == signal_name), None)
+    if signal_meta is None:
+        raise HTTPException(status_code=404, detail=f"Signal '{signal_name}' not found")
+
+    return SignalMetadataResponse(
+        name=signal_meta.name,
+        display_signal=signal_meta.display_signal,
+        category_signal=signal_meta.category_signal,
+    )
+
+
+@router.patch("/{dataset_id}/signal-category")
+def rename_signal_category(dataset_id: str, payload: SignalCategoryRenameRequest):
+    """Rename the category for all matching signals in a dataset."""
+    try:
+        updated_count = mat_loader.rename_signal_category(
+            dataset_id,
+            payload.old_category,
+            payload.new_category,
+        )
+    except MatValidationError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+
+    return {"message": f"Updated category for {updated_count} signal(s)"}
 
 
 @router.post("/{dataset_id}/query", response_model=DatasetQueryResponse)
@@ -455,6 +510,8 @@ async def calculate_map_output(payload: MapTuningRequest):
             payload.outputChannelName,
             output_values,
             payload.datasetId,
+            display_signal=payload.display_signal,
+            category_signal=payload.category_signal or "raw",
         )
 
         return {
@@ -581,7 +638,13 @@ async def compute_math_channel(dataset_id: str, payload: ComputeMathRequest):
 
     logger.debug(f"[compute-math] Result range: [{result.min():.6f}, {result.max():.6f}], mean={result.mean():.6f}, std={result.std():.6f}")
 
-    mat_loader.add_new_channel(payload.output_name, result, dataset_id)
+    mat_loader.add_new_channel(
+        payload.output_name,
+        result,
+        dataset_id,
+        display_signal=payload.display_signal,
+        category_signal=payload.category_signal or "raw",
+    )
     logger.info(f"[compute-math] Successfully stored channel '{payload.output_name}' with {len(result)} samples")
 
     return ComputeMathResponse(

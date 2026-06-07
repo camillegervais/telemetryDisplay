@@ -9,6 +9,12 @@ export type DatasetImportResponse = {
   message: string;
 };
 
+export type SignalMetadata = {
+  name: string;
+  display_signal: boolean;
+  category_signal: string;
+};
+
 export type DatasetMetadata = {
   dataset_id: string;
   source_path: string;
@@ -18,6 +24,7 @@ export type DatasetMetadata = {
   lap_distance_min: number;
   lap_distance_max: number;
   signal_names: string[];
+  signal_metadata: SignalMetadata[];
   source_sample_rate_hz: number | null;
   has_time_axis: boolean;
   interpolation_method: string;
@@ -63,6 +70,7 @@ export type SoftMathOp = {
   name: string;          // output signal name
   expression: string;
   dependencies: string[]; // parsed from expression
+  displaySignal?: boolean;
 };
 
 export type SoftLutOp = {
@@ -70,6 +78,7 @@ export type SoftLutOp = {
   kind: "lut2d";
   name: string;          // output signal name (overrides map's outputChannelName)
   mapConfigKey: string;  // key in ConfigManager "map-configs" Record<string, MapTuningData>
+  displaySignal?: boolean;
 };
 
 export type SoftOperation = SoftMathOp | SoftLutOp;
@@ -106,6 +115,8 @@ export type MapTuningSaveResponse = {
 
 export type MapTuningCalculateRequest = {
   datasetId: string;
+  display_signal?: boolean;
+  category_signal?: string;
 } & MapTuningData;
 
 export type MapTuningCalculateResponse = {

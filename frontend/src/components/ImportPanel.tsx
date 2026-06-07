@@ -140,6 +140,7 @@ export default function ImportPanel({
   const [axisSectionOpen, setAxisSectionOpen] = useState(false);
   const [statsSectionOpen, setStatsSectionOpen] = useState(false);
   const [signalFilter, setSignalFilter] = useState("");
+  const [categoryFilter, setCategoryFilter] = useState("all");
   const [signalStats, setSignalStats] = useState<Record<string, SignalStats>>({});
   const [loadingStats, setLoadingStats] = useState(false);
   const [statsError, setStatsError] = useState<string | null>(null);
@@ -158,17 +159,52 @@ export default function ImportPanel({
   const [newConfigFreq, setNewConfigFreq] = useState("100");
   const [newConfigVCHPath, setNewConfigVCHPath] = useState("");
 
+  const signalMetadataByName = useMemo(
+    () => new Map(datasetMetadata?.signal_metadata?.map((meta) => [meta.name, meta]) ?? []),
+    [datasetMetadata]
+  );
+
+  const categoryOptions = useMemo(() => {
+    const categories = datasetMetadata?.signal_metadata?.map((meta) => meta.category_signal) ?? [];
+    return ["all", ...uniqueStrings(categories)];
+  }, [datasetMetadata]);
+
+  useEffect(() => {
+    setCategoryFilter("all");
+  }, [datasetMetadata?.dataset_id]);
+
   const allSignals = useMemo(
     () => uniqueStrings(datasetMetadata?.signal_names ?? []),
     [datasetMetadata]
   );
+
   const filteredSignals = useMemo(() => {
     const filter = signalFilter.trim().toLowerCase();
-    if (!filter) {
-      return allSignals;
-    }
-    return allSignals.filter((signal) => signal.toLowerCase().includes(filter));
-  }, [allSignals, signalFilter]);
+    return allSignals.filter((signal) => {
+      const meta = signalMetadataByName.get(signal);
+      const category = meta?.category_signal ?? "raw";
+      const isDisplayed = meta?.display_signal ?? true;
+      
+      // Filter by display_signal flag
+      if (!isDisplayed) {
+        return false;
+      }
+      
+      // Filter by category
+      if (categoryFilter !== "all" && category !== categoryFilter) {
+        return false;
+      }
+      
+      // Filter by name/category search text
+      if (!filter) {
+        return true;
+      }
+      return (
+        signal.toLowerCase().includes(filter) ||
+        category.toLowerCase().includes(filter)
+      );
+    });
+  }, [allSignals, signalFilter, categoryFilter, signalMetadataByName]);
 
   // Sync map configs and listen for external updates
   useEffect(() => {
@@ -428,13 +464,26 @@ export default function ImportPanel({
         </button>
         {signalsSectionOpen ? (
           <div className="import-submenu-content">
-            <input
-              type="text"
-              className="signals-filter-input"
-              value={signalFilter}
-              onChange={(event) => setSignalFilter(event.target.value)}
-              placeholder="Filtrer les signaux..."
-            />
+            <div className="signals-filter-row">
+              <input
+                type="text"
+                className="signals-filter-input"
+                value={signalFilter}
+                onChange={(event) => setSignalFilter(event.target.value)}
+                placeholder="Filtrer les signaux ou catégories..."
+              />
+              <select
+                className="mini-select"
+                value={categoryFilter}
+                onChange={(event) => setCategoryFilter(event.target.value)}
+              >
+                {categoryOptions.map((category) => (
+                  <option key={category} value={category}>
+                    {category === "all" ? "All categories" : category}
+                  </option>
+                ))}
+              </select>
+            </div>
 
             {!datasetMetadata || datasetMetadata.signal_names.length === 0 ? (
               <p className="panel-text">Import a dataset to display signals</p>
@@ -442,21 +491,24 @@ export default function ImportPanel({
               <p className="panel-text">No signal verify this filter.</p>
             ) : (
               <div className="sidebar-signals-list">
-                {filteredSignals.map((signal) => (
-                  <button
-                    key={signal}
-                    type="button"
-                    className="sidebar-signal-chip"
-                    draggable
-                    onDragStart={(event) => {
-                      event.dataTransfer.setData("application/x-telemetry-signal", signal);
-                      event.dataTransfer.effectAllowed = "copy";
-                    }}
-                    title="Glisser vers un graphe pour ajouter"
-                  >
-                    {signal}
-                  </button>
-                ))}
+                {filteredSignals.map((signal) => {
+                  const category = signalMetadataByName.get(signal)?.category_signal ?? "raw";
+                  return (
+                    <button
+                      key={signal}
+                      type="button"
+                      className="sidebar-signal-chip"
+                      draggable
+                      onDragStart={(event) => {
+                        event.dataTransfer.setData("application/x-telemetry-signal", signal);
+                        event.dataTransfer.effectAllowed = "copy";
+                      }}
+                      title={`Glisser vers un graphe pour ajouter — catégorie: ${category}`}
+                    >
+                      {signal}
+                    </button>
+                  );
+                })}
               </div>
             )}
           </div>

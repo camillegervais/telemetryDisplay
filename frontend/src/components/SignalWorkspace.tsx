@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import type { MouseEvent as ReactMouseEvent } from "react";
 import Plot from "react-plotly.js";
 
-import { queryDataset, calculateMapTuning, computeMathChannel } from "../api";
+import { queryDataset, calculateMapTuning, computeMathChannel, renameSignalCategory } from "../api";
 import { evaluateMathChannel, hasBackendOnlyFunctions } from "../mathChannels";
 import { useTelemetryStore } from "../store/telemetryStore";
 import { ConfigManager } from "../store/ConfigManager";
@@ -926,6 +926,25 @@ export default function SignalWorkspace({
     softBlocksRef.current = softBlocks;
   }, [softBlocks]);
 
+  const previousBlockNamesRef = useRef<Record<string, string>>({});
+  useEffect(() => {
+    const previousNames = previousBlockNamesRef.current;
+    const nextNames = Object.fromEntries(softBlocks.map((block) => [block.id, block.name]));
+
+    if (datasetId) {
+      for (const block of softBlocks) {
+        const previousName = previousNames[block.id];
+        if (previousName && previousName !== block.name) {
+          renameSignalCategory(datasetId, previousName, block.name).catch((error) => {
+            console.warn("Failed to rename soft block signal category:", error);
+          });
+        }
+      }
+    }
+
+    previousBlockNamesRef.current = nextNames;
+  }, [softBlocks, datasetId]);
+
   // Helper function to update widgets and sync to tabs
   function updateWidgetsAndTabs(
     updater: (prev: GraphWidget[]) => GraphWidget[],
@@ -1493,6 +1512,8 @@ export default function SignalWorkspace({
             offsetVal: mapCfg.offsetVal,
             interpolation: mapCfg.interpolation ?? "linear",
             extrapolation: mapCfg.extrapolation ?? "clamp",
+            display_signal: lutOp.displaySignal ?? true,
+            category_signal: block.name,
           });
         } else if (op.kind === "math") {
           const mathOp = op as SoftMathOp;
@@ -1502,6 +1523,8 @@ export default function SignalWorkspace({
               output_name: mathOp.name,
               expression: mathOp.expression,
               dependencies: mathOp.dependencies,
+              display_signal: mathOp.displaySignal ?? true,
+              category_signal: block.name,
             });
           }
         }
@@ -3237,6 +3260,7 @@ export default function SignalWorkspace({
               setMapConfigs(updated);
               ConfigManager.set("map-configs", updated);
             }}
+            onRefreshDatasetMetadata={onRefreshDatasetMetadata}
           />
         </div>
       ) : isTabSwitching ? (

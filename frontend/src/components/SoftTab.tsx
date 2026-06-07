@@ -7,6 +7,7 @@
 import React, { useState, useCallback, useMemo, useEffect } from "react";
 import { analyzeMathExpression } from "../mathChannels";
 import { getFunctionDocumentation, getOperatorDocumentation } from "../mathFunctions";
+import { updateSignalMetadata } from "../api";
 import type { SoftBlock, SoftOperation, SoftMathOp, SoftLutOp, MapTuningData } from "../types";
 
 // ── Status ────────────────────────────────────────────────────────────────────
@@ -29,6 +30,8 @@ interface SoftTabProps {
   onSwitchToMapTuning?: () => void;
   /** Called when duplicating a block that contains lut2d ops — passes cloned map config entries to persist */
   onDuplicateMapConfigs?: (additions: Record<string, MapTuningData>) => void;
+  /** Called after display_signal toggle to refresh metadata from backend */
+  onRefreshDatasetMetadata?: () => Promise<void>;
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -38,11 +41,24 @@ function makeId(prefix: string): string {
 }
 
 function defaultMathOp(): SoftMathOp {
-  return { id: makeId("op"), kind: "math", name: "new_signal", expression: "", dependencies: [] };
+  return {
+    id: makeId("op"),
+    kind: "math",
+    name: "new_signal",
+    expression: "",
+    dependencies: [],
+    displaySignal: true,
+  };
 }
 
 function defaultLutOp(): SoftLutOp {
-  return { id: makeId("op"), kind: "lut2d", name: "new_map", mapConfigKey: "" };
+  return {
+    id: makeId("op"),
+    kind: "lut2d",
+    name: "new_map",
+    mapConfigKey: "",
+    displaySignal: true,
+  };
 }
 
 /** Signals available BEFORE operation at opIndex in the given block */
@@ -267,7 +283,9 @@ const OperationRow: React.FC<{
   isLast: boolean;
   mapConfigs: Record<string, MapTuningData>;
   onSwitchToMapTuning?: () => void;
-}> = ({ op, opIndex, availableSignals, onUpdate, onDelete, onMoveUp, onMoveDown, isFirst, isLast, mapConfigs, onSwitchToMapTuning }) => {
+  datasetId?: string | null;
+  onRefreshDatasetMetadata?: () => Promise<void>;
+}> = ({ op, opIndex, availableSignals, onUpdate, onDelete, onMoveUp, onMoveDown, isFirst, isLast, mapConfigs, onSwitchToMapTuning, datasetId, onRefreshDatasetMetadata }) => {
   const [expanded, setExpanded] = useState(false);
   const [nameEdit, setNameEdit] = useState(op.name);
   const [nameError, setNameError] = useState<string | null>(null);
@@ -313,6 +331,26 @@ const OperationRow: React.FC<{
           </span>
         )}
         <div className="soft-op-actions">
+          <button
+            className="soft-icon-btn"
+            onClick={async () => {
+              const newValue = !(op.displaySignal ?? true);
+              onUpdate({ displaySignal: newValue });
+              // Persist to backend
+              if (datasetId && op.name) {
+                try {
+                  await updateSignalMetadata(datasetId, op.name, { display_signal: newValue });
+                  // Refresh metadata so ImportPanel sees the change
+                  await onRefreshDatasetMetadata?.();
+                } catch (error) {
+                  console.error("Failed to update signal metadata:", error);
+                }
+              }
+            }}
+            title={op.displaySignal ?? true ? "Hide this output" : "Show this output"}
+          >
+            {op.displaySignal ?? true ? "👁" : "🚫"}
+          </button>
           <button className="soft-icon-btn" onClick={onMoveUp} disabled={isFirst} title="Go up">↑</button>
           <button className="soft-icon-btn" onClick={onMoveDown} disabled={isLast} title="Go down">↓</button>
           <button className="soft-icon-btn" onClick={() => setExpanded((p) => !p)} title="Edit">
@@ -358,7 +396,9 @@ const BlockCard: React.FC<{
   onDuplicate?: () => void;
   mapConfigs: Record<string, MapTuningData>;
   onSwitchToMapTuning?: () => void;
-}> = ({ block, blockIndex, allBlocks, baseSignals, status, onUpdate, onDelete, onCalculate, onDuplicate, mapConfigs, onSwitchToMapTuning }) => {
+  datasetId?: string | null;
+  onRefreshDatasetMetadata?: () => Promise<void>;
+}> = ({ block, blockIndex, allBlocks, baseSignals, status, onUpdate, onDelete, onCalculate, onDuplicate, mapConfigs, onSwitchToMapTuning, datasetId, onRefreshDatasetMetadata }) => {
   const [collapsed, setCollapsed] = useState(true);
   const [nameEdit, setNameEdit] = useState(block.name);
 
@@ -492,6 +532,8 @@ const BlockCard: React.FC<{
                 isLast={opIndex === block.operations.length - 1}
                 mapConfigs={mapConfigs}
                 onSwitchToMapTuning={onSwitchToMapTuning}
+                datasetId={datasetId}
+                onRefreshDatasetMetadata={onRefreshDatasetMetadata}
               />
               <GapBetweenOps index={opIndex} />
             </div>
@@ -524,6 +566,7 @@ export default function SoftTab({
   mapConfigs,
   onSwitchToMapTuning,
   onDuplicateMapConfigs,
+  onRefreshDatasetMetadata,
 }: SoftTabProps) {
   const addBlock = () => {
     onChange([
@@ -713,6 +756,8 @@ export default function SoftTab({
               onDuplicate={() => duplicateBlock(block.id)}
               mapConfigs={mapConfigs}
               onSwitchToMapTuning={onSwitchToMapTuning}
+              datasetId={datasetId}
+              onRefreshDatasetMetadata={onRefreshDatasetMetadata}
             />
           ))}
         </div>

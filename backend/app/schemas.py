@@ -17,6 +17,12 @@ class AppInfoResponse(BaseModel):
 
 
 # === Dataset Metadata ===
+class SignalMetadataResponse(BaseModel):
+    name: str
+    display_signal: bool = Field(description="Whether the signal should appear in available signal lists")
+    category_signal: str = Field(description="Signal category, e.g. raw or soft block name")
+
+
 class DatasetMetadataResponse(BaseModel):
     dataset_id: str
     source_path: str
@@ -26,6 +32,7 @@ class DatasetMetadataResponse(BaseModel):
     lap_distance_min: float
     lap_distance_max: float
     signal_names: List[str]
+    signal_metadata: List[SignalMetadataResponse]
     source_sample_rate_hz: Optional[float]
     has_time_axis: bool
     interpolation_method: str
@@ -70,6 +77,16 @@ class DatasetImportFromPathRequest(BaseModel):
     mat_path: str = Field(..., min_length=1, description="Absolute or server-local path to a .mat file")
 
 
+class SignalMetadataUpdateRequest(BaseModel):
+    display_signal: Optional[bool] = Field(default=None, description="Whether the signal should appear in available lists")
+    category_signal: Optional[str] = Field(default=None, description="New category for the signal")
+
+
+class SignalCategoryRenameRequest(BaseModel):
+    old_category: str = Field(..., min_length=1, description="Existing category to rename")
+    new_category: str = Field(..., min_length=1, description="New category name")
+
+
 # === Map Tuning ===
 class MapTuningRequest(BaseModel):
     datasetId: str
@@ -84,6 +101,8 @@ class MapTuningRequest(BaseModel):
     offsetVal: float
     interpolation: str = "linear"
     extrapolation: str = "clamp"
+    display_signal: bool = Field(default=True, description="Whether this output signal should be shown in signal lists")
+    category_signal: Optional[str] = Field(default=None, description="Category label for this computed signal")
 
 
 class MapTuningSaveResponse(BaseModel):
@@ -101,6 +120,8 @@ class ComputeMathRequest(BaseModel):
     output_name: str = Field(..., description="Name for the output signal")
     expression: str = Field(..., description="Math expression using signal names")
     dependencies: List[str] = Field(..., description="Signal names referenced in the expression")
+    display_signal: bool = Field(default=True, description="Whether this output signal should be shown in signal lists")
+    category_signal: Optional[str] = Field(default=None, description="Category label for this computed signal")
 
 
 class ComputeMathResponse(BaseModel):

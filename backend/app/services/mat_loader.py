@@ -22,6 +22,13 @@ class MatValidationError(Exception):
 
 
 @dataclass
+class SignalMetadata:
+    name: str
+    display_signal: bool = True
+    category_signal: str = "raw"
+
+
+@dataclass
 class DatasetMetadata:
     """Metadata about a loaded and normalized dataset."""
 
@@ -32,6 +39,7 @@ class DatasetMetadata:
     num_samples: int
     lap_distance_range: Tuple[float, float]
     signal_names: List[str]
+    signal_metadata: List[SignalMetadata]
     max_slap: float  # Maximum value of original lap_distance/sLap before normalization
     max_tlap: Optional[float] = None  # Maximum value of tLap signal if present
     source_sample_rate_hz: Optional[float] = None
@@ -165,6 +173,7 @@ class MatLoader:
                 float(df_normalized.index.max()),
             ),
             signal_names=signal_names,
+            signal_metadata=[SignalMetadata(name=name, display_signal=True, category_signal="raw") for name in signal_names],
             max_slap=float(lap_distance.max()),
             max_tlap=max_tlap,
             source_sample_rate_hz=sample_rate_hz,
@@ -182,6 +191,8 @@ class MatLoader:
             channel_name: str,
             channel_data: np.ndarray,
             dataset_id: Optional[str] = None,
+            display_signal: bool = True,
+            category_signal: Optional[str] = None,
         ) -> str:
         if not self.loaded_datasets:
             raise MatValidationError("Aucun jeu de données chargé pour ajouter un canal.")
@@ -201,11 +212,24 @@ class MatLoader:
                 f"({len(df)} points), reçu {len(channel_array)}."
             )
 
-        if not channel_name in df.columns:
+        if channel_name not in df.columns:
             metadata.signal_names.append(channel_name)
 
         df[channel_name] = channel_array
-        
+
+        existing_metadata = next((m for m in metadata.signal_metadata if m.name == channel_name), None)
+        if existing_metadata is not None:
+            existing_metadata.display_signal = display_signal if display_signal is not None else existing_metadata.display_signal
+            existing_metadata.category_signal = category_signal or existing_metadata.category_signal
+        else:
+            metadata.signal_metadata.append(
+                SignalMetadata(
+                    name=channel_name,
+                    display_signal=display_signal,
+                    category_signal=category_signal or "raw",
+                )
+            )
+
         self.loaded_datasets[dataset_id] = (df, metadata)
 
         return metadata.source_path
@@ -418,6 +442,45 @@ class MatLoader:
         df.set_index("lap_distance", inplace=True)
 
         return df
+
+    def set_signal_metadata(
+        self,
+        dataset_id: str,
+        signal_name: str,
+        display_signal: Optional[bool] = None,
+        category_signal: Optional[str] = None,
+    ) -> None:
+        dataset = self.loaded_datasets.get(dataset_id)
+        if dataset is None:
+            raise MatValidationError(f"Dataset '{dataset_id}' introuvable.")
+
+        _, metadata = dataset
+        signal_meta = next((m for m in metadata.signal_metadata if m.name == signal_name), None)
+        if signal_meta is None:
+            raise MatValidationError(f"Signal '{signal_name}' introuvable dans le dataset")
+
+        if display_signal is not None:
+            signal_meta.display_signal = display_signal
+        if category_signal is not None:
+            signal_meta.category_signal = category_signal
+
+    def rename_signal_category(
+        self,
+        dataset_id: str,
+        old_category: str,
+        new_category: str,
+    ) -> int:
+        dataset = self.loaded_datasets.get(dataset_id)
+        if dataset is None:
+            raise MatValidationError(f"Dataset '{dataset_id}' introuvable.")
+
+        _, metadata = dataset
+        updated_count = 0
+        for signal_meta in metadata.signal_metadata:
+            if signal_meta.category_signal == old_category:
+                signal_meta.category_signal = new_category
+                updated_count += 1
+        return updated_count
 
     def get_dataset(self, dataset_id: str) -> Optional[Tuple[pd.DataFrame, DatasetMetadata]]:
         """Retrieve cached dataset by ID."""

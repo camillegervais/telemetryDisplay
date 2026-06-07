@@ -16,6 +16,13 @@ export type ComputeMathChannelRequest = {
   output_name: string;
   expression: string;
   dependencies: string[];
+  display_signal?: boolean;
+  category_signal?: string;
+};
+
+export type SignalMetadataUpdateRequest = {
+  display_signal?: boolean;
+  category_signal?: string;
 };
 
 export type ComputeMathChannelResponse = {
@@ -197,6 +204,43 @@ export async function computeMathChannel(
   }
 
   return (await response.json()) as ComputeMathChannelResponse;
+}
+
+export async function updateSignalMetadata(
+  datasetId: string,
+  signalName: string,
+  payload: SignalMetadataUpdateRequest
+): Promise<void> {
+  const response = await fetch(
+    `${API_BASE_URL}/datasets/${datasetId}/signals/${encodeURIComponent(signalName)}/metadata`,
+    {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    }
+  );
+
+  if (!response.ok) {
+    const payload = await response.json().catch(() => ({ detail: "Update failed" }));
+    throw new Error(payload.detail ?? "Update failed");
+  }
+}
+
+export async function renameSignalCategory(
+  datasetId: string,
+  oldCategory: string,
+  newCategory: string
+): Promise<void> {
+  const response = await fetch(`${API_BASE_URL}/datasets/${datasetId}/signal-category`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ old_category: oldCategory, new_category: newCategory }),
+  });
+
+  if (!response.ok) {
+    const payload = await response.json().catch(() => ({ detail: "Update failed" }));
+    throw new Error(payload.detail ?? "Update failed");
+  }
 }
 
 // ---------------------------------------------------------------------------
