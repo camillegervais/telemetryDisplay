@@ -331,26 +331,25 @@ const OperationRow: React.FC<{
           </span>
         )}
         <div className="soft-op-actions">
-          <button
-            className="soft-icon-btn"
-            onClick={async () => {
-              const newValue = !(op.displaySignal ?? true);
-              onUpdate({ displaySignal: newValue });
-              // Persist to backend
-              if (datasetId && op.name) {
-                try {
-                  await updateSignalMetadata(datasetId, op.name, { display_signal: newValue });
-                  // Refresh metadata so ImportPanel sees the change
-                  await onRefreshDatasetMetadata?.();
-                } catch (error) {
-                  console.error("Failed to update signal metadata:", error);
+          <label className="ios-toggle" title={op.displaySignal ?? true ? "Hide this output" : "Show this output"}>
+            <input
+              type="checkbox"
+              checked={!!op.displaySignal}
+              onChange={async (e) => {
+                const newValue = e.target.checked;
+                onUpdate({ displaySignal: newValue });
+                if (datasetId && op.name) {
+                  try {
+                    await updateSignalMetadata(datasetId, op.name, { display_signal: newValue });
+                    await onRefreshDatasetMetadata?.();
+                  } catch (error) {
+                    console.error("Failed to update signal metadata:", error);
+                  }
                 }
-              }
-            }}
-            title={op.displaySignal ?? true ? "Hide this output" : "Show this output"}
-          >
-            {op.displaySignal ?? true ? "👁" : "🚫"}
-          </button>
+              }}
+            />
+            <span className={`ios-switch ${op.displaySignal ? "ios-switch-on" : "ios-switch-off"}`} />
+          </label>
           <button className="soft-icon-btn" onClick={onMoveUp} disabled={isFirst} title="Go up">↑</button>
           <button className="soft-icon-btn" onClick={onMoveDown} disabled={isLast} title="Go down">↓</button>
           <button className="soft-icon-btn" onClick={() => setExpanded((p) => !p)} title="Edit">

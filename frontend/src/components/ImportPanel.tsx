@@ -182,7 +182,7 @@ export default function ImportPanel({
     const filter = signalFilter.trim().toLowerCase();
     return allSignals.filter((signal) => {
       const meta = signalMetadataByName.get(signal);
-      const category = meta?.category_signal ?? "raw";
+      const category = meta?.category_signal ?? "Dataset";
       const isDisplayed = meta?.display_signal ?? true;
       
       // Filter by display_signal flag
@@ -476,6 +476,7 @@ export default function ImportPanel({
                 className="mini-select"
                 value={categoryFilter}
                 onChange={(event) => setCategoryFilter(event.target.value)}
+                style={{marginBottom: "1rem"}}
               >
                 {categoryOptions.map((category) => (
                   <option key={category} value={category}>
@@ -492,7 +493,7 @@ export default function ImportPanel({
             ) : (
               <div className="sidebar-signals-list">
                 {filteredSignals.map((signal) => {
-                  const category = signalMetadataByName.get(signal)?.category_signal ?? "raw";
+                  const category = signalMetadataByName.get(signal)?.category_signal ?? "Dataset";
                   return (
                     <button
                       key={signal}

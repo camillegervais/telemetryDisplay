@@ -25,7 +25,7 @@ class MatValidationError(Exception):
 class SignalMetadata:
     name: str
     display_signal: bool = True
-    category_signal: str = "raw"
+    category_signal: str = "Dataset"
 
 
 @dataclass
@@ -173,7 +173,7 @@ class MatLoader:
                 float(df_normalized.index.max()),
             ),
             signal_names=signal_names,
-            signal_metadata=[SignalMetadata(name=name, display_signal=True, category_signal="raw") for name in signal_names],
+            signal_metadata=[SignalMetadata(name=name, display_signal=True, category_signal="Dataset") for name in signal_names],
             max_slap=float(lap_distance.max()),
             max_tlap=max_tlap,
             source_sample_rate_hz=sample_rate_hz,
@@ -226,7 +226,7 @@ class MatLoader:
                 SignalMetadata(
                     name=channel_name,
                     display_signal=display_signal,
-                    category_signal=category_signal or "raw",
+                    category_signal=category_signal or "Dataset",
                 )
             )
 

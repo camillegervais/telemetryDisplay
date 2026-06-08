@@ -511,7 +511,7 @@ async def calculate_map_output(payload: MapTuningRequest):
             output_values,
             payload.datasetId,
             display_signal=payload.display_signal,
-            category_signal=payload.category_signal or "raw",
+            category_signal=payload.category_signal or "Dataset",
         )
 
         return {
@@ -643,7 +643,7 @@ async def compute_math_channel(dataset_id: str, payload: ComputeMathRequest):
         result,
         dataset_id,
         display_signal=payload.display_signal,
-        category_signal=payload.category_signal or "raw",
+        category_signal=payload.category_signal or "Dataset",
     )
     logger.info(f"[compute-math] Successfully stored channel '{payload.output_name}' with {len(result)} samples")
 

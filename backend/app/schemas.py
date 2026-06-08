@@ -20,7 +20,7 @@ class AppInfoResponse(BaseModel):
 class SignalMetadataResponse(BaseModel):
     name: str
     display_signal: bool = Field(description="Whether the signal should appear in available signal lists")
-    category_signal: str = Field(description="Signal category, e.g. raw or soft block name")
+    category_signal: str = Field(description="Signal category, e.g. Dataset or soft block name")
 
 
 class DatasetMetadataResponse(BaseModel):
