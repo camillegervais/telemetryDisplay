@@ -77,7 +77,14 @@ export type SoftLutOp = {
   id: string;
   kind: "lut2d";
   name: string;          // output signal name (overrides map's outputChannelName)
-  mapConfigKey: string;  // key in ConfigManager "map-configs" Record<string, MapTuningData>
+  /** @deprecated Use cartoKey instead — kept for backward-compat migration */
+  mapConfigKey?: string;
+  /** Reference to carto-configs[key] (new model) */
+  cartoKey?: string;
+  /** Channel used to interpolate on X axis (overrides carto's defaultInputChannelX) */
+  inputChannelX?: string;
+  /** Channel used to interpolate on Y axis (overrides carto's defaultInputChannelY) */
+  inputChannelY?: string;
   displaySignal?: boolean;
 };
 
@@ -102,6 +109,43 @@ export type MapTuningData = {
   offsetVal: number;
   interpolation: "floor" | "nearest" | "linear" | "round";
   extrapolation: "clamp" | "linear";
+};
+
+// ── New carto system ─────────────────────────────────────────────────────────
+
+/**
+ * Standalone breakpoint axis — can be shared across multiple CartoObjects.
+ * Stored in ConfigManager under "breakpoint-configs".
+ */
+export type BreakpointObject = {
+  name: string;
+  values: number[];
+  unit?: string;
+  description?: string;
+};
+
+/**
+ * Carto (lookup table) referencing breakpoint objects by key.
+ * Channels are indicative only (for visualisation) — actual channels used
+ * for interpolation are declared in the SoftLutOp that references this carto.
+ * Stored in ConfigManager under "carto-configs".
+ */
+export type CartoObject = {
+  name: string;
+  /** Key in "breakpoint-configs" for the X axis (rows) */
+  breakpointKeyX: string;
+  /** Key in "breakpoint-configs" for the Y axis (columns) — absent for 1D cartos */
+  breakpointKeyY?: string;
+  gridData: number[][];
+  gainVal: number;
+  offsetVal: number;
+  interpolation: "floor" | "nearest" | "linear" | "round";
+  extrapolation: "clamp" | "linear";
+  braking_signal: boolean;
+  /** Indicative channel for X axis — used for LUT cell highlight and usage stats only */
+  defaultInputChannelX?: string;
+  /** Indicative channel for Y axis — used for LUT cell highlight and usage stats only */
+  defaultInputChannelY?: string;
 };
 
 export type MapTuningSaveRequest = {

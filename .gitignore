@@ -7,3 +7,4 @@ import_cache
 .vscode
 *.db
 log.txt
+resources/*.m

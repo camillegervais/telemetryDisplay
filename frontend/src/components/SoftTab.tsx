@@ -8,7 +8,7 @@ import React, { useState, useCallback, useMemo, useEffect } from "react";
 import { analyzeMathExpression } from "../mathChannels";
 import { getFunctionDocumentation, getOperatorDocumentation } from "../mathFunctions";
 import { updateSignalMetadata } from "../api";
-import type { SoftBlock, SoftOperation, SoftMathOp, SoftLutOp, MapTuningData } from "../types";
+import type { SoftBlock, SoftOperation, SoftMathOp, SoftLutOp, MapTuningData, CartoObject } from "../types";
 
 // ── Status ────────────────────────────────────────────────────────────────────
 
@@ -27,9 +27,13 @@ interface SoftTabProps {
   onCalculateBlock: (blockId: string) => void;
   blockStatuses: Record<string, BlockStatus>;
   mapConfigs: Record<string, MapTuningData>;
+  /** New carto system configs (carto-configs) */
+  cartoConfigs?: Record<string, CartoObject>;
   onSwitchToMapTuning?: () => void;
   /** Called when duplicating a block that contains lut2d ops — passes cloned map config entries to persist */
   onDuplicateMapConfigs?: (additions: Record<string, MapTuningData>) => void;
+  /** Called when duplicating a block — passes cloned carto config entries to persist */
+  onDuplicateCartoConfigs?: (additions: Record<string, CartoObject>) => void;
   /** Called after display_signal toggle to refresh metadata from backend */
   onRefreshDatasetMetadata?: () => Promise<void>;
 }
@@ -56,7 +60,9 @@ function defaultLutOp(): SoftLutOp {
     id: makeId("op"),
     kind: "lut2d",
     name: "new_map",
-    mapConfigKey: "",
+    cartoKey: "",
+    inputChannelX: "",
+    inputChannelY: "",
     displaySignal: true,
   };
 }
@@ -122,10 +128,110 @@ const LutRefEditor: React.FC<{
   op: SoftLutOp;
   onUpdate: (patch: Partial<SoftLutOp>) => void;
   mapConfigs: Record<string, MapTuningData>;
+  cartoConfigs?: Record<string, CartoObject>;
+  availableSignals: string[];
   onSwitchToMapTuning?: () => void;
-}> = ({ op, onUpdate, mapConfigs, onSwitchToMapTuning }) => {
+}> = ({ op, onUpdate, mapConfigs, cartoConfigs, availableSignals, onSwitchToMapTuning }) => {
+  // Determine active key and mode
+  const useNewModel = !!cartoConfigs && Object.keys(cartoConfigs).length > 0;
+  const activeCartoKey = op.cartoKey ?? op.mapConfigKey ?? "";
+
+  // New model: select from carto-configs
+  if (useNewModel) {
+    const cartoKeys = Object.keys(cartoConfigs!);
+    const selectedCarto = cartoConfigs![activeCartoKey];
+    const is2D = selectedCarto ? !!selectedCarto.breakpointKeyY : true;
+
+    return (
+      <div className="soft-lut-editor">
+        {cartoKeys.length === 0 ? (
+          <p className="soft-expr-error-msg">
+            Aucune carto sauvegardée.{" "}
+            {onSwitchToMapTuning && (
+              <button className="link-btn" onClick={onSwitchToMapTuning}>Go to Map Tuning →</button>
+            )}
+          </p>
+        ) : (
+          <label className="soft-field-row">
+            <span>Carto</span>
+            <select
+              className="soft-select"
+              value={activeCartoKey}
+              onChange={e => onUpdate({ cartoKey: e.target.value, mapConfigKey: undefined })}
+            >
+              <option value="">— choisir une carto —</option>
+              {[...cartoKeys]
+                .sort((a, b) => a.localeCompare(b))
+                .map(k => (
+                  <option key={k} value={k}>
+                    {k}{cartoConfigs![k] ? ` (${cartoConfigs![k].gridData.length}×${cartoConfigs![k].gridData[0]?.length ?? 1})` : ""}
+                  </option>
+              ))}
+            </select>
+          </label>
+        )}
+
+        {selectedCarto && (
+          <>
+            <div className="soft-lut-info">
+              <span className="soft-deps">
+                BP X: <strong>{selectedCarto.breakpointKeyX || "—"}</strong>
+                {selectedCarto.breakpointKeyY && <>{" · "}BP Y: <strong>{selectedCarto.breakpointKeyY}</strong></>}
+                {"  ·  "}Gain: <strong>{selectedCarto.gainVal}</strong>
+                {"  ·  "}Offset: <strong>{selectedCarto.offsetVal}</strong>
+              </span>
+              {selectedCarto.braking_signal && (
+                <span className="soft-deps" style={{ color: "#ff8a33" }}>⚠ active braking filtering</span>
+              )}
+            </div>
+
+            {/* Channel selectors — these drive the actual calculation */}
+            <div style={{ display: "flex", gap: "0.75rem", marginTop: "0.5rem", flexWrap: "wrap" }}>
+              <label className="soft-field-row" style={{ flex: 1, minWidth: "160px" }}>
+                <span>Channel X <span style={{ color: "var(--fg-2)", fontSize: "0.7rem" }}>(calcul)</span></span>
+                <select
+                  className="soft-select"
+                  value={op.inputChannelX ?? ""}
+                  onChange={e => onUpdate({ inputChannelX: e.target.value })}
+                >
+                  <option value="">— choisir un channel —</option>
+                  {availableSignals.map(s => <option key={s} value={s}>{s}</option>)}
+                  {op.inputChannelX && !availableSignals.includes(op.inputChannelX) && (
+                    <option value={op.inputChannelX}>{op.inputChannelX}</option>
+                  )}
+                </select>
+              </label>
+
+              {is2D && (
+                <label className="soft-field-row" style={{ flex: 1, minWidth: "160px" }}>
+                  <span>Channel Y <span style={{ color: "var(--fg-2)", fontSize: "0.7rem" }}>(calcul)</span></span>
+                  <select
+                    className="soft-select"
+                    value={op.inputChannelY ?? ""}
+                    onChange={e => onUpdate({ inputChannelY: e.target.value })}
+                  >
+                    <option value="">— choisir un channel —</option>
+                    {availableSignals.map(s => <option key={s} value={s}>{s}</option>)}
+                    {op.inputChannelY && !availableSignals.includes(op.inputChannelY) && (
+                      <option value={op.inputChannelY}>{op.inputChannelY}</option>
+                    )}
+                  </select>
+                </label>
+              )}
+            </div>
+          </>
+        )}
+
+        {activeCartoKey && !selectedCarto && (
+          <p className="soft-expr-error-msg">Carto "{activeCartoKey}" introuvable — peut-être supprimée.</p>
+        )}
+      </div>
+    );
+  }
+
+  // Legacy model: mapConfigKey (kept for backward compatibility during transition)
   const mapKeys = Object.keys(mapConfigs);
-  const selected = mapConfigs[op.mapConfigKey];
+  const selected = mapConfigs[activeCartoKey];
 
   return (
     <div className="soft-lut-editor">
@@ -133,21 +239,19 @@ const LutRefEditor: React.FC<{
         <p className="soft-expr-error-msg">
           Aucune map sauvegardée.{" "}
           {onSwitchToMapTuning && (
-            <button className="link-btn" onClick={onSwitchToMapTuning}>
-              Go to Map Tuning →
-            </button>
+            <button className="link-btn" onClick={onSwitchToMapTuning}>Go to Map Tuning →</button>
           )}
         </p>
       ) : (
         <label className="soft-field-row">
-          <span>Map</span>
+          <span>Map (legacy)</span>
           <select
             className="soft-select"
-            value={op.mapConfigKey}
-            onChange={(e) => onUpdate({ mapConfigKey: e.target.value })}
+            value={activeCartoKey}
+            onChange={e => onUpdate({ mapConfigKey: e.target.value })}
           >
             <option value="">— choose a map —</option>
-            {mapKeys.map((k) => <option key={k} value={k}>{k}</option>)}
+            {mapKeys.map(k => <option key={k} value={k}>{k}</option>)}
           </select>
         </label>
       )}
@@ -156,14 +260,10 @@ const LutRefEditor: React.FC<{
         <div className="soft-lut-info">
           <span className="soft-deps">
             X: <strong>{selected.inputChannelX || "—"}</strong>
-            {"  ·  "}
-            Y: <strong>{selected.inputChannelY || "—"}</strong>
-            {"  ·  "}
-            Grid: <strong>{selected.rowHeaders.length} × {selected.colHeaders.length}</strong>
-            {"  ·  "}
-            Gain: <strong>{selected.gainVal}</strong>
-            {"  ·  "}
-            Offset: <strong>{selected.offsetVal}</strong>
+            {"  ·  "}Y: <strong>{selected.inputChannelY || "—"}</strong>
+            {"  ·  "}Grid: <strong>{selected.rowHeaders.length} × {selected.colHeaders.length}</strong>
+            {"  ·  "}Gain: <strong>{selected.gainVal}</strong>
+            {"  ·  "}Offset: <strong>{selected.offsetVal}</strong>
           </span>
           {selected.braking_signal && (
             <span className="soft-deps" style={{ color: "#ff8a33" }}>⚠ active braking filtering</span>
@@ -171,8 +271,8 @@ const LutRefEditor: React.FC<{
         </div>
       )}
 
-      {op.mapConfigKey && !selected && (
-        <p className="soft-expr-error-msg">Map "{op.mapConfigKey}" unavailable — might be deleted.</p>
+      {activeCartoKey && !selected && (
+        <p className="soft-expr-error-msg">Map "{activeCartoKey}" unavailable — might be deleted.</p>
       )}
     </div>
   );
@@ -282,10 +382,11 @@ const OperationRow: React.FC<{
   isFirst: boolean;
   isLast: boolean;
   mapConfigs: Record<string, MapTuningData>;
+  cartoConfigs?: Record<string, CartoObject>;
   onSwitchToMapTuning?: () => void;
   datasetId?: string | null;
   onRefreshDatasetMetadata?: () => Promise<void>;
-}> = ({ op, opIndex, availableSignals, onUpdate, onDelete, onMoveUp, onMoveDown, isFirst, isLast, mapConfigs, onSwitchToMapTuning, datasetId, onRefreshDatasetMetadata }) => {
+}> = ({ op, opIndex, availableSignals, onUpdate, onDelete, onMoveUp, onMoveDown, isFirst, isLast, mapConfigs, cartoConfigs, onSwitchToMapTuning, datasetId, onRefreshDatasetMetadata }) => {
   const [expanded, setExpanded] = useState(false);
   const [nameEdit, setNameEdit] = useState(op.name);
   const [nameError, setNameError] = useState<string | null>(null);
@@ -326,8 +427,8 @@ const OperationRow: React.FC<{
           <span className="soft-op-preview" title={op.expression}>= {op.expression || "…"}</span>
         )}
         {op.kind === "lut2d" && (
-          <span className="soft-op-preview" title={op.mapConfigKey || "not linked"}>
-            {op.mapConfigKey || "— not linked —"}
+          <span className="soft-op-preview" title={(op.cartoKey || op.mapConfigKey) || "not linked"}>
+            {(op.cartoKey || op.mapConfigKey) || "— not linked —"}
           </span>
         )}
         <div className="soft-op-actions">
@@ -371,6 +472,8 @@ const OperationRow: React.FC<{
             <LutRefEditor
               op={op}
               mapConfigs={mapConfigs}
+              cartoConfigs={cartoConfigs}
+              availableSignals={availableSignals}
               onSwitchToMapTuning={onSwitchToMapTuning}
               onUpdate={(patch) => onUpdate(patch as Partial<SoftOperation>)}
             />
@@ -394,10 +497,11 @@ const BlockCard: React.FC<{
   onCalculate: () => void;
   onDuplicate?: () => void;
   mapConfigs: Record<string, MapTuningData>;
+  cartoConfigs?: Record<string, CartoObject>;
   onSwitchToMapTuning?: () => void;
   datasetId?: string | null;
   onRefreshDatasetMetadata?: () => Promise<void>;
-}> = ({ block, blockIndex, allBlocks, baseSignals, status, onUpdate, onDelete, onCalculate, onDuplicate, mapConfigs, onSwitchToMapTuning, datasetId, onRefreshDatasetMetadata }) => {
+}> = ({ block, blockIndex, allBlocks, baseSignals, status, onUpdate, onDelete, onCalculate, onDuplicate, mapConfigs, cartoConfigs, onSwitchToMapTuning, datasetId, onRefreshDatasetMetadata }) => {
   const [collapsed, setCollapsed] = useState(true);
   const [nameEdit, setNameEdit] = useState(block.name);
 
@@ -530,6 +634,7 @@ const BlockCard: React.FC<{
                 isFirst={opIndex === 0}
                 isLast={opIndex === block.operations.length - 1}
                 mapConfigs={mapConfigs}
+                cartoConfigs={cartoConfigs}
                 onSwitchToMapTuning={onSwitchToMapTuning}
                 datasetId={datasetId}
                 onRefreshDatasetMetadata={onRefreshDatasetMetadata}
@@ -563,8 +668,10 @@ export default function SoftTab({
   onCalculateBlock,
   blockStatuses,
   mapConfigs,
+  cartoConfigs,
   onSwitchToMapTuning,
   onDuplicateMapConfigs,
+  onDuplicateCartoConfigs,
   onRefreshDatasetMetadata,
 }: SoftTabProps) {
   const addBlock = () => {
@@ -592,10 +699,8 @@ export default function SoftTab({
     if (idx === -1) return;
     const src = softBlocks[idx];
 
-    // Helper: strip existing _EvoN suffix if present
     const stripEvo = (s: string) => s.replace(/_Evo\d+$/, "");
 
-    // Find next global Evo counter by scanning all block/operation names AND map config keys
     let maxN = 0;
     const evoRe = /_Evo(\d+)$/;
     for (const b of softBlocks) {
@@ -606,8 +711,11 @@ export default function SoftTab({
         if (mo) maxN = Math.max(maxN, parseInt(mo[1], 10));
       }
     }
-    // Also scan existing map config keys for _EvoN to avoid collisions
     for (const key of Object.keys(mapConfigs)) {
+      const mk = key.match(evoRe);
+      if (mk) maxN = Math.max(maxN, parseInt(mk[1], 10));
+    }
+    for (const key of Object.keys(cartoConfigs ?? {})) {
       const mk = key.match(evoRe);
       if (mk) maxN = Math.max(maxN, parseInt(mk[1], 10));
     }
@@ -617,95 +725,87 @@ export default function SoftTab({
 
     const baseBlockName = stripEvo(src.name || `Bloc ${idx + 1}`);
     let newBlockName = `${baseBlockName}${suffix}`;
-
-    // Ensure uniqueness (rare): increment nextN if collision
     const existingNames = new Set(softBlocks.map((b) => b.name));
     let curN = nextN;
-    while (existingNames.has(newBlockName)) {
-      curN += 1;
-      newBlockName = `${baseBlockName}_Evo${curN}`;
-    }
+    while (existingNames.has(newBlockName)) { curN += 1; newBlockName = `${baseBlockName}_Evo${curN}`; }
 
-    // Build mapping oldOpName -> newOpName (strip old Evo suffixes first)
     const nameMap: Record<string, string> = {};
     for (const op of src.operations) {
-      const baseOpName = stripEvo(op.name);
-      nameMap[op.name] = `${baseOpName}${suffix}`;
+      nameMap[op.name] = `${stripEvo(op.name)}${suffix}`;
     }
 
-    // Build mapping oldMapKey -> newMapKey for lut2d ops, and clone the map configs
+    // Legacy map config duplication
     const mapKeyMap: Record<string, string> = {};
     const mapAdditions: Record<string, MapTuningData> = {};
     const existingMapKeys = new Set(Object.keys(mapConfigs));
     for (const op of src.operations) {
-      if (op.kind !== "lut2d" || !op.mapConfigKey) continue;
-      const srcMapKey = op.mapConfigKey;
-      if (mapKeyMap[srcMapKey]) continue; // already handled (shared key across multiple ops)
-      const baseMapKey = stripEvo(srcMapKey);
-      let newMapKey = `${baseMapKey}${suffix}`;
-      let mCurN = nextN;
-      while (existingMapKeys.has(newMapKey)) {
-        mCurN += 1;
-        newMapKey = `${baseMapKey}_Evo${mCurN}`;
+      if (op.kind !== "lut2d" || !(op as SoftLutOp).mapConfigKey) continue;
+      const srcKey = (op as SoftLutOp).mapConfigKey!;
+      if (mapKeyMap[srcKey]) continue;
+      let newKey = `${stripEvo(srcKey)}${suffix}`;
+      let mN = nextN;
+      while (existingMapKeys.has(newKey)) { mN += 1; newKey = `${stripEvo(srcKey)}_Evo${mN}`; }
+      existingMapKeys.add(newKey);
+      mapKeyMap[srcKey] = newKey;
+      if (mapConfigs[srcKey]) {
+        const cloned = JSON.parse(JSON.stringify(mapConfigs[srcKey]));
+        cloned.outputChannelName = newKey;
+        mapAdditions[newKey] = cloned;
       }
-      existingMapKeys.add(newMapKey); // reserve it
-      mapKeyMap[srcMapKey] = newMapKey;
-      if (mapConfigs[srcMapKey]) {
-        // Deep-clone the map config under the new key and update its internal name
-        const cloned = JSON.parse(JSON.stringify(mapConfigs[srcMapKey]));
-        cloned.outputChannelName = newMapKey;
-        mapAdditions[newMapKey] = cloned;
+    }
+
+    // New carto duplication
+    const cartoKeyMap: Record<string, string> = {};
+    const cartoAdditions: Record<string, CartoObject> = {};
+    const existingCartoKeys = new Set(Object.keys(cartoConfigs ?? {}));
+    for (const op of src.operations) {
+      if (op.kind !== "lut2d" || !(op as SoftLutOp).cartoKey) continue;
+      const srcKey = (op as SoftLutOp).cartoKey!;
+      if (cartoKeyMap[srcKey]) continue;
+      let newKey = `${stripEvo(srcKey)}${suffix}`;
+      let cN = nextN;
+      while (existingCartoKeys.has(newKey)) { cN += 1; newKey = `${stripEvo(srcKey)}_Evo${cN}`; }
+      existingCartoKeys.add(newKey);
+      cartoKeyMap[srcKey] = newKey;
+      const srcCarto = cartoConfigs?.[srcKey];
+      if (srcCarto) {
+        const cloned: CartoObject = { ...JSON.parse(JSON.stringify(srcCarto)), name: newKey };
+        cartoAdditions[newKey] = cloned;
       }
     }
 
     const escapeRegExp = (str: string) => str.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
-    // Clone operations: new ids, new names, replace references in expressions & dependencies
     const newOps = src.operations.map((op) => {
       const newName = nameMap[op.name];
-      let newExpr = op.kind === "math" && typeof op.expression === "string" ? op.expression : (op as any).expression;
-      if (newExpr && typeof newExpr === "string") {
-        // Replace occurrences of any old op names with their new names (word boundaries)
+      let newExpr = op.kind === "math" ? (op as SoftMathOp).expression : undefined;
+      if (newExpr) {
         for (const [oldName, newN] of Object.entries(nameMap)) {
-          const re = new RegExp(`\\b${escapeRegExp(oldName)}\\b`, "g");
-          newExpr = newExpr.replace(re, newN);
+          newExpr = newExpr.replace(new RegExp(`\\b${escapeRegExp(oldName)}\\b`, "g"), newN);
         }
       }
-
-      const newDeps = (op as any).dependencies?.map((d: string) => {
-        return nameMap[d] ?? d;
-      }) ?? [];
-
-      const newMapConfigKey = op.kind === "lut2d"
-        ? (mapKeyMap[op.mapConfigKey] ?? op.mapConfigKey)
-        : undefined;
-
+      const newDeps = (op as any).dependencies?.map((d: string) => nameMap[d] ?? d) ?? [];
+      const lutOp = op as SoftLutOp;
       return {
         ...op,
         id: makeId("op"),
         name: newName,
-        expression: newExpr,
-        dependencies: newDeps,
-        ...(op.kind === "lut2d" ? { mapConfigKey: newMapConfigKey } : {}),
+        ...(op.kind === "math" ? { expression: newExpr, dependencies: newDeps } : {}),
+        ...(op.kind === "lut2d" ? {
+          mapConfigKey: lutOp.mapConfigKey ? (mapKeyMap[lutOp.mapConfigKey] ?? lutOp.mapConfigKey) : undefined,
+          cartoKey: lutOp.cartoKey ? (cartoKeyMap[lutOp.cartoKey] ?? lutOp.cartoKey) : undefined,
+        } : {}),
       } as SoftOperation;
     });
 
-    const newBlock: SoftBlock = {
-      ...src,
-      id: makeId("blk"),
-      name: newBlockName,
-      operations: newOps,
-    };
-
+    const newBlock: SoftBlock = { ...src, id: makeId("blk"), name: newBlockName, operations: newOps };
     const next = [...softBlocks.slice(0, idx + 1), newBlock, ...softBlocks.slice(idx + 1)];
 
-    // Persist cloned map configs before updating soft blocks
-    if (Object.keys(mapAdditions).length > 0) {
-      onDuplicateMapConfigs?.(mapAdditions);
-    }
+    if (Object.keys(mapAdditions).length > 0) onDuplicateMapConfigs?.(mapAdditions);
+    if (Object.keys(cartoAdditions).length > 0) onDuplicateCartoConfigs?.(cartoAdditions);
 
     onChange(next);
-  }, [softBlocks, onChange, mapConfigs, onDuplicateMapConfigs]);
+  }, [softBlocks, onChange, mapConfigs, cartoConfigs, onDuplicateMapConfigs, onDuplicateCartoConfigs]);
 
   const runAll = useCallback(() => {
     softBlocks.forEach((b) => onCalculateBlock(b.id));
@@ -754,6 +854,7 @@ export default function SoftTab({
               onCalculate={() => onCalculateBlock(block.id)}
               onDuplicate={() => duplicateBlock(block.id)}
               mapConfigs={mapConfigs}
+              cartoConfigs={cartoConfigs}
               onSwitchToMapTuning={onSwitchToMapTuning}
               datasetId={datasetId}
               onRefreshDatasetMetadata={onRefreshDatasetMetadata}

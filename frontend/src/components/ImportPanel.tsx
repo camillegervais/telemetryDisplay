@@ -5,7 +5,7 @@ import { useTelemetryStore } from "../store/telemetryStore";
 import { ConfigManager } from "../store/ConfigManager";
 import { ImportDataModal } from "./ImportDataModal";
 
-import type { DatasetMetadata, MapTuningData } from "../types";
+import type { DatasetMetadata, MapTuningData, CartoObject } from "../types";
 import type { TelDataImportConfig } from "../types/ConfigTypes";
 
 type ImportPanelProps = {
@@ -146,8 +146,10 @@ export default function ImportPanel({
   const [statsError, setStatsError] = useState<string | null>(null);
   const [mapsSectionOpen, setMapsSectionOpen] = useState(false);
   const [mapFilter, setMapFilter] = useState("");
-  const [mapConfigs, setMapConfigs] = useState<Record<string, MapTuningData>>(() =>
-    ConfigManager.get<Record<string, MapTuningData>>("map-configs") ?? {}
+  const [mapConfigs, setMapConfigs] = useState<Record<string, CartoObject>>(() =>
+    ConfigManager.get<Record<string, CartoObject>>("carto-configs") ??
+    // Fallback to legacy map-configs if carto-configs not yet migrated
+    {} as Record<string, CartoObject>
   );
   const [telDataConfigsSectionOpen, setTelDataConfigsSectionOpen] = useState(false);
   const [telDataConfigs, setTelDataConfigs] = useState<TelDataImportConfig[]>(
@@ -206,9 +208,9 @@ export default function ImportPanel({
     });
   }, [allSignals, signalFilter, categoryFilter, signalMetadataByName]);
 
-  // Sync map configs and listen for external updates
+  // Sync carto configs and listen for external updates
   useEffect(() => {
-    const unsubscribe = ConfigManager.subscribe<Record<string, MapTuningData>>("map-configs", (newConfigs) => {
+    const unsubscribe = ConfigManager.subscribe<Record<string, CartoObject>>("carto-configs", (newConfigs) => {
       setMapConfigs(newConfigs ?? {});
     });
     return () => unsubscribe();
@@ -309,9 +311,9 @@ export default function ImportPanel({
       if (!cfg) return prev;
       next[name] = { ...cfg, gainVal: Number(Number(newGain).toFixed(3)) };
       try {
-        ConfigManager.set("map-configs", next);
+        ConfigManager.set("carto-configs", next);
       } catch (e) {
-        console.error("Failed to set map-configs", e);
+        console.error("Failed to set carto-configs", e);
       }
       return next;
     });
@@ -325,9 +327,9 @@ export default function ImportPanel({
       if (!cfg) return prev;
       next[name] = { ...cfg, offsetVal: Number(Number(newOffset).toFixed(3)) };
       try {
-        ConfigManager.set("map-configs", next);
+        ConfigManager.set("carto-configs", next);
       } catch (e) {
-        console.error("Failed to set map-configs", e);
+        console.error("Failed to set carto-configs", e);
       }
       return next;
     });

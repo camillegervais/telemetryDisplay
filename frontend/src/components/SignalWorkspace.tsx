@@ -892,7 +892,15 @@ export default function SignalWorkspace({
   const [mapConfigs, setMapConfigs] = useState<Record<string, MapTuningData>>(
     () => ConfigManager.get<Record<string, MapTuningData>>("map-configs") ?? {}
   );
+  const [cartoConfigs, setCartoConfigs] = useState<Record<string, import("../types").CartoObject>>(
+    () => ConfigManager.get<Record<string, import("../types").CartoObject>>("carto-configs") ?? {}
+  );
+  const [breakpointConfigs, setBreakpointConfigs] = useState<Record<string, import("../types").BreakpointObject>>(
+    () => ConfigManager.get<Record<string, import("../types").BreakpointObject>>("breakpoint-configs") ?? {}
+  );
   const mapConfigsRef = useRef<Record<string, MapTuningData>>(mapConfigs);
+  const cartoConfigsRef = useRef(cartoConfigs);
+  const breakpointConfigsRef = useRef(breakpointConfigs);
   const datasetIdRef = useRef<string | null>(datasetId);
   const [softBlocks, setSoftBlocks] = useState<SoftBlock[]>(() => ConfigManager.get<SoftBlock[]>("soft-blocks") ?? []);
   const [softBlockStatuses, setSoftBlockStatuses] = useState<Record<string, BlockStatus>>({});
@@ -1456,7 +1464,7 @@ export default function SignalWorkspace({
       timeoutId = setTimeout(() => {
         // Find blocks referencing any of the changed map keys
         const affectedBlocks = softBlocksRef.current.filter((b) =>
-          b.operations.some((op) => op.kind === "lut2d" && changedKeys.includes((op as SoftLutOp).mapConfigKey))
+          b.operations.some((op) => op.kind === "lut2d" && changedKeys.includes((op as SoftLutOp).mapConfigKey ?? ""))
         );
         // Only recalculate if no other tab is currently calculating (avoids parallel backend conflicts)
         if (!isCalcLockHeldByOther(tabInstanceIdRef.current)) {
@@ -1475,6 +1483,71 @@ export default function SignalWorkspace({
   useEffect(() => {
     mapConfigsRef.current = mapConfigs;
   }, [mapConfigs]);
+
+  // ── Carto / Breakpoint configs: sync from other tabs ────────────────────────
+  useEffect(() => {
+    let timeoutId: ReturnType<typeof setTimeout> | null = null;
+
+    const triggerCartoRecalc = (changedCartoKeys: string[]) => {
+      if (!datasetIdRef.current || changedCartoKeys.length === 0) return;
+      if (timeoutId !== null) clearTimeout(timeoutId);
+      timeoutId = setTimeout(() => {
+        const affectedBlocks = softBlocksRef.current.filter((b) =>
+          b.operations.some((op) => {
+            if (op.kind !== "lut2d") return false;
+            const lutOp = op as SoftLutOp;
+            return changedCartoKeys.includes(lutOp.cartoKey ?? "");
+          })
+        );
+        if (!isCalcLockHeldByOther(tabInstanceIdRef.current)) {
+          for (const blk of affectedBlocks) {
+            // eslint-disable-next-line @typescript-eslint/no-floating-promises
+            calculateSoftBlock(blk.id, softBlocksRef.current);
+          }
+        }
+        timeoutId = null;
+      }, 250);
+    };
+
+    const unsubCarto = ConfigManager.subscribe<Record<string, import("../types").CartoObject>>("carto-configs", (newConfigs) => {
+      const next = newConfigs ?? {};
+      const prev = cartoConfigsRef.current ?? {};
+      const changedKeys: string[] = [];
+      const allKeys = new Set([...Object.keys(prev), ...Object.keys(next)]);
+      const fieldsToCheck = ["gridData", "gainVal", "offsetVal", "braking_signal", "interpolation", "extrapolation", "breakpointKeyX", "breakpointKeyY"];
+      for (const k of allKeys) {
+        const a = prev[k], b = next[k];
+        if (a && b) {
+          for (const f of fieldsToCheck) {
+            if (JSON.stringify((a as any)[f]) !== JSON.stringify((b as any)[f])) { changedKeys.push(k); break; }
+          }
+        }
+      }
+      setCartoConfigs(next);
+      cartoConfigsRef.current = next;
+      triggerCartoRecalc(changedKeys);
+    });
+
+    const unsubBp = ConfigManager.subscribe<Record<string, import("../types").BreakpointObject>>("breakpoint-configs", (newConfigs) => {
+      const next = newConfigs ?? {};
+      const prev = breakpointConfigsRef.current ?? {};
+      // Find which breakpoint keys changed values
+      const changedBpKeys = Object.keys(next).filter(k => JSON.stringify(prev[k]?.values) !== JSON.stringify(next[k]?.values));
+      setBreakpointConfigs(next);
+      breakpointConfigsRef.current = next;
+      if (changedBpKeys.length === 0) return;
+      // Find cartos using those breakpoints
+      const changedCartoKeys = Object.entries(cartoConfigsRef.current)
+        .filter(([, c]) => changedBpKeys.includes(c.breakpointKeyX) || (c.breakpointKeyY && changedBpKeys.includes(c.breakpointKeyY)))
+        .map(([k]) => k);
+      triggerCartoRecalc(changedCartoKeys);
+    });
+
+    return () => { unsubCarto(); unsubBp(); if (timeoutId) clearTimeout(timeoutId); };
+  }, []);
+
+  useEffect(() => { cartoConfigsRef.current = cartoConfigs; }, [cartoConfigs]);
+  useEffect(() => { breakpointConfigsRef.current = breakpointConfigs; }, [breakpointConfigs]);
 
   // ── Soft Blocks: calculation engine ────────────────────────────────────────
 
@@ -1495,26 +1568,62 @@ export default function SignalWorkspace({
           const lutOp = op as SoftLutOp;
           // Use the latest persisted map configs (ref) to ensure live edits are applied
           const latestMapCfgs = mapConfigsRef.current ?? mapConfigs;
-          const mapCfg = latestMapCfgs[lutOp.mapConfigKey];
-          if (!mapCfg) {
-            throw new Error(`Map "${lutOp.mapConfigKey}" unknown. Save it first in Map Tuning tab.`);
+          const latestCartoCfgs = cartoConfigsRef.current ?? cartoConfigs;
+          const latestBpCfgs = breakpointConfigsRef.current ?? breakpointConfigs;
+
+          // New model: cartoKey + inputChannelX/Y declared in the op
+          if (lutOp.cartoKey) {
+            const cartoCfg = latestCartoCfgs[lutOp.cartoKey];
+            if (!cartoCfg) {
+              throw new Error(`Carto "${lutOp.cartoKey}" inconnue. Sauvegardez-la d'abord dans l'onglet Map Tuning.`);
+            }
+            const rowHeaders = latestBpCfgs[cartoCfg.breakpointKeyX]?.values ?? [];
+            const colHeaders = (cartoCfg.breakpointKeyY ? latestBpCfgs[cartoCfg.breakpointKeyY]?.values : null) ?? [0];
+            const inputChannelX = lutOp.inputChannelX ?? cartoCfg.defaultInputChannelX ?? "";
+            const inputChannelY = lutOp.inputChannelY ?? cartoCfg.defaultInputChannelY ?? "";
+            if (!inputChannelX) {
+              throw new Error(`Canal X non défini pour la carto "${lutOp.cartoKey}" dans le bloc "${block.name}".`);
+            }
+            await calculateMapTuning({
+              datasetId: currentDatasetId,
+              inputChannelX,
+              inputChannelY,
+              outputChannelName: lutOp.name,
+              gridData: cartoCfg.gridData,
+              rowHeaders,
+              colHeaders,
+              braking_signal: cartoCfg.braking_signal,
+              gainVal: cartoCfg.gainVal,
+              offsetVal: cartoCfg.offsetVal,
+              interpolation: cartoCfg.interpolation ?? "linear",
+              extrapolation: cartoCfg.extrapolation ?? "clamp",
+              display_signal: lutOp.displaySignal ?? true,
+              category_signal: block.name,
+            });
+          } else {
+            // Legacy model: mapConfigKey (backward compat)
+            const legacyKey = lutOp.mapConfigKey ?? "";
+            const mapCfg = latestMapCfgs[legacyKey];
+            if (!mapCfg) {
+              throw new Error(`Map "${legacyKey}" inconnue. Sauvegardez-la d'abord dans l'onglet Map Tuning.`);
+            }
+            await calculateMapTuning({
+              datasetId: currentDatasetId,
+              inputChannelX: mapCfg.inputChannelX,
+              inputChannelY: mapCfg.inputChannelY,
+              outputChannelName: lutOp.name,
+              gridData: mapCfg.gridData,
+              rowHeaders: mapCfg.rowHeaders,
+              colHeaders: mapCfg.colHeaders,
+              braking_signal: mapCfg.braking_signal,
+              gainVal: mapCfg.gainVal,
+              offsetVal: mapCfg.offsetVal,
+              interpolation: mapCfg.interpolation ?? "linear",
+              extrapolation: mapCfg.extrapolation ?? "clamp",
+              display_signal: lutOp.displaySignal ?? true,
+              category_signal: block.name,
+            });
           }
-          await calculateMapTuning({
-            datasetId: currentDatasetId,
-            inputChannelX: mapCfg.inputChannelX,
-            inputChannelY: mapCfg.inputChannelY,
-            outputChannelName: lutOp.name,  // use op name as output (not map's outputChannelName)
-            gridData: mapCfg.gridData,
-            rowHeaders: mapCfg.rowHeaders,
-            colHeaders: mapCfg.colHeaders,
-            braking_signal: mapCfg.braking_signal,
-            gainVal: mapCfg.gainVal,
-            offsetVal: mapCfg.offsetVal,
-            interpolation: mapCfg.interpolation ?? "linear",
-            extrapolation: mapCfg.extrapolation ?? "clamp",
-            display_signal: lutOp.displaySignal ?? true,
-            category_signal: block.name,
-          });
         } else if (op.kind === "math") {
           const mathOp = op as SoftMathOp;
           if (mathOp.dependencies.length > 0 && mathOp.expression.trim()) {
@@ -3254,11 +3363,18 @@ export default function SignalWorkspace({
             onCalculateBlock={(blockId) => calculateSoftBlock(blockId)}
             blockStatuses={softBlockStatuses}
             mapConfigs={mapConfigs}
+            cartoConfigs={cartoConfigs}
             onSwitchToMapTuning={switchToAnalysisTab}
             onDuplicateMapConfigs={(additions) => {
               const updated = { ...mapConfigsRef.current, ...additions };
               setMapConfigs(updated);
               ConfigManager.set("map-configs", updated);
+            }}
+            onDuplicateCartoConfigs={(additions) => {
+              const updated = { ...cartoConfigsRef.current, ...additions };
+              setCartoConfigs(updated);
+              cartoConfigsRef.current = updated;
+              ConfigManager.set("carto-configs", updated);
             }}
             onRefreshDatasetMetadata={onRefreshDatasetMetadata}
           />

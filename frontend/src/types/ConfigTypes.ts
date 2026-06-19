@@ -5,7 +5,7 @@
  * Each type represents a specific aspect of the application state that should be persisted to localStorage.
  */
 
-import type { MathChannel, MapTuningData, SoftBlock } from "../types";
+import type { MathChannel, MapTuningData, SoftBlock, BreakpointObject, CartoObject } from "../types";
 
 /**
  * Graph widget in a workspace tab
@@ -152,6 +152,12 @@ export type ConfigStorage = {
   "math-channels": MathChannel[];
   "map-configs": Record<string, MapTuningData>;
   "current-map-config": string | null;
+  /** New carto system — replaces map-configs */
+  "carto-configs": Record<string, CartoObject>;
+  /** Currently selected carto key in MapTuning */
+  "current-carto-config": string | null;
+  /** Standalone breakpoint axes — shared across cartos */
+  "breakpoint-configs": Record<string, BreakpointObject>;
   "user-preferences": UserPreferences;
   "dataset-id": string | null;
   /** Dataset ID loaded in slot B (reference dataset) */
@@ -187,6 +193,9 @@ export const CONFIG_DEFAULTS: ConfigStorage = {
   "math-channels": [],
   "map-configs": {},
   "current-map-config": null,
+  "carto-configs": {},
+  "current-carto-config": null,
+  "breakpoint-configs": {},
   "user-preferences": {
     displayName: "",
   },
