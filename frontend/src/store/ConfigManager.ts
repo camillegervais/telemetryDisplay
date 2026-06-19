@@ -1,16 +1,16 @@
 /**
- * ConfigManager - Centralized configuration storage and state management
+ * ConfigManager - Stockage centralisé de la configuration et gestion de l'état
  *
- * Singleton class that manages all application configurations:
- * - Persists to localStorage with dot-notation access
- * - Manages Zustand store for runtime state
- * - Provides subscribers pattern for reactive updates
- * - Supports cross-tab synchronization via StorageEvent
+ * Classe Singleton qui gère toutes les configurations de l'application :
+ * - Persistance dans le localStorage avec accès par notation par point
+ * - Gère le store Zustand pour l'état d'exécution
+ * - Fournit un modèle d'abonnés (subscribers) pour les mises à jour réactives
+ * - Supporte la synchronisation entre onglets via StorageEvent
  *
- * Usage:
- *   const layouts = ConfigManager.get('layouts');
- *   ConfigManager.set('math-channels', [...]);
- *   const unsubscribe = ConfigManager.subscribe('layouts', (newValue) => {...});
+ * Utilisation :
+ * const layouts = ConfigManager.get('layouts');
+ * ConfigManager.set('math-channels', [...]);
+ * const unsubscribe = ConfigManager.subscribe('layouts', (newValue) => {...});
  */
 
 import * as TOML from "smol-toml";
@@ -24,7 +24,7 @@ import {
   isValidConfigKey,
   setNestedValue,
 } from "../types/ConfigTypes";
-import type { MapTuningData } from "../types";
+import type { BreakpointObject, CartoObject } from "../types";
 
 type SubscriberCallback<T = unknown> = (newValue: T) => void;
 type Subscribers = Map<string, Set<SubscriberCallback>>;
@@ -32,7 +32,7 @@ type Subscribers = Map<string, Set<SubscriberCallback>>;
 const STORAGE_PREFIX = "telemetry-display.config";
 
 /**
- * ConfigManager Singleton - unified configuration management
+ * ConfigManager Singleton - gestion unifiée de la configuration
  */
 class ConfigManagerClass {
   private storage: ConfigStorage;
@@ -45,7 +45,7 @@ class ConfigManagerClass {
   }
 
   /**
-   * Load all configurations from localStorage
+   * Charge toutes les configurations depuis le localStorage
    */
   private loadFromLocalStorage(): ConfigStorage {
     if (typeof window === "undefined") {
@@ -66,7 +66,7 @@ class ConfigManagerClass {
           (result as any)[key] = CONFIG_DEFAULTS[key];
         }
       } catch (error) {
-        console.error(`Failed to load config ${key}:`, error);
+        console.error(`Échec du chargement de la configuration ${key}:`, error);
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         (result as any)[key] = CONFIG_DEFAULTS[key];
       }
@@ -76,7 +76,7 @@ class ConfigManagerClass {
   }
 
   /**
-   * Save a specific configuration to localStorage
+   * Sauvegarde une configuration spécifique dans le localStorage
    */
   private saveToLocalStorage<K extends keyof ConfigStorage>(key: K, value: ConfigStorage[K]): void {
     if (typeof window === "undefined") {
@@ -87,12 +87,12 @@ class ConfigManagerClass {
       const storageKey = `${STORAGE_PREFIX}.${key}`;
       window.localStorage.setItem(storageKey, JSON.stringify(value));
     } catch (error) {
-      console.error(`Failed to save config ${key}:`, error);
+      console.error(`Échec de la sauvegarde de la configuration ${key}:`, error);
     }
   }
 
   /**
-   * Setup listener for cross-tab synchronization
+   * Configure l'écouteur pour la synchronisation entre les onglets
    */
   private setupStorageEventListener(): void {
     if (typeof window === "undefined") {
@@ -100,7 +100,7 @@ class ConfigManagerClass {
     }
 
     this.storageEventListener = (event: StorageEvent) => {
-      // Only process events for our config keys
+      // Ne traite que les événements de nos clés de configuration
       if (!event.key || !event.key.startsWith(STORAGE_PREFIX)) {
         return;
       }
@@ -118,13 +118,13 @@ class ConfigManagerClass {
           newValue = CONFIG_DEFAULTS[key as keyof ConfigStorage];
         }
 
-        // Update internal storage
+        // Met à jour le stockage interne
         (this.storage as Record<string, unknown>)[key] = newValue;
 
-        // Notify subscribers
+        // Notifie les abonnés
         this.notifySubscribers(key, newValue);
       } catch (error) {
-        console.error(`Failed to process storage event for ${key}:`, error);
+        console.error(`Échec du traitement de l'événement de stockage pour ${key}:`, error);
       }
     };
 
@@ -132,7 +132,7 @@ class ConfigManagerClass {
   }
 
   /**
-   * Get a configuration value using dot notation
+   * Récupère une valeur de configuration via la notation par points
    * @example get('layouts') or get('layouts.0.name')
    */
   public get<T = unknown>(path: string): T | undefined {
@@ -140,7 +140,7 @@ class ConfigManagerClass {
     const topLevelKey = parts[0];
 
     if (!isValidConfigKey(topLevelKey)) {
-      console.warn(`Invalid config key: ${topLevelKey}`);
+      console.warn(`Clé de configuration invalide : ${topLevelKey}`);
       return undefined;
     }
 
@@ -153,8 +153,8 @@ class ConfigManagerClass {
   }
 
   /**
-   * Set a configuration value using dot notation
-   * Updates both internal storage and localStorage
+   * Définit une valeur de configuration via la notation par points
+   * Met à jour le stockage interne et le localStorage
    * @example set('layouts', [...]) or set('layouts.0.name', 'New Name')
    */
   public set<T = unknown>(path: string, value: T): void {
@@ -162,18 +162,18 @@ class ConfigManagerClass {
     const topLevelKey = parts[0];
 
     if (!isValidConfigKey(topLevelKey)) {
-      throw new Error(`Invalid config key: ${topLevelKey}`);
+      throw new Error(`Clé de configuration invalide : ${topLevelKey}`);
     }
 
     if (parts.length === 1) {
-      // Setting top-level key
+      // Définition d'une clé de premier niveau
       const storedValue = value as ConfigStorage[typeof topLevelKey];
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       (this.storage as any)[topLevelKey] = storedValue;
       this.saveToLocalStorage(topLevelKey, storedValue);
       this.notifySubscribers(path, value);
     } else {
-      // Setting nested value
+      // Définition d'une valeur imbriquée
       const nestedPath = parts.slice(1).join(".");
       const updated = setNestedValue(
         this.storage[topLevelKey] as Record<string, unknown>,
@@ -189,13 +189,13 @@ class ConfigManagerClass {
   }
 
   /**
-   * Subscribe to changes on a configuration value
-   * Returns unsubscribe function
+   * S'abonne aux changements d'une valeur de configuration
+   * Retourne une fonction de désabonnement
    * @example
-   *   const unsubscribe = ConfigManager.subscribe('layouts', (newValue) => {
-   *     console.log('Layouts changed:', newValue);
-   *   });
-   *   unsubscribe(); // stop listening
+   * const unsubscribe = ConfigManager.subscribe('layouts', (newValue) => {
+   * console.log('Layouts changed:', newValue);
+   * });
+   * unsubscribe(); // arrête l'écoute
    */
   public subscribe<T = unknown>(path: string, callback: SubscriberCallback<T>): () => void {
     if (!this.subscribers.has(path)) {
@@ -213,19 +213,18 @@ class ConfigManagerClass {
   }
 
   /**
-   * Subscribe with debounce - prevents double actions on rapid updates
-   * Ideal for expensive operations (API calls, recalculations)
-   * @param path Config key to watch
-   * @param callback Function to call when value changes
-   * @param debounceMs Delay before calling callback (default 100ms)
-   * @returns Unsubscribe function
-   * 
-   * @example
-   *   ConfigManager.subscribeDebouncedFull(
-   *     'math-channels',
-   *     (newValue) => recalculateAll(newValue),
-   *     200
-   *   );
+   * S'abonne avec un délai (debounce) - empêche les doubles actions sur des mises à jour rapides
+   * Idéal pour les opérations coûteuses (appels API, recalculs)
+   * @param path Clé de configuration à surveiller
+   * @param callback Fonction à appeler quand la valeur change
+   * @param debounceMs Délai avant d'appeler le callback (défaut 100ms)
+   * @returns Fonction de désabonnement
+   * * @example
+   * ConfigManager.subscribeDebouncedFull(
+   * 'math-channels',
+   * (newValue) => recalculateAll(newValue),
+   * 200
+   * );
    */
   public subscribeDebouncedFull<T = unknown>(
     path: string,
@@ -236,18 +235,18 @@ class ConfigManagerClass {
     let lastValue: unknown = this.get(path);
 
     const wrappedCallback: SubscriberCallback<T> = (newValue: T) => {
-      // Skip if value hasn't actually changed
+      // Ignorer si la valeur n'a pas réellement changé
       if (JSON.stringify(newValue) === JSON.stringify(lastValue)) {
         return;
       }
       lastValue = newValue;
 
-      // Clear pending call
+      // Effacer l'appel en attente
       if (timeoutId !== null) {
         clearTimeout(timeoutId);
       }
 
-      // Schedule new call
+      // Programmer le nouvel appel
       timeoutId = setTimeout(() => {
         callback(newValue);
         timeoutId = null;
@@ -258,25 +257,24 @@ class ConfigManagerClass {
   }
 
   /**
-   * Update multiple config values atomically
-   * All updates use the same batch, preventing intermediate states
-   * @param updates Object with config keys and their new values
-   * 
-   * @example
-   *   ConfigManager.setBatch({
-   *     'math-channels': newChannels,
-   *     'dataset-id': datasetId
-   *   });
+   * Met à jour plusieurs valeurs de configuration de manière atomique
+   * Toutes les mises à jour utilisent le même lot, évitant les états intermédiaires
+   * @param updates Objet avec les clés de configuration et leurs nouvelles valeurs
+   * * @example
+   * ConfigManager.setBatch({
+   * 'math-channels': newChannels,
+   * 'dataset-id': datasetId
+   * });
    */
   public setBatch(updates: Partial<ConfigStorage>): void {
-    // Validate all keys first
+    // Valider toutes les clés en premier
     for (const key of Object.keys(updates)) {
       if (!isValidConfigKey(key)) {
-        throw new Error(`Invalid config key: ${key}`);
+        throw new Error(`Clé de configuration invalide : ${key}`);
       }
     }
 
-    // Apply all updates
+    // Appliquer toutes les mises à jour
     for (const key of Object.keys(updates) as Array<keyof ConfigStorage>) {
       const value = updates[key];
       if (value !== undefined) {
@@ -290,7 +288,7 @@ class ConfigManagerClass {
   }
 
   /**
-   * Notify all subscribers for a config path
+   * Notifie tous les abonnés pour un chemin de configuration
    */
   private notifySubscribers(path: string, value: unknown): void {
     const callbacks = this.subscribers.get(path);
@@ -299,12 +297,12 @@ class ConfigManagerClass {
         try {
           callback(value);
         } catch (error) {
-          console.error(`Subscriber error for ${path}:`, error);
+          console.error(`Erreur de l'abonné pour ${path}:`, error);
         }
       });
     }
 
-    // Also notify parent subscribers (e.g., if 'layouts.0' changed, notify 'layouts' subscribers)
+    // Notifie également les abonnés parents (ex: si 'layouts.0' change, notifier les abonnés 'layouts')
     const parts = path.split(".");
     if (parts.length > 1) {
       const parentPath = parts.slice(0, -1).join(".");
@@ -315,7 +313,7 @@ class ConfigManagerClass {
           try {
             callback(parentValue);
           } catch (error) {
-            console.error(`Subscriber error for ${parentPath}:`, error);
+            console.error(`Erreur de l'abonné pour ${parentPath}:`, error);
           }
         });
       }
@@ -323,15 +321,15 @@ class ConfigManagerClass {
   }
 
   /**
-   * Get all configurations as a snapshot
-   * Useful for export functionality
+   * Récupère toutes les configurations sous forme d'instantané (snapshot)
+   * Utile pour la fonctionnalité d'exportation
    */
   public getAllConfig(): ConfigStorage {
     return JSON.parse(JSON.stringify(this.storage));
   }
 
   /**
-   * Clear all configurations and reset to defaults
+   * Efface toutes les configurations et réinitialise aux valeurs par défaut
    */
   public clear(): void {
     if (typeof window === "undefined") {
@@ -349,7 +347,7 @@ class ConfigManagerClass {
   }
 
   /**
-   * Cleanup event listeners (called on app shutdown if needed)
+   * Nettoie les écouteurs d'événements (appelé à l'arrêt de l'application si nécessaire)
    */
   public destroy(): void {
     if (this.storageEventListener && typeof window !== "undefined") {
@@ -358,7 +356,7 @@ class ConfigManagerClass {
   }
 
   /**
-   * Export all configurations to TOML format (excluding dataset-id)
+   * Exporte toutes les configurations au format TOML (à l'exclusion de dataset-id)
    */
   public exportToToml(): string {
     const exportData: Record<string, unknown> = {
@@ -369,8 +367,8 @@ class ConfigManagerClass {
       session: this.storage.session,
       layouts: this.storage.layouts,
       "math-channels": this.storage["math-channels"],
-      "map-configs": this.storage["map-configs"],
-      "current-map-config": this.storage["current-map-config"],
+      "breakpoint-configs": this.storage["breakpoint-configs"],
+      "carto-configs": this.storage["carto-configs"],
       "user-preferences": this.storage["user-preferences"],
       "soft-blocks": this.storage["soft-blocks"],
       "signal-colors": this.storage["signal-colors"],
@@ -381,8 +379,8 @@ class ConfigManagerClass {
   }
 
   /**
-   * Parse TOML for import preview without applying changes
-   * Returns structured data with metadata for selective import UI
+   * Analyse le TOML pour l'aperçu de l'importation sans appliquer de changements
+   * Renvoie des données structurées avec des métadonnées pour l'interface d'importation sélective
    */
   public parseTomlForImport(tomlString: string): ParsedTomlData {
     try {
@@ -390,7 +388,8 @@ class ConfigManagerClass {
 
       const layouts = (parsed.layouts as ConfigStorage["layouts"]) || [];
       const mathChannels = (parsed["math-channels"] as ConfigStorage["math-channels"]) || [];
-      const mapConfigs = (parsed["map-configs"] as ConfigStorage["map-configs"]) || {};
+      const breakpoints = (parsed["breakpoint-configs"] as Record<string, BreakpointObject>) || {};
+      const cartos = (parsed["carto-configs"] as Record<string, CartoObject>) || {};
       const softBlocks = (parsed["soft-blocks"] as ConfigStorage["soft-blocks"]) || [];
       const signalColors = (parsed["signal-colors"] as ConfigStorage["signal-colors"]) || {};
       const telDataConfigs = (parsed["teldata-configs"] as ConfigStorage["teldata-configs"]) || [];
@@ -405,10 +404,15 @@ class ConfigManagerClass {
           items: mathChannels,
           count: mathChannels.length,
         },
-        mapConfigs: {
-          items: mapConfigs,
-          keys: Object.keys(mapConfigs),
-          count: Object.keys(mapConfigs).length,
+        breakpoints: {
+          items: breakpoints,
+          keys: Object.keys(breakpoints),
+          count: Object.keys(breakpoints).length,
+        },
+        cartos: {
+          items: cartos,
+          keys: Object.keys(cartos),
+          count: Object.keys(cartos).length,
         },
         softBlocks: {
           items: softBlocks,
@@ -429,18 +433,18 @@ class ConfigManagerClass {
       };
     } catch (error) {
       throw new Error(
-        `Failed to parse TOML configuration: ${error instanceof Error ? error.message : String(error)}`
+        `Échec de l'analyse de la configuration TOML: ${error instanceof Error ? error.message : String(error)}`
       );
     }
   }
 
   /**
-   * Import configurations from TOML with selective options
-   * Allows partial imports with merge or replace modes
+   * Importe les configurations depuis le TOML avec des options sélectives
+   * Permet des importations partielles avec les modes de fusion (add) ou de remplacement (replace)
    */
   public importFromTomlPartial(data: ParsedTomlData, selection: ImportSelection): void {
     try {
-      // Helper function to merge arrays by deduplicating on a key
+      // Fonction utilitaire pour fusionner des tableaux en dédupliquant sur une clé
       const mergeArrays = <T extends Record<string, unknown>>(
         existing: T[],
         imported: T[],
@@ -455,7 +459,7 @@ class ConfigManagerClass {
 
       const updates: Partial<ConfigStorage> = {};
 
-      // Handle layouts
+      // Gestion des layouts
       if (selection.layouts?.enabled) {
         const selectedLayouts = selection.layouts.selectedIds
           ? data.layouts.items.filter((l) => selection.layouts?.selectedIds?.includes(l.id))
@@ -468,7 +472,7 @@ class ConfigManagerClass {
         }
       }
 
-      // Handle math channels
+      // Gestion des math channels
       if (selection.mathChannels?.enabled) {
         if (selection.mathChannels.mode === "replace") {
           updates["math-channels"] = data.mathChannels.items;
@@ -481,26 +485,45 @@ class ConfigManagerClass {
         }
       }
 
-      // Handle map configs
-      if (selection.mapConfigs?.enabled) {
-        const selectedKeys = selection.mapConfigs.selectedKeys && selection.mapConfigs.selectedKeys.length > 0
-          ? selection.mapConfigs.selectedKeys
-          : data.mapConfigs.keys;
+      // Gestion des breakpoints
+      if (selection.breakpoints?.enabled) {
+        const selectedKeys = selection.breakpoints.selectedKeys && selection.breakpoints.selectedKeys.length > 0
+          ? selection.breakpoints.selectedKeys
+          : data.breakpoints.keys;
         const selectedConfigs = Object.fromEntries(
-          selectedKeys.map((key) => [key, data.mapConfigs.items[key]]).filter(([, v]) => v)
+          selectedKeys.map((key) => [key, data.breakpoints.items[key]]).filter(([, v]) => v)
         );
 
-        if (selection.mapConfigs.mode === "replace") {
-          updates["map-configs"] = selectedConfigs as Record<string, MapTuningData>;
+        if (selection.breakpoints.mode === "replace") {
+          updates["breakpoint-configs"] = selectedConfigs as Record<string, BreakpointObject>;
         } else {
-          updates["map-configs"] = {
-            ...this.storage["map-configs"],
+          updates["breakpoint-configs"] = {
+            ...this.storage["breakpoint-configs"],
             ...selectedConfigs,
           };
         }
       }
 
-      // Handle soft blocks
+      // Gestion des cartos 2D
+      if (selection.cartos?.enabled) {
+        const selectedKeys = selection.cartos.selectedKeys && selection.cartos.selectedKeys.length > 0
+          ? selection.cartos.selectedKeys
+          : data.cartos.keys;
+        const selectedConfigs = Object.fromEntries(
+          selectedKeys.map((key) => [key, data.cartos.items[key]]).filter(([, v]) => v)
+        );
+
+        if (selection.cartos.mode === "replace") {
+          updates["carto-configs"] = selectedConfigs as Record<string, CartoObject>;
+        } else {
+          updates["carto-configs"] = {
+            ...this.storage["carto-configs"],
+            ...selectedConfigs,
+          };
+        }
+      }
+
+      // Gestion des soft blocks
       if (selection.softBlocks?.enabled) {
         const selectedBlocks = selection.softBlocks.selectedIds && selection.softBlocks.selectedIds.length > 0
           ? data.softBlocks.items.filter((block) => selection.softBlocks?.selectedIds?.includes(block.id))
@@ -517,7 +540,7 @@ class ConfigManagerClass {
         }
       }
 
-      // Handle signal colors
+      // Gestion des signal colors
       if (selection.signalColors?.enabled) {
         if (selection.signalColors.mode === "replace") {
           updates["signal-colors"] = data.signalColors.items;
@@ -528,7 +551,8 @@ class ConfigManagerClass {
           };
         }
       }
-      // Handle TelData configs
+      
+      // Gestion des TelData configs
       if (selection.telDataConfigs?.enabled) {
         const selectedConfigs = selection.telDataConfigs.selectedIds && selection.telDataConfigs.selectedIds.length > 0
           ? data.telDataConfigs.items.filter((c) => selection.telDataConfigs?.selectedIds?.includes(c.id))
@@ -545,7 +569,7 @@ class ConfigManagerClass {
         }
       }
 
-      // Apply all updates
+      // Appliquer toutes les mises à jour
       for (const [key, value] of Object.entries(updates)) {
         if (value !== undefined) {
           const storageKey = key as keyof ConfigStorage;
@@ -557,34 +581,34 @@ class ConfigManagerClass {
       }
     } catch (error) {
       throw new Error(
-        `Failed to import TOML configuration: ${error instanceof Error ? error.message : String(error)}`
+        `Échec de l'importation de la configuration TOML: ${error instanceof Error ? error.message : String(error)}`
       );
     }
   }
 
   /**
-   * Import configurations from TOML format (replaces all existing configs)
+   * Importe les configurations depuis le format TOML (remplace toutes les configs existantes)
    */
   public importFromToml(tomlString: string): void {
     try {
       const parsed = TOML.parse(tomlString) as Record<string, unknown>;
 
-      // Extract configs, ignoring _meta
+      // Extrait les configurations, en ignorant _meta
       const configsToImport: Partial<ConfigStorage> = {
         session: (parsed.session as ConfigStorage["session"]) || this.storage.session,
         layouts: (parsed.layouts as ConfigStorage["layouts"]) || this.storage.layouts,
         "math-channels": (parsed["math-channels"] as ConfigStorage["math-channels"]) || this.storage["math-channels"],
-        "map-configs": (parsed["map-configs"] as ConfigStorage["map-configs"]) || this.storage["map-configs"],
-        "current-map-config": (parsed["current-map-config"] as ConfigStorage["current-map-config"]) || this.storage["current-map-config"],
+        "breakpoint-configs": (parsed["breakpoint-configs"] as ConfigStorage["breakpoint-configs"]) || this.storage["breakpoint-configs"],
+        "carto-configs": (parsed["carto-configs"] as ConfigStorage["carto-configs"]) || this.storage["carto-configs"],
         "user-preferences": (parsed["user-preferences"] as ConfigStorage["user-preferences"]) || this.storage["user-preferences"],
         "soft-blocks": (parsed["soft-blocks"] as ConfigStorage["soft-blocks"]) || this.storage["soft-blocks"],
         "signal-colors": (parsed["signal-colors"] as ConfigStorage["signal-colors"]) || this.storage["signal-colors"],
-        "dataset-id": this.storage["dataset-id"], // Keep current dataset
+        "dataset-id": this.storage["dataset-id"], // Garde le dataset actuel
       };
 
-      // Replace all configs (except dataset-id which stays unchanged)
+      // Remplace toutes les configurations (sauf dataset-id qui reste inchangé)
       for (const key of Object.keys(configsToImport) as Array<keyof ConfigStorage>) {
-        if (key === "dataset-id") continue; // Don't override dataset
+        if (key === "dataset-id") continue; // Ne pas écraser le dataset
 
         const value = configsToImport[key];
         if (value !== undefined) {
@@ -596,17 +620,17 @@ class ConfigManagerClass {
         }
       }
     } catch (error) {
-      throw new Error(`Failed to import TOML configuration: ${error instanceof Error ? error.message : String(error)}`);
+      throw new Error(`Échec de l'importation de la configuration TOML: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
 }
 
 /**
- * Singleton instance - exported as the public API
+ * Instance Singleton - exportée en tant qu'API publique
  */
 export const ConfigManager = new ConfigManagerClass();
 
 /**
- * Type export for dependency injection scenarios (optional)
+ * Exportation du type pour les scénarios d'injection de dépendances (optionnel)
  */
 export type { ConfigManagerClass };

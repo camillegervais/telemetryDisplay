@@ -318,10 +318,15 @@ export type ImportSelection = {
     enabled: boolean;
     mode: ImportMode;
   };
-  mapConfigs?: {
+  breakpoints?: {
     enabled: boolean;
     mode: ImportMode;
-    selectedKeys?: string[];
+    selectedKeys: string[];
+  };
+  cartos?: {
+    enabled: boolean;
+    mode: ImportMode;
+    selectedKeys: string[];
   };
   softBlocks?: {
     enabled: boolean;
@@ -351,10 +356,15 @@ export type ParsedTomlData = {
     items: MathChannel[];
     count: number;
   };
-  mapConfigs: {
-    items: Record<string, MapTuningData>;
-    keys: string[];
+  breakpoints: {
     count: number;
+    keys: string[];
+    items: Record<string, BreakpointObject>;
+  };
+  cartos: {
+    count: number;
+    keys: string[];
+    items: Record<string, CartoObject>;
   };
   softBlocks: {
     items: SoftBlock[];

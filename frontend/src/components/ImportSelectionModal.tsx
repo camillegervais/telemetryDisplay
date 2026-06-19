@@ -19,7 +19,12 @@ export function ImportSelectionModal({ data, onConfirm, onCancel, isLoading = fa
       enabled: false,
       mode: "add",
     },
-    mapConfigs: {
+    breakpoints: {
+      enabled: false,
+      mode: "add",
+      selectedKeys: [],
+    },
+    cartos: {
       enabled: false,
       mode: "add",
       selectedKeys: [],
@@ -196,14 +201,26 @@ export function ImportSelectionModal({ data, onConfirm, onCancel, isLoading = fa
     }));
   };
 
-  const handleMapConfigSelect = (key: string, checked: boolean) => {
+  const handleBreakpointSelect = (key: string, checked: boolean) => {
     setSelection((prev) => ({
       ...prev,
-      mapConfigs: {
-        ...prev.mapConfigs!,
+      breakpoints: {
+        ...prev.breakpoints!,
         selectedKeys: checked
-          ? [...(prev.mapConfigs?.selectedKeys || []), key]
-          : (prev.mapConfigs?.selectedKeys || []).filter((k) => k !== key),
+          ? [...(prev.breakpoints?.selectedKeys || []), key]
+          : (prev.breakpoints?.selectedKeys || []).filter((k) => k !== key),
+      },
+    }));
+  };
+
+  const handleCartoSelect = (key: string, checked: boolean) => {
+    setSelection((prev) => ({
+      ...prev,
+      cartos: {
+        ...prev.cartos!,
+        selectedKeys: checked
+          ? [...(prev.cartos?.selectedKeys || []), key]
+          : (prev.cartos?.selectedKeys || []).filter((k) => k !== key),
       },
     }));
   };
@@ -236,15 +253,31 @@ export function ImportSelectionModal({ data, onConfirm, onCancel, isLoading = fa
     });
   };
 
-  const handleSelectAllMapConfigs = () => {
+  const handleSelectAllBreakpoints = () => {
     setSelection((prev) => {
-      const allKeys = data.mapConfigs.keys || [];
-      const currentlySelected = prev.mapConfigs?.selectedKeys || [];
+      const allKeys = data.breakpoints.keys || [];
+      const currentlySelected = prev.breakpoints?.selectedKeys || [];
       const allSelected = currentlySelected.length === allKeys.length && allKeys.length > 0;
       return {
         ...prev,
-        mapConfigs: {
-          ...prev.mapConfigs!,
+        breakpoints: {
+          ...prev.breakpoints!,
+          enabled: true,
+          selectedKeys: allSelected ? [] : allKeys,
+        },
+      };
+    });
+  };
+
+  const handleSelectAllCartos = () => {
+    setSelection((prev) => {
+      const allKeys = data.cartos.keys || [];
+      const currentlySelected = prev.cartos?.selectedKeys || [];
+      const allSelected = currentlySelected.length === allKeys.length && allKeys.length > 0;
+      return {
+        ...prev,
+        cartos: {
+          ...prev.cartos!,
           enabled: true,
           selectedKeys: allSelected ? [] : allKeys,
         },
@@ -350,7 +383,8 @@ export function ImportSelectionModal({ data, onConfirm, onCancel, isLoading = fa
             {data.mathChannels.count > 0 && (
               <div>✓ {data.mathChannels.count} Math Channel{data.mathChannels.count !== 1 ? "s" : ""}</div>
             )}
-            {data.mapConfigs.count > 0 && <div>✓ {data.mapConfigs.count} Map{data.mapConfigs.count !== 1 ? "s" : ""}</div>}
+            {data.breakpoints.count > 0 && <div>✓ {data.breakpoints.count} Breakpoint{data.breakpoints.count !== 1 ? "s" : ""}</div>}
+            {data.cartos.count > 0 && <div>✓ {data.cartos.count} Carto{data.cartos.count !== 1 ? "s" : ""} 2D</div>}
             {data.softBlocks.count > 0 && (
               <div>✓ {data.softBlocks.count} Soft Block{data.softBlocks.count !== 1 ? "s" : ""}</div>
             )}
@@ -383,19 +417,39 @@ export function ImportSelectionModal({ data, onConfirm, onCancel, isLoading = fa
           </div>
         ))}
 
-        {/* Map Configs Section */}
-        {renderSection("Cartos", "mapConfigs", data.mapConfigs.count, (
+        {/* Breakpoints Section */}
+        {renderSection("Breakpoints", "breakpoints", data.breakpoints.count, (
           <div style={itemsListStyle}>
             <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: "0.5rem" }}>
-              <button style={smallButtonStyle} onClick={handleSelectAllMapConfigs}>Select all</button>
+              <button style={smallButtonStyle} onClick={handleSelectAllBreakpoints}>Select all</button>
             </div>
 
-            {data.mapConfigs.keys.map((key) => (
+            {data.breakpoints.keys.map((key) => (
               <label key={key} style={itemCheckboxStyle}>
                 <input
                   type="checkbox"
-                  checked={selection.mapConfigs?.selectedKeys?.includes(key) ?? false}
-                  onChange={(e) => handleMapConfigSelect(key, e.target.checked)}
+                  checked={selection.breakpoints?.selectedKeys?.includes(key) ?? false}
+                  onChange={(e) => handleBreakpointSelect(key, e.target.checked)}
+                />
+                <span>{key}</span>
+              </label>
+            ))}
+          </div>
+        ))}
+
+        {/* Cartos Section */}
+        {renderSection("Cartos 2D", "cartos", data.cartos.count, (
+          <div style={itemsListStyle}>
+            <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: "0.5rem" }}>
+              <button style={smallButtonStyle} onClick={handleSelectAllCartos}>Select all</button>
+            </div>
+
+            {data.cartos.keys.map((key) => (
+              <label key={key} style={itemCheckboxStyle}>
+                <input
+                  type="checkbox"
+                  checked={selection.cartos?.selectedKeys?.includes(key) ?? false}
+                  onChange={(e) => handleCartoSelect(key, e.target.checked)}
                 />
                 <span>{key}</span>
               </label>
@@ -425,6 +479,7 @@ export function ImportSelectionModal({ data, onConfirm, onCancel, isLoading = fa
 
         {/* Signal Colors Section */}
         {renderSection("Couleurs Signaux", "signalColors", data.signalColors.count)}
+        
         {/* TelData Configs Section */}
         {renderSection("Configs TelData", "telDataConfigs", data.telDataConfigs.count, (
           <div style={itemsListStyle}>
