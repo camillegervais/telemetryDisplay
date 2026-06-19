@@ -53,6 +53,7 @@ export function CartoImportPanel({ onImportComplete }: CartoImportPanelProps) {
     fontSize: "0.9rem",
     fontWeight: "bold",
     transition: "all 0.2s",
+    marginRight: "1rem"
   };
 
   const handleOpenImport = () => {

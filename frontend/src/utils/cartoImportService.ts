@@ -251,7 +251,7 @@ export class CartoImportService {
           updatedCartos[existingEntry.key] = {
             ...existingEntry.obj,
             gridData: importedCarto.gridData,
-            breakpointKeyX: bpXKey,
+            breakpointKeyX: bpXKey || existingEntry.obj.breakpointKeyX,
             breakpointKeyY: bpYKey || existingEntry.obj.breakpointKeyY,
             description: `Updated from import on ${new Date().toISOString()}`,
           };

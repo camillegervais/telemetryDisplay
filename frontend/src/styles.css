@@ -892,6 +892,7 @@ body::after {
   color: var(--cyan);
   padding: 0.15rem 0.45rem;
   font-size: 0.74rem;
+  height: fit-content;
 }
 
 .panel-text {

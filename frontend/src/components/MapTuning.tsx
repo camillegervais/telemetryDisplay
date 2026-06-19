@@ -638,7 +638,10 @@ export default function MapTuning({
       
       <div className="panel-header panel-header-tight">
         <h2>Map tuning</h2>
-        <div className="panel-badge">{outputChannelName}</div>
+        <div style={{display: "flex", alignItems: "center"}}>
+          <CartoImportPanel onImportComplete={handleImportComplete} />
+          <div className="panel-badge">{outputChannelName}</div>
+        </div>
       </div>
 
       {saveMessage && (
@@ -654,98 +657,7 @@ export default function MapTuning({
       )}
 
       {/* ================================================================
-          SECTION A — Gestionnaire de breakpoints
-          ================================================================ */}
-      <section className="map-tuning-section">
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", cursor: "pointer" }}
-             onClick={() => setShowBpSection(s => !s)}>
-          <h3 style={{ margin: 0 }}>Breakpoints ({Object.keys(breakpointConfigs).length})</h3>
-          <span style={{ fontSize: "0.8rem", color: "var(--fg-2)" }}>{showBpSection ? "▲ Masquer" : "▼ Afficher"}</span>
-        </div>
-
-        {showBpSection && (
-          <div style={{ marginTop: "0.75rem", display: "flex", flexDirection: "column", gap: "0.5rem" }}>
-            {/* Create new breakpoint */}
-            <div style={{ display: "flex", gap: "0.5rem" }}>
-              <input
-                type="text"
-                className="topbar-user-input"
-                placeholder="Nom du breakpoint (ex : BP_N_Engine)"
-                value={newBpName}
-                onChange={e => setNewBpName(e.target.value)}
-                onKeyDown={e => { if (e.key === "Enter") handleCreateBreakpoint(); }}
-                style={{ flex: 1 }}
-              />
-              <button className="small-button" onClick={handleCreateBreakpoint} disabled={!newBpName.trim()}>
-                + Créer
-              </button>
-            </div>
-
-            {/* List of breakpoints */}
-            {Object.keys(breakpointConfigs).length === 0 ? (
-              <p style={{ fontSize: "0.8rem", color: "var(--fg-2)" }}>Aucun breakpoint. Créez-en un ci-dessus.</p>
-            ) : (
-              Object.entries(breakpointConfigs).map(([key, bp]) => {
-                const usedBy = bpUsage(key);
-                const isActive = activeBpKey === key;
-                return (
-                  <div key={key} style={{
-                    border: `1px solid ${isActive ? "var(--accent)" : "var(--line)"}`,
-                    borderRadius: "4px",
-                    padding: "0.5rem",
-                    background: isActive ? "rgba(255,70,93,0.05)" : "transparent"
-                  }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
-                      <button
-                        className="small-button"
-                        style={{ padding: "0 6px" }}
-                        onClick={() => setActiveBpKey(isActive ? null : key)}
-                        title="Éditer les valeurs"
-                      >{isActive ? "▲" : "▼"}</button>
-                      <strong style={{ fontSize: "0.85rem", flex: 1 }}>{key}</strong>
-                      <span style={{ fontSize: "0.75rem", color: "var(--fg-2)" }}>
-                        {bp.values.length} pts
-                        {usedBy.length > 0 && ` · utilisé par : ${usedBy.join(", ")}`}
-                      </span>
-                      <button
-                        className="soft-icon-btn soft-icon-btn-danger"
-                        onClick={() => handleDeleteBreakpoint(key)}
-                        title="Supprimer ce breakpoint"
-                        disabled={usedBy.length > 0}
-                      >×</button>
-                    </div>
-
-                    {isActive && (
-                      <div style={{ marginTop: "0.5rem" }}>
-                        <label className="field-label" style={{ fontSize: "0.75rem" }}>
-                          Valeurs (séparées par tabulation, virgule, espace ou nouvelle ligne)
-                        </label>
-                        <textarea
-                          style={{
-                            width: "100%", fontFamily: "monospace", fontSize: "0.75rem",
-                            background: "var(--bg-2)", color: "var(--fg-1)",
-                            border: "1px solid var(--line)", borderRadius: "3px",
-                            padding: "0.25rem", boxSizing: "border-box", resize: "vertical", minHeight: "48px"
-                          }}
-                          defaultValue={bp.values.join("\t")}
-                          onBlur={e => handleBpValuesChange(key, e.target.value)}
-                          onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleBpValuesChange(key, (e.target as HTMLTextAreaElement).value); } }}
-                        />
-                        <p style={{ fontSize: "0.7rem", color: "var(--fg-2)", margin: "0.25rem 0 0" }}>
-                          Modifier les valeurs ici les propagera à toutes les cartos qui utilisent ce breakpoint.
-                        </p>
-                      </div>
-                    )}
-                  </div>
-                );
-              })
-            )}
-          </div>
-        )}
-      </section>
-
-      {/* ================================================================
-          SECTION B — Bibliothèque locale de cartos
+          SECTION A — Bibliothèque locale de cartos
           ================================================================ */}
       <section className="map-tuning-section" style={{ position: "relative" }}>
         <h3>Cartos sauvegardées</h3>
@@ -1174,7 +1086,6 @@ export default function MapTuning({
             {isSaving ? "⏳ Loading..." : "💾 Save"}
           </button>
           <div style={{ display: "flex", gap: "0.5rem" }}>
-            <CartoImportPanel onImportComplete={handleImportComplete} />
             <button
               className="small-button"
               onClick={() => setShow3DViewer((s) => !s)}
@@ -1292,6 +1203,97 @@ export default function MapTuning({
           </div>
         )}
       </footer>
+
+      {/* ================================================================
+          SECTION A — Gestionnaire de breakpoints
+          ================================================================ */}
+      <section className="map-tuning-section">
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", cursor: "pointer" }}
+             onClick={() => setShowBpSection(s => !s)}>
+          <h3 style={{ margin: 0 }}>Breakpoints ({Object.keys(breakpointConfigs).length})</h3>
+          <span style={{ fontSize: "0.8rem", color: "var(--fg-2)" }}>{showBpSection ? "▲ Masquer" : "▼ Afficher"}</span>
+        </div>
+
+        {showBpSection && (
+          <div style={{ marginTop: "0.75rem", display: "flex", flexDirection: "column", gap: "0.5rem" }}>
+            {/* Create new breakpoint */}
+            <div style={{ display: "flex", gap: "0.5rem" }}>
+              <input
+                type="text"
+                className="topbar-user-input"
+                placeholder="Nom du breakpoint (ex : BP_N_Engine)"
+                value={newBpName}
+                onChange={e => setNewBpName(e.target.value)}
+                onKeyDown={e => { if (e.key === "Enter") handleCreateBreakpoint(); }}
+                style={{ flex: 1 }}
+              />
+              <button className="small-button" onClick={handleCreateBreakpoint} disabled={!newBpName.trim()}>
+                + Créer
+              </button>
+            </div>
+
+            {/* List of breakpoints */}
+            {Object.keys(breakpointConfigs).length === 0 ? (
+              <p style={{ fontSize: "0.8rem", color: "var(--fg-2)" }}>Aucun breakpoint. Créez-en un ci-dessus.</p>
+            ) : (
+              Object.entries(breakpointConfigs).map(([key, bp]) => {
+                const usedBy = bpUsage(key);
+                const isActive = activeBpKey === key;
+                return (
+                  <div key={key} style={{
+                    border: `1px solid ${isActive ? "var(--accent)" : "var(--line)"}`,
+                    borderRadius: "4px",
+                    padding: "0.5rem",
+                    background: isActive ? "rgba(255,70,93,0.05)" : "transparent"
+                  }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                      <button
+                        className="small-button"
+                        style={{ padding: "0 6px" }}
+                        onClick={() => setActiveBpKey(isActive ? null : key)}
+                        title="Éditer les valeurs"
+                      >{isActive ? "▲" : "▼"}</button>
+                      <strong style={{ fontSize: "0.85rem", flex: 1 }}>{key}</strong>
+                      <span style={{ fontSize: "0.75rem", color: "var(--fg-2)" }}>
+                        {bp.values.length} pts
+                        {usedBy.length > 0 && ` · utilisé par : ${usedBy.join(", ")}`}
+                      </span>
+                      <button
+                        className="soft-icon-btn soft-icon-btn-danger"
+                        onClick={() => handleDeleteBreakpoint(key)}
+                        title="Supprimer ce breakpoint"
+                        disabled={usedBy.length > 0}
+                      >×</button>
+                    </div>
+
+                    {isActive && (
+                      <div style={{ marginTop: "0.5rem" }}>
+                        <label className="field-label" style={{ fontSize: "0.75rem" }}>
+                          Valeurs (séparées par tabulation, virgule, espace ou nouvelle ligne)
+                        </label>
+                        <textarea
+                          style={{
+                            width: "100%", fontFamily: "monospace", fontSize: "0.75rem",
+                            background: "var(--bg-2)", color: "var(--fg-1)",
+                            border: "1px solid var(--line)", borderRadius: "3px",
+                            padding: "0.25rem", boxSizing: "border-box", resize: "vertical", minHeight: "48px"
+                          }}
+                          defaultValue={bp.values.join("\t")}
+                          onBlur={e => handleBpValuesChange(key, e.target.value)}
+                          onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleBpValuesChange(key, (e.target as HTMLTextAreaElement).value); } }}
+                        />
+                        <p style={{ fontSize: "0.7rem", color: "var(--fg-2)", margin: "0.25rem 0 0" }}>
+                          Modifier les valeurs ici les propagera à toutes les cartos qui utilisent ce breakpoint.
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                );
+              })
+            )}
+          </div>
+        )}
+      </section>
     </div>
   );
 }
