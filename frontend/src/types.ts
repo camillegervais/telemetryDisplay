@@ -133,9 +133,9 @@ export type BreakpointObject = {
 export type CartoObject = {
   name: string;
   /** Key in "breakpoint-configs" for the X axis (rows) */
-  breakpointKeyX: string;
+  breakpointKeyX: string | undefined;
   /** Key in "breakpoint-configs" for the Y axis (columns) — absent for 1D cartos */
-  breakpointKeyY?: string;
+  breakpointKeyY?: string | undefined;
   gridData: number[][];
   gainVal: number;
   offsetVal: number;

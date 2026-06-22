@@ -198,51 +198,44 @@ export class CartoImportService {
         const importedCarto = importedCartos[importedKey];
 
         // Validation: les breakpoints doivent exister
-        const bpXKey = this._findBreakpointKey(
-          importedCarto.breakpointKeyX || importedCarto.name,
-          existingBreakpoints,
-          bpByName
-        );
-        const bpYKey = importedCarto.breakpointKeyY
-          ? this._findBreakpointKey(
-              importedCarto.breakpointKeyY,
-              existingBreakpoints,
-              bpByName
-            )
-          : undefined;
+        // const bpXKey = this._findBreakpointKey(
+        //   importedCarto.breakpointKeyX || importedCarto.name,
+        //   existingBreakpoints,
+        //   bpByName
+        // );
+        // const bpYKey = importedCarto.breakpointKeyY
+        //   ? this._findBreakpointKey(
+        //       importedCarto.breakpointKeyY,
+        //       existingBreakpoints,
+        //       bpByName
+        //     )
+        //   : undefined;
 
-        // If breakpoint X not found, allow import but record a warning.
-        if (!bpXKey) {
-          result.errors.push(
-            `Carto ${importedKey}: X breakpoint not found — importing carto with empty X reference`
-          );
-        }
+        // // Vérifier la cohérence des tailles uniquement si breakpoint existe
+        // if (bpXKey) {
+        //   const bpX = existingBreakpoints[bpXKey];
+        //   if (bpX.values.length !== importedCarto.gridData.length) {
+        //     result.errors.push(
+        //       `Carto ${importedKey}: X breakpoint size (${bpX.values.length}) doesn't match grid rows (${importedCarto.gridData.length})`
+        //     );
+        //     // still import but mark as skipped to avoid corrupt data
+        //     result.cartosSkipped.push(importedKey);
+        //     continue;
+        //   }
+        // }
 
-        // Vérifier la cohérence des tailles uniquement si breakpoint existe
-        if (bpXKey) {
-          const bpX = existingBreakpoints[bpXKey];
-          if (bpX.values.length !== importedCarto.gridData.length) {
-            result.errors.push(
-              `Carto ${importedKey}: X breakpoint size (${bpX.values.length}) doesn't match grid rows (${importedCarto.gridData.length})`
-            );
-            // still import but mark as skipped to avoid corrupt data
-            result.cartosSkipped.push(importedKey);
-            continue;
-          }
-        }
-
-        if (bpYKey) {
-          const bpY = existingBreakpoints[bpYKey];
-          const expectedCols = bpY.values.length;
-          const actualCols = importedCarto.gridData[0]?.length || 0;
-          if (expectedCols !== actualCols) {
-            result.errors.push(
-              `Carto ${importedKey}: Y breakpoint size (${expectedCols}) doesn't match grid cols (${actualCols})`
-            );
-            result.cartosSkipped.push(importedKey);
-            continue;
-          }
-        }
+        // if (bpYKey) {
+        //   const bpY = existingBreakpoints[bpYKey];
+        //   const expectedCols = bpY.values.length;
+        //   const actualCols = importedCarto.gridData[0]?.length || 0;
+        //   if (expectedCols !== actualCols) {
+        //     result.errors.push(
+        //       `Carto ${importedKey}: Y breakpoint size (${expectedCols}) doesn't match grid cols (${actualCols})`
+        //     );
+        //     result.cartosSkipped.push(importedKey);
+        //     continue;
+        //   }
+        // }
 
         const existingEntry = cartoByName[importedCarto.name];
 
@@ -251,8 +244,8 @@ export class CartoImportService {
           updatedCartos[existingEntry.key] = {
             ...existingEntry.obj,
             gridData: importedCarto.gridData,
-            breakpointKeyX: bpXKey || existingEntry.obj.breakpointKeyX,
-            breakpointKeyY: bpYKey || existingEntry.obj.breakpointKeyY,
+            breakpointKeyX: existingEntry.obj.breakpointKeyX,
+            breakpointKeyY: existingEntry.obj.breakpointKeyY,
             description: `Updated from import on ${new Date().toISOString()}`,
           };
           result.cartosUpdated.push(existingEntry.key);
@@ -269,8 +262,8 @@ export class CartoImportService {
           updatedCartos[newKey] = {
             name: importedCarto.name,
             gridData: importedCarto.gridData,
-            breakpointKeyX: bpXKey,
-            breakpointKeyY: bpYKey,
+            breakpointKeyX: undefined,
+            breakpointKeyY: undefined,
             gainVal: 1.0,
             offsetVal: 0.0,
             interpolation: "linear",

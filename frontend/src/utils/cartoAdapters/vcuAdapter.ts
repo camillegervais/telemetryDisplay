@@ -224,9 +224,9 @@ export class VcuAdapter implements CartoAdapter {
         return;
       }
 
-      if (gridData[0].length !== 0) {
+      if (gridData.length > 1) {
         const transposedGridData = gridData[0].map((_, colIndex) =>
-            gridData.map(row => row[colIndex])
+          gridData.map(row => row[colIndex])
         );  
 
         gridData = transposedGridData;
