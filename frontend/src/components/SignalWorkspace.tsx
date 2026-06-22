@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import type { MouseEvent as ReactMouseEvent } from "react";
 import Plot from "react-plotly.js";
 
@@ -52,6 +52,7 @@ type WidgetOptions = {
   filterByBraking?: boolean;
   yAxisMin?: number;
   yAxisMax?: number;
+  hiddenSignals?: string[];
   [key: string]: unknown;
 };
 
@@ -565,12 +566,15 @@ function buildChartConfig(
       yValues = yValues.map((v, i) => brakeValues[i] !== 0 ? v : NaN);
     }
 
+    const isHidden = options?.hiddenSignals?.includes(signal);
+
     return {
       type: "scatter" as const,
       mode: "lines" as const,
       name: signal,
       x: xValues,
       y: yValues,
+      visible: isHidden ? "legendonly" : true,
       line: {
         color: getSignalColor(signal, index),
         width: 2,
@@ -3088,12 +3092,24 @@ export default function SignalWorkspace({
     return resized;
   }
 
+  const runAll = useCallback(() => {
+      softBlocks.forEach((b) => calculateSoftBlock(b.id));
+    }, [softBlocks, calculateSoftBlock]);
+
 
   return (
     <section className={`panel signal-workspace ${graphOnlyMode ? "signal-workspace-max" : ""}`}>
       <div className={`panel-header panel-header-tight ${graphOnlyMode ? "panel-header-hidden" : ""}`}>
         <h2>Dashboard</h2>
         <div className="dashboard-tools">
+          <button
+            className="small-button"
+            onClick={runAll}
+            disabled={!datasetId || softBlocks.length === 0}
+            title="Calculer tous les blocs"
+          >
+            ▶▶ Compute all
+          </button>
           <select
             className="mini-select config-select"
             value={selectedConfigId}
@@ -3778,6 +3794,32 @@ export default function SignalWorkspace({
                       if (eventData["xaxis.autorange"] === true) {
                         setXRange(null);
                       }
+                    }}
+                    onLegendClick={(evt) => {
+                      const curveIndex = evt.curveNumber;
+                      const clickedSignal = widget.signals[curveIndex];
+
+                      if (clickedSignal) {
+                        setWidgets((prev) =>
+                          prev.map((item) => {
+                            if (item.id !== widget.id) return item;
+                            
+                            const hidden = item.options?.hiddenSignals ?? [];
+                            const nextHidden = hidden.includes(clickedSignal)
+                              ? hidden.filter((s) => s !== clickedSignal)
+                              : [...hidden, clickedSignal];
+
+                            return {
+                              ...item,
+                              options: {
+                                ...(item.options ?? {}),
+                                hiddenSignals: nextHidden,
+                              },
+                            };
+                          })
+                        );
+                      }
+                      return false;
                     }}
                   />
                 </div>
