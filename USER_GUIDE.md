@@ -131,7 +131,7 @@ At the bottom of the `Import Panel` you can associate a color with a signal's na
 - Interlagos: `interlagos`
 - Portimao: `portimao`
 - Barhein: `barhein`
-- Le Mans: `lemans` or `LeMans` (as it is the case for WinTAX data)
+- Le Mans: `lemans` or `LeMans`
 
 ### Tabs configuration
 
@@ -140,7 +140,7 @@ You can have multiple tab configuration if you want to study part of the car. Th
 The following buttons help you manage your tab configurations:
 
 - `LOAD` load the configuration selected in the input
-- `SAVE` save the current configuration, a nema is required: if you want to update your current configuration keep th e same name, otherwise enter a new name
+- `SAVE` save the current configuration, a name is required: if you want to update your current configuration keep the same name, otherwise enter a new name
 - `DELETE` delete the configuration from your computer: **cannot be undone**
 
 **/!\\** The tab configuration only store and load the configuration of the graphs, cartos and software blocks (introduced further in that document) are not loaded. 
@@ -157,6 +157,8 @@ Create custom signals by combining existing signals with expressions.
    - **Expression**: e.g., `gain(Ax, 9.81)` or `sqrt(Ax^2 + Ay^2)`, you can use the `?` button to get help on the syntax
 3. New signal appears in the Signal List
 
+Tips: You can create a software block reserved to simple Math Channels to avoid creating too much software blocks.
+
 ### Available Operations
 
 **Arithmetic**: `+ - * /`  
@@ -169,6 +171,8 @@ Create custom signals by combining existing signals with expressions.
 - `norm2(a, b)` – Euclidean norm: √(a² + b²)
 - `_and(a, b)`, `_or(a, b)`, `_xor(a, b)`, `_not(a)` – Logical operations
 - `where(condition, val_if_true, val_if_false)` - Condition handling 
+
+The complete set of available functions and operators is available in the app by clicking **"?"**- at the end in the matht channel input.
 
 **Examples**:
 ```
@@ -192,26 +196,38 @@ Create interpolation maps for calibration tuning.
 
 **Access**: Open the `MAP TUNING` tab
 
+Different objects are available:
+- A Map is a table linked to breakpoints that allow the evaluation of 2D map interpolated in between coefficient
+- A Breakpoint is a 1D array that store a mapping of an axle.
+
+A breakpoint is linked to one or many map. Its length should be the same as the corresponding dimension of the map it is linked to.
+
+Breakpoints can be created for a specific case but mostly they are imported from TeamDB with a m file.
+
 **How it works**:
-1. Select **Input X** (columns) and **Input Y** (rows) channels
+1. Select **Breakpoints X** (columns) and **Breakpoints Y** (rows) breakpoint object created earlier.
 2. Select the interpolation method and extrapolation method in case we hit breakpoints out of bounds.
 3. Define grid dimensions (5×5, 10×10, etc.)
-4. Enter header values (breakpoints for each axis)
-5. Edit or paste table values
-6. Apply **Gain** and **Offset** scaling if needed
-7. Click **"💾 Save** to save locally
+4. Edit or paste table values
+5. Apply **Gain** and **Offset** scaling if needed
+6. Click **"💾 Save** to save locally
 
 **Features**:
 - Save multiple configurations locally
 - Load previously saved maps
 - Heatmap visualization (green=low, red=high)
-- Braking signal filtering option (signal active only when MBrakeR is not null)
 - Different type of interpolation: linear, round, nearest, floor
 - Different type of extrapolation: linear and clamp
 - Visualize the map in a 2D or 3D graph depending on the map dimension (click on **VIEW 3D**) to display
 - Export the breakpoints and the values by copying the data in your clipboard (to paste in Excel or TeamDB for example)
 
+**Map Import**:
+
 These maps can be included in software blocks in the `Soft` tab. To compute their output they have to be included in a software block, whose output will be computed each time you change numerical values of the carto (gain, offset, breakpoints and value). The computation is done no matter where in the application you change the value.
+
+The active set of maps and breakpoints can be imported from a car configuration through a m file downloaded from TeamDB. To do so, in the parameter editor tab you can select an assembly correponding to the session you are studying. Than you can export its configuration (select m file instead of clx in the file explorer).
+
+Once the import is done you can find the exact same configuration as you had in the car so the signals emulated should follow the signal from the car.
 
 ### Software blocks
 
@@ -247,7 +263,7 @@ Fine-tune individual graph properties:
 
 Save your entire workspace (tabs, graphs, math channels, map configs):
 
-1. **Export**: Press on the button **"📥 Export"**→ downloads a `.toml` file
+1. **Export**: Press on the button **"📥 Export"** → downloads a `.toml` file
 2. **Import**: Press on the button **"📤 Import"** → upload a saved `.toml` file
 
 Useful for sharing analysis setups or archiving configurations.

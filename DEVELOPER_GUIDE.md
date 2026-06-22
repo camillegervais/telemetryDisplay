@@ -210,11 +210,17 @@ telemetryDisplay/
 │   │   │   ├── ImportPanel.tsx                 # Import données, gestion configs
 │   │   │   ├── SignalWorkspace.tsx             # Dashboard multi-graphs
 │   │   │   ├── MapTuning.tsx                   # Éditeur lookup table
+│   │   │   ├── Map3DViewer.tsx                 # Visualization of maps values
 │   │   │   ├── SignalColorManager.tsx          # Gestion couleurs signaux
 │   │   │   ├── TrackMapPanel.tsx               # Visualisation piste
+│   │   │   ├── ImportSelectionModal.tsx        # Modal de sélection des éléments de configuration importés
+│   │   │   ├── ImportSummaryModal.tsx          # Récapitulatif des bkpts et maps importés
 │   │   │   ├── ConfigExportImport.tsx          # Sauvegarde configs
 │   │   │   ├── ImportDataModal.tsx             # Modal import MAT
 │   │   │   ├── TelDataImportModal.tsx          # Modal import TelData
+│   │   │   ├── CartoImportPanel.tsx            # Button to add in the page, handle the process with different modals
+│   │   │   ├── CartoSelectionModal.tsx         # Modals where you select the maps and breakpoints you want to import
+│   │   │   ├── CartoImportModal.tsx            # Modal window handling the summary of the import
 │   │   │   └── index.ts                        # Exports
 │   │   ├── hooks/                              # Custom React hooks
 │   │   │   ├── useConfig.ts                    # Lecture/écriture ConfigManager
@@ -231,6 +237,12 @@ telemetryDisplay/
 │   │   │   ├── types.ts                        # Types app
 │   │   │   └── (autres types)
 │   │   ├── utils/                              # Utilitaires
+│   │   │   ├── cartoAdapters
+│   │   │   │   ├── index.ts                    # Export
+│   │   │   │   └── vcuAdapter.ts               # Logic to import m file from VCU
+│   │   │   ├── cartoImportService.ts           # Code to effectively import the maps and breakpoints in the localStorage
+│   │   │   ├── lutCellLocator.ts               # Find the active cell in a map to highlight it
+│   │   │   └── MapTuningHelpers.ts             # Seems redundant with above
 │   │   └── styles.css                          # Styles globaux
 │   ├── public/                                 # Assets statiques
 │   ├── index.html                              # HTML template
@@ -250,10 +262,7 @@ telemetryDisplay/
 │       └── EXAMPLE_USAGE.ts                    # Exemple d'utilisation API
 │
 ├── resources/                                  # Ressources supplémentaires
-│   ├── python-3.14.5-amd64.exe                 # Installeur Python (Windows)
-│   ├── Sample_Python.py
-│   ├── test.py
-│   └── output.mat
+│   └── python-3.14.5-amd64.exe                 # Installeur Python (Windows)
 │
 ├── package.json                                # NPM root (lance dev concurrente)
 ├── tsconfig.json
@@ -339,6 +348,16 @@ app.include_router(map_tuning.router)
 |----------|---------|----------|
 | `/map-tuning/save` | POST | Sauvegarder lookup table |
 | `/map-tuning/calculate` | POST | Calcul signal output via LUT |
+
+#### `backend/app/routers/teldata.py`
+
+| Endpoint | Méthode | Fonction |
+|----------|---------|----------|
+| `/tel-data/open` | POST | Permet d'ouvrir une instance TelData, redonne la liste des runs |
+| `/tel-data/{id}/laps` | POST | Retourne la liste des tours dans un run donné |
+| `/tel-data/{id}/channels` | POST | Retourne la liste des channels dispos pour ce tour |
+| `/tel-data/{id}/export` | POST | Exporte en point mat la data du tour et l'importe dans l'appli |
+
 
 #### `backend/app/services/mat_loader.py`
 
@@ -791,15 +810,6 @@ try {
   }
 }
 ```
-
-### 5. TypeScript strict
-
-- Types explicites partout (pas d'`any`)
-- Interfaces pour structures métier
-- Literal types pour enums (`'linear' | 'nearest'`)
-- Discriminated unions pour polymorphisme
-
----
 
 ## Fonctionnalités détaillées
 
