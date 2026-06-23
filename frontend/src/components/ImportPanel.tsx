@@ -365,85 +365,87 @@ export default function ImportPanel({
 
       {/* ── Slot A / B / C / D ── */}
       <div className="import-submenu" style={{ marginBottom: "0.25rem" }}>
-        <div style={{ display: "flex", alignItems: "center", gap: "0.4rem", padding: "0.35rem 0.5rem", flexWrap: "wrap" }}>
-          <button
-            type="button"
-            className={`small-button${activeSlot === "A" ? " small-button-active" : ""}`}
-            onClick={() => activeSlot !== "A" && onSwapSlot("A")}
-            title={datasetMetadata?.source_path ? datasetMetadata.source_path.split(/[\/\\]/).pop() : "Slot A"}
-          >
-            A
-          </button>
-          <div style={{ display: "flex", alignItems: "center", gap: "0.2rem" }}>
+        <div>
+          <div style={{ display: "flex", alignItems: "center", gap: "0.4rem", padding: "0.35rem 0.5rem", flexWrap: "wrap" }}>
             <button
               type="button"
-              className={`small-button${activeSlot === "B" ? " small-button-active" : ""}`}
-              onClick={() => activeSlot !== "B" && onSwapSlot("B")}
-              title={datasetMetadataB?.source_path ? datasetMetadataB.source_path.split(/[\/\\]/).pop() : "Slot B vide"}
+              className={`small-button${activeSlot === "A" ? " small-button-active" : ""}`}
+              onClick={() => activeSlot !== "A" && onSwapSlot("A")}
+              title={datasetMetadata?.source_path ? datasetMetadata.source_path.split(/[\/\\]/).pop() : "Slot A"}
             >
-              B
+              A
             </button>
-            <button
-              type="button"
-              className="small-button"
-              onClick={() => {
-                setImportRefTargetSlot("B");
-                setImportRefModalOpen(true);
-              }}
-              disabled={importing}
-              style={{ fontSize: "0.7rem", padding: "0.1rem 0.3rem" }}
-              title="Importer vers B"
-            >
-              +
-            </button>
+            <div style={{ display: "flex", alignItems: "center", gap: "0.2rem" }}>
+              <button
+                type="button"
+                className={`small-button${activeSlot === "B" ? " small-button-active" : ""}`}
+                onClick={() => activeSlot !== "B" && onSwapSlot("B")}
+                title={datasetMetadataB?.source_path ? datasetMetadataB.source_path.split(/[\/\\]/).pop() : "Slot B vide"}
+              >
+                B
+              </button>
+              <button
+                type="button"
+                className="small-button"
+                onClick={() => {
+                  setImportRefTargetSlot("B");
+                  setImportRefModalOpen(true);
+                }}
+                disabled={importing}
+                style={{ fontSize: "0.7rem", padding: "0.1rem 0.3rem" }}
+                title="Importer vers B"
+              >
+                +
+              </button>
+            </div>
+            <div style={{ display: "flex", alignItems: "center", gap: "0.2rem" }}>
+              <button
+                type="button"
+                className={`small-button${activeSlot === "C" ? " small-button-active" : ""}`}
+                onClick={() => activeSlot !== "C" && onSwapSlot("C")}
+                title={datasetMetadataC?.source_path ? datasetMetadataC.source_path.split(/[\/\\]/).pop() : "Slot C vide"}
+              >
+                C
+              </button>
+              <button
+                type="button"
+                className="small-button"
+                onClick={() => {
+                  setImportRefTargetSlot("C");
+                  setImportRefModalOpen(true);
+                }}
+                disabled={importing}
+                style={{ fontSize: "0.7rem", padding: "0.1rem 0.3rem" }}
+                title="Importer vers C"
+              >
+                +
+              </button>
+            </div>
+            <div style={{ display: "flex", alignItems: "center", gap: "0.2rem" }}>
+              <button
+                type="button"
+                className={`small-button${activeSlot === "D" ? " small-button-active" : ""}`}
+                onClick={() => activeSlot !== "D" && onSwapSlot("D")}
+                title={datasetMetadataD?.source_path ? datasetMetadataD.source_path.split(/[\/\\]/).pop() : "Slot D vide"}
+              >
+                D
+              </button>
+              <button
+                type="button"
+                className="small-button"
+                onClick={() => {
+                  setImportRefTargetSlot("D");
+                  setImportRefModalOpen(true);
+                }}
+                disabled={importing}
+                style={{ fontSize: "0.7rem", padding: "0.1rem 0.3rem" }}
+                title="Importer vers D"
+              >
+                +
+              </button>
+            </div>
           </div>
-          <div style={{ display: "flex", alignItems: "center", gap: "0.2rem" }}>
-            <button
-              type="button"
-              className={`small-button${activeSlot === "C" ? " small-button-active" : ""}`}
-              onClick={() => activeSlot !== "C" && onSwapSlot("C")}
-              title={datasetMetadataC?.source_path ? datasetMetadataC.source_path.split(/[\/\\]/).pop() : "Slot C vide"}
-            >
-              C
-            </button>
-            <button
-              type="button"
-              className="small-button"
-              onClick={() => {
-                setImportRefTargetSlot("C");
-                setImportRefModalOpen(true);
-              }}
-              disabled={importing}
-              style={{ fontSize: "0.7rem", padding: "0.1rem 0.3rem" }}
-              title="Importer vers C"
-            >
-              +
-            </button>
-          </div>
-          <div style={{ display: "flex", alignItems: "center", gap: "0.2rem" }}>
-            <button
-              type="button"
-              className={`small-button${activeSlot === "D" ? " small-button-active" : ""}`}
-              onClick={() => activeSlot !== "D" && onSwapSlot("D")}
-              title={datasetMetadataD?.source_path ? datasetMetadataD.source_path.split(/[\/\\]/).pop() : "Slot D vide"}
-            >
-              D
-            </button>
-            <button
-              type="button"
-              className="small-button"
-              onClick={() => {
-                setImportRefTargetSlot("D");
-                setImportRefModalOpen(true);
-              }}
-              disabled={importing}
-              style={{ fontSize: "0.7rem", padding: "0.1rem 0.3rem" }}
-              title="Importer vers D"
-            >
-              +
-            </button>
-          </div>
-          <span style={{ fontSize: "0.75rem", opacity: 0.55, flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", minWidth: "50px" }}>
+          <span style={{ fontSize: "0.75rem", opacity: 0.55, flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", minWidth: "50px", padding: "0.5rem", width: "fit-parent" }}>
             {activeSlot === "A"
               ? (datasetMetadata?.source_path ? datasetMetadata.source_path.split(/[\/\\]/).pop() : "A")
               : activeSlot === "B"
